@@ -14,6 +14,7 @@ mod stt;
 mod state;
 mod tray;
 
+use audio::capture::AudioRecorder;
 use state::AppState;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -40,6 +41,7 @@ pub fn run() {
 
             app.manage(AppState {
                 db: Arc::new(Mutex::new(conn)),
+                recorder: Arc::new(AudioRecorder::new()),
             });
 
             log::info!("LocalYapper initialized. DB at {:?}", app_data_dir);

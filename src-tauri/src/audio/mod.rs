@@ -1,1 +1,2 @@
-// Audio capture and VAD — implemented in Phase 2.
+pub mod capture;
+pub mod vad;

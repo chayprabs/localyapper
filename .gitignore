@@ -4,6 +4,8 @@ node_modules/
 # Build output
 dist/
 src-tauri/target/
+*.tsbuildinfo
+vite.config.d.ts
 
 # Models (large binary files)
 *.bin

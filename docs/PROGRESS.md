@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 2 — Audio Capture
+## CURRENT PHASE: Phase 3 — Speech to Text
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -13,10 +13,10 @@ Goal: App launches, database initializes, no crashes.
 - [x] Configure two windows in tauri.conf.json (main + overlay)
 - [x] Verification: eslint, tsc --noEmit, cargo clippy — all zero errors
 
-### Phase 2: Audio Capture
-- [ ] audio/vad.rs — energy-based silence detection
-- [ ] audio/capture.rs — cpal 16kHz mono, 0.5s pre-roll ring buffer
-- [ ] Expose start_recording() and stop_recording() commands
+### Phase 2: Audio Capture (COMPLETE)
+- [x] audio/vad.rs — energy-based silence detection
+- [x] audio/capture.rs — cpal 16kHz mono, 0.5s pre-roll ring buffer
+- [x] Expose start_recording() and stop_recording() commands
 
 ### Phase 3: Speech to Text
 - [ ] stt/whisper.rs — whisper-rs wrapper loading bundled ggml-tiny.en.bin
