@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/nicegui/static/tauri-v2-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for LocalYapper",
+  "windows": ["main", "overlay"],
+  "permissions": [
+    "core:default",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "fs:allow-read-dir",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-mkdir",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "shell:allow-open",
+    "notification:default"
+  ]
+}

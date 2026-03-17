@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Read", "Write", "Edit", "MultiEdit",
+      "Glob", "Grep", "LS", "Task",
+      "WebFetch", "WebSearch",
+      "Bash(git *)", "Bash(npm *)", "Bash(npx *)",
+      "Bash(cargo build *)", "Bash(cargo test *)",
+      "Bash(cargo check *)", "Bash(cargo clippy *)",
+      "Bash(cargo fmt *)", "Bash(cargo tauri *)",
+      "Bash(rustfmt *)"
+    ],
+    "deny": [
+      "Read(./.env)", "Read(./.env.*)",
+      "Bash(sudo:*)", "Bash(rm -rf /*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/auto-format.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/nicegui/static/tauri-v2-schema.json",
+  "productName": "LocalYapper",
+  "version": "0.1.0",
+  "identifier": "com.localyapper.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:* https://api.openai.com https://api.anthropic.com https://api.groq.com https://api.github.com; img-src 'self' asset: https://asset.localhost; style-src 'self' 'unsafe-inline'"
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "LocalYapper",
+        "width": 900,
+        "height": 650,
+        "resizable": true,
+        "center": true,
+        "url": "/"
+      },
+      {
+        "label": "overlay",
+        "title": "LocalYapper Overlay",
+        "width": 320,
+        "height": 80,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "url": "/overlay"
+      }
+    ]
+  }
+}

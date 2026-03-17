@@ -1,0 +1,126 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// A transcription history entry.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct HistoryEntry {
+    pub id: String,
+    pub raw_text: String,
+    pub final_text: String,
+    pub app_name: Option<String>,
+    pub mode_id: Option<String>,
+    pub duration_ms: Option<i64>,
+    pub word_count: Option<i64>,
+    pub created_at: String,
+}
+
+/// A learned correction mapping.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Correction {
+    pub id: String,
+    pub raw_word: String,
+    pub corrected: String,
+    pub count: i64,
+    pub confidence: f64,
+    pub last_used_at: Option<String>,
+    pub created_at: String,
+}
+
+/// A personal dictionary word.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DictionaryWord {
+    pub id: String,
+    pub word: String,
+    pub count: i64,
+    pub added_at: String,
+}
+
+/// An AI mode preset.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Mode {
+    pub id: String,
+    pub name: String,
+    pub system_prompt: String,
+    pub skip_llm: bool,
+    pub is_builtin: bool,
+    pub color: String,
+    pub created_at: String,
+}
+
+/// Payload for creating a new mode.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NewMode {
+    pub name: String,
+    pub system_prompt: String,
+    pub skip_llm: bool,
+    pub color: String,
+}
+
+/// App profile linking an app to a mode.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AppProfile {
+    pub id: String,
+    pub app_name: String,
+    pub mode_id: String,
+}
+
+/// Result from the voice dictation pipeline.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PipelineResult {
+    pub raw_text: String,
+    pub final_text: String,
+    pub duration_ms: i64,
+    pub word_count: i64,
+}
+
+/// Ollama service status.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OllamaStatus {
+    pub running: bool,
+    pub models: Vec<String>,
+}
+
+/// Model download progress event payload.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DownloadProgress {
+    pub percent: f64,
+    pub downloaded_mb: u64,
+    pub total_mb: u64,
+    pub speed_mbps: f64,
+}
+
+/// BYOK API connection test result.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConnectionResult {
+    pub success: bool,
+    pub latency_ms: u64,
+    pub error: Option<String>,
+}
+
+/// Dashboard statistics.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Stats {
+    pub words_today: i64,
+    pub words_week: i64,
+    pub words_all_time: i64,
+    pub avg_wpm: f64,
+    pub total_sessions: i64,
+}
+
+/// System permissions status.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PermissionsStatus {
+    pub microphone: bool,
+    pub accessibility: bool,
+}
+
+/// Result of importing a dictionary.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportResult {
+    pub imported: i64,
+    pub skipped: i64,
+    pub errors: Vec<String>,
+}
+
+/// All settings as a key-value map.
+pub type AllSettings = HashMap<String, String>;
