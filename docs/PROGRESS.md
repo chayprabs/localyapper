@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 6 — LLM Integration
+## CURRENT PHASE: Phase 7 — Full Pipeline Wire-up
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -32,10 +32,16 @@ Goal: App launches, database initializes, no crashes.
 - [x] correction/engine.rs — exact-match substitution from DB
 - [x] Sub-5ms performance (pre-load at startup, refresh on change)
 
-### Phase 6: LLM Integration
-- [ ] llm/engine.rs — llama-cpp-rs wrapper
-- [ ] llm/prompt.rs — system prompt builder with mode + app context
-- [ ] context/detector.rs — focused window name per OS
+### Phase 6: LLM Integration (COMPLETE)
+- [x] llm/engine.rs — llama-cpp-2 wrapper (load GGUF, tokenize, decode, sample)
+- [x] llm/prompt.rs — ChatML prompt builder with mode system prompt + app context
+- [x] context/detector.rs — focused window name per OS (Windows/macOS/Linux)
+- [x] LLM wired into stop_recording pipeline (skip if no model or mode.skip_llm)
+- [x] context detector wired into get_focused_app command
+- [x] download_model — streaming download from HuggingFace with progress events + cancellation
+- [x] cancel_model_download — AtomicBool cancellation flag
+- [x] check_ollama — HTTP check to localhost:11434 with 2s timeout
+- [x] test_byok_connection — OpenAI/Anthropic/Groq API key test with latency
 
 ### Phase 7: Full Pipeline Wire-up
 - [ ] Wire: hotkey → capture → VAD → whisper → correction → LLM → inject

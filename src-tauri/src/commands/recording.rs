@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
 use crate::audio::vad;
+use crate::context::detector;
+use crate::llm::engine::LlmEngine;
+use crate::llm::prompt;
 use crate::models::PipelineResult;
 use crate::state::AppState;
 use crate::stt::whisper::WhisperEngine;
@@ -54,8 +57,57 @@ pub async fn stop_recording(
         raw_text.split_whitespace().count() as i64
     };
 
-    let final_text = state.correction_engine.apply(&raw_text)
+    let corrected_text = state.correction_engine.apply(&raw_text)
         .unwrap_or_else(|_| raw_text.clone());
+
+    // LLM cleanup step — skipped if no model or mode says skip_llm
+    let final_text = {
+        let should_run_llm = state.llm.is_some() && {
+            let db = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
+            match crate::db::queries::get_active_mode(&db) {
+                Ok(mode) => !mode.skip_llm,
+                Err(_) => false,
+            }
+        };
+
+        if should_run_llm {
+            let llm: Arc<LlmEngine> = state.llm.as_ref().expect("checked above").clone();
+
+            // Get active mode system prompt
+            let system_prompt = {
+                let db = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
+                crate::db::queries::get_active_mode(&db)
+                    .map(|m| m.system_prompt)
+                    .unwrap_or_default()
+            };
+
+            let app_name = detector::get_focused_window_name();
+            let llm_prompt = prompt::build_prompt(&system_prompt, &corrected_text, &app_name);
+            let max_tokens = (corrected_text.len() as u32 * 2).clamp(128, 512);
+
+            match tokio::task::spawn_blocking(move || {
+                llm.generate(&llm_prompt, max_tokens)
+            })
+            .await
+            {
+                Ok(Ok(llm_output)) if !llm_output.is_empty() => {
+                    log::info!("LLM cleanup applied ({} -> {} chars)", corrected_text.len(), llm_output.len());
+                    llm_output
+                }
+                Ok(Err(e)) => {
+                    log::warn!("LLM generation failed, using corrected text: {e}");
+                    corrected_text
+                }
+                Err(e) => {
+                    log::warn!("LLM task panicked, using corrected text: {e}");
+                    corrected_text
+                }
+                _ => corrected_text,
+            }
+        } else {
+            corrected_text
+        }
+    };
 
     Ok(PipelineResult {
         final_text,

@@ -33,7 +33,10 @@
       "Bash(for dir:*)",
       "Bash(do echo:*)",
       "Read(//c/Users/chait/Project/localyapper/src-tauri/src/**)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(cargo doc:*)",
+      "Bash(cargo tree:*)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

@@ -1,1 +1,2 @@
-// LLM engine (llama-cpp-rs) and prompt builder — implemented in Phase 6.
+pub mod engine;
+pub mod prompt;

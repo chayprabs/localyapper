@@ -16,8 +16,10 @@ mod tray;
 
 use audio::capture::AudioRecorder;
 use correction::engine::CorrectionEngine;
+use llm::engine::{LlmEngine, LLM_MODEL_FILENAME};
 use state::AppState;
 use stt::whisper::{WhisperEngine, WHISPER_MODEL_FILENAME};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
@@ -53,6 +55,38 @@ fn load_whisper_model(app: &tauri::App) -> Option<Arc<WhisperEngine>> {
     None
 }
 
+/// Attempt to load the LLM model from app data models dir or bundled resources.
+/// Returns `None` with a warning log if the model file is not found or fails to load.
+fn load_llm_model(app: &tauri::App) -> Option<Arc<LlmEngine>> {
+    let candidates = [
+        // App data models directory (downloaded on first launch)
+        app.path().app_data_dir().ok().map(|p| p.join("models").join(LLM_MODEL_FILENAME)),
+        // Bundled resource path (production builds)
+        app.path().resource_dir().ok().map(|p| p.join("resources").join(LLM_MODEL_FILENAME)),
+    ];
+
+    for candidate in candidates.into_iter().flatten() {
+        if candidate.exists() {
+            log::info!("Found LLM model at {}", candidate.display());
+            match LlmEngine::new(&candidate) {
+                Ok(engine) => {
+                    log::info!("LLM engine loaded successfully");
+                    return Some(Arc::new(engine));
+                }
+                Err(e) => {
+                    log::warn!("Failed to load LLM model from {}: {}", candidate.display(), e);
+                }
+            }
+        }
+    }
+
+    log::warn!(
+        "LLM model ({}) not found. LLM cleanup will be skipped until the model is downloaded.",
+        LLM_MODEL_FILENAME
+    );
+    None
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -76,6 +110,9 @@ pub fn run() {
             // Load Whisper STT model
             let whisper = load_whisper_model(app);
 
+            // Load LLM model
+            let llm = load_llm_model(app);
+
             // Initialize correction engine
             let correction_engine = Arc::new(CorrectionEngine::new());
             let threshold: f64 = db::queries::get_setting(&conn, "confidence_threshold")
@@ -90,8 +127,10 @@ pub fn run() {
                 db: Arc::new(Mutex::new(conn)),
                 recorder: Arc::new(AudioRecorder::new()),
                 whisper,
+                llm,
                 last_injection: Arc::new(Mutex::new(None)),
                 correction_engine,
+                download_cancel: Arc::new(AtomicBool::new(false)),
             });
 
             log::info!("LocalYapper initialized. DB at {:?}", app_data_dir);

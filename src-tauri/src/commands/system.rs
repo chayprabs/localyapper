@@ -1,9 +1,10 @@
+use crate::context::detector;
 use crate::models::PermissionsStatus;
 
 /// Returns the name of the currently focused application.
 #[tauri::command]
 pub async fn get_focused_app() -> Result<String, String> {
-    Ok("Unknown".to_string())
+    Ok(detector::get_focused_window_name())
 }
 
 /// Checks for app updates via GitHub releases API.

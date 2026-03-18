@@ -1,0 +1,5 @@
+# Both whisper-rs-sys and llama-cpp-sys-2 statically bundle ggml.c.
+# On MSVC, duplicate symbols are errors by default.
+# /FORCE:MULTIPLE tells the linker to accept the first definition found.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-args=/FORCE:MULTIPLE"]
