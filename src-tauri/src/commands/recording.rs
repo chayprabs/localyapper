@@ -75,18 +75,55 @@ pub async fn run_pipeline(
 /// Inject text into the currently focused application.
 #[tauri::command]
 pub async fn inject_text(
-    _text: String,
-    _hold_shift: bool,
+    text: String,
+    hold_shift: bool,
+    state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    Err("Not implemented: Phase 4".to_string())
+    if text.is_empty() {
+        return Ok(());
+    }
+
+    // Store as last injection for paste_last
+    {
+        let mut last = state
+            .last_injection
+            .lock()
+            .map_err(|e| format!("Lock error: {e}"))?;
+        *last = Some(text.clone());
+    }
+
+    let t = text;
+    let s = hold_shift;
+    tokio::task::spawn_blocking(move || {
+        crate::injection::injector::inject(&t, s)
+    })
+    .await
+    .map_err(|e| format!("Injection task failed: {e}"))?
 }
 
 /// Re-inject the last dictated text.
 #[tauri::command]
 pub async fn paste_last(
-    _state: tauri::State<'_, AppState>,
+    state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    Err("Not implemented: Phase 4".to_string())
+    let text = {
+        let last = state
+            .last_injection
+            .lock()
+            .map_err(|e| format!("Lock error: {e}"))?;
+        last.clone()
+    };
+
+    match text {
+        Some(t) if !t.is_empty() => {
+            tokio::task::spawn_blocking(move || {
+                crate::injection::injector::inject(&t, false)
+            })
+            .await
+            .map_err(|e| format!("Injection task failed: {e}"))?
+        }
+        _ => Err("No previous injection to paste".to_string()),
+    }
 }
 
 /// Cancel ongoing recording and discard audio.

@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 4 — Text Injection
+## CURRENT PHASE: Phase 5 — Correction Engine
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -23,10 +23,10 @@ Goal: App launches, database initializes, no crashes.
 - [x] Model loaded once at startup, reused for all transcriptions
 - [x] Run transcription on blocking thread (whisper-rs is sync)
 
-### Phase 4: Text Injection
-- [ ] injection/platform.rs — OS detection, X11 vs Wayland check
-- [ ] injection/injector.rs — clipboard save/set/paste/restore flow
-- [ ] Hold Shift variant for auto-send
+### Phase 4: Text Injection (COMPLETE)
+- [x] injection/platform.rs — OS detection, X11 vs Wayland check
+- [x] injection/injector.rs — clipboard save/set/paste/restore flow
+- [x] Hold Shift variant for auto-send
 
 ### Phase 5: Correction Engine
 - [ ] correction/engine.rs — exact-match substitution from DB

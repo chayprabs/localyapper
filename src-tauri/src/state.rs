@@ -8,4 +8,5 @@ pub struct AppState {
     pub db: Arc<Mutex<Connection>>,
     pub recorder: Arc<AudioRecorder>,
     pub whisper: Option<Arc<WhisperEngine>>,
+    pub last_injection: Arc<Mutex<Option<String>>>,
 }

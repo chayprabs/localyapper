@@ -79,6 +79,7 @@ pub fn run() {
                 db: Arc::new(Mutex::new(conn)),
                 recorder: Arc::new(AudioRecorder::new()),
                 whisper,
+                last_injection: Arc::new(Mutex::new(None)),
             });
 
             log::info!("LocalYapper initialized. DB at {:?}", app_data_dir);
