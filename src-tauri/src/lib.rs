@@ -15,6 +15,7 @@ mod state;
 mod tray;
 
 use audio::capture::AudioRecorder;
+use correction::engine::CorrectionEngine;
 use state::AppState;
 use stt::whisper::{WhisperEngine, WHISPER_MODEL_FILENAME};
 use std::sync::{Arc, Mutex};
@@ -75,11 +76,22 @@ pub fn run() {
             // Load Whisper STT model
             let whisper = load_whisper_model(app);
 
+            // Initialize correction engine
+            let correction_engine = Arc::new(CorrectionEngine::new());
+            let threshold: f64 = db::queries::get_setting(&conn, "confidence_threshold")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.6);
+            if let Err(e) = correction_engine.load(&conn, threshold) {
+                log::warn!("Failed to load correction engine: {e}");
+            }
+
             app.manage(AppState {
                 db: Arc::new(Mutex::new(conn)),
                 recorder: Arc::new(AudioRecorder::new()),
                 whisper,
                 last_injection: Arc::new(Mutex::new(None)),
+                correction_engine,
             });
 
             log::info!("LocalYapper initialized. DB at {:?}", app_data_dir);

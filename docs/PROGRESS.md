@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 5 — Correction Engine
+## CURRENT PHASE: Phase 6 — LLM Integration
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -28,9 +28,9 @@ Goal: App launches, database initializes, no crashes.
 - [x] injection/injector.rs — clipboard save/set/paste/restore flow
 - [x] Hold Shift variant for auto-send
 
-### Phase 5: Correction Engine
-- [ ] correction/engine.rs — exact-match substitution from DB
-- [ ] Sub-5ms performance (pre-load at startup, refresh on change)
+### Phase 5: Correction Engine (COMPLETE)
+- [x] correction/engine.rs — exact-match substitution from DB
+- [x] Sub-5ms performance (pre-load at startup, refresh on change)
 
 ### Phase 6: LLM Integration
 - [ ] llm/engine.rs — llama-cpp-rs wrapper

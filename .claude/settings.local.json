@@ -28,7 +28,12 @@
       "Bash(cargo search:*)",
       "Bash(cargo info:*)",
       "Bash(LIBCLANG_PATH=\"C:/Program Files/LLVM/bin\" cargo doc --document-private-items -p whisper-rs --no-deps)",
-      "Bash(LIBCLANG_PATH=\"C:/Program Files/LLVM/bin\" cargo test)"
+      "Bash(LIBCLANG_PATH=\"C:/Program Files/LLVM/bin\" cargo test)",
+      "Bash(find /c/Users/chait/Project/localyapper/src-tauri/src/correction -type f -name *.rs)",
+      "Bash(for dir:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/chait/Project/localyapper/src-tauri/src/**)",
+      "Bash(done)"
     ]
   }
 }

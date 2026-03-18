@@ -54,9 +54,11 @@ pub async fn stop_recording(
         raw_text.split_whitespace().count() as i64
     };
 
-    // final_text = raw_text for now (correction + LLM are later phases)
+    let final_text = state.correction_engine.apply(&raw_text)
+        .unwrap_or_else(|_| raw_text.clone());
+
     Ok(PipelineResult {
-        final_text: raw_text.clone(),
+        final_text,
         raw_text,
         duration_ms: vad_result.speech_duration_ms as i64,
         word_count,

@@ -186,6 +186,32 @@ pub fn insert_correction(
     Ok(correction)
 }
 
+/// Returns all corrections above a confidence threshold for engine loading.
+/// Results are ordered so that for each raw_word, the highest-confidence (then highest-count) row comes first.
+pub fn get_all_corrections_for_engine(
+    conn: &Connection,
+    confidence_threshold: f64,
+) -> Result<Vec<(String, String, i64, f64)>, LocalYapperError> {
+    let mut stmt = conn.prepare(
+        "SELECT raw_word, corrected, count, confidence
+         FROM corrections WHERE confidence >= ?1
+         ORDER BY raw_word ASC, confidence DESC, count DESC",
+    )?;
+    let rows = stmt.query_map(params![confidence_threshold], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, f64>(3)?,
+        ))
+    })?;
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row?);
+    }
+    Ok(results)
+}
+
 /// Deletes a correction by ID.
 pub fn delete_correction(conn: &Connection, id: &str) -> Result<(), LocalYapperError> {
     let affected = conn.execute("DELETE FROM corrections WHERE id = ?1", params![id])?;

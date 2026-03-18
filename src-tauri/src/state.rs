@@ -1,4 +1,5 @@
 use crate::audio::capture::AudioRecorder;
+use crate::correction::engine::CorrectionEngine;
 use crate::stt::whisper::WhisperEngine;
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
@@ -9,4 +10,5 @@ pub struct AppState {
     pub recorder: Arc<AudioRecorder>,
     pub whisper: Option<Arc<WhisperEngine>>,
     pub last_injection: Arc<Mutex<Option<String>>>,
+    pub correction_engine: Arc<CorrectionEngine>,
 }
