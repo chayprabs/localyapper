@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 3 — Speech to Text
+## CURRENT PHASE: Phase 4 — Text Injection
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -18,10 +18,10 @@ Goal: App launches, database initializes, no crashes.
 - [x] audio/capture.rs — cpal 16kHz mono, 0.5s pre-roll ring buffer
 - [x] Expose start_recording() and stop_recording() commands
 
-### Phase 3: Speech to Text
-- [ ] stt/whisper.rs — whisper-rs wrapper loading bundled ggml-tiny.en.bin
-- [ ] Model loaded once at startup, reused for all transcriptions
-- [ ] Run transcription on blocking thread (whisper-rs is sync)
+### Phase 3: Speech to Text (COMPLETE)
+- [x] stt/whisper.rs — whisper-rs wrapper loading bundled ggml-tiny.en.bin
+- [x] Model loaded once at startup, reused for all transcriptions
+- [x] Run transcription on blocking thread (whisper-rs is sync)
 
 ### Phase 4: Text Injection
 - [ ] injection/platform.rs — OS detection, X11 vs Wayland check

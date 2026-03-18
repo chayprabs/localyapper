@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use crate::audio::vad;
 use crate::models::PipelineResult;
 use crate::state::AppState;
+use crate::stt::whisper::WhisperEngine;
 
 /// Start audio capture from the default microphone.
 #[tauri::command]
@@ -10,8 +13,7 @@ pub async fn start_recording(
     state.recorder.start().map_err(|e| e.to_string())
 }
 
-/// Stop capture, apply VAD, return result with audio stats.
-/// Transcription is not yet implemented (Phase 3).
+/// Stop capture, apply VAD, transcribe speech via Whisper, return result.
 #[tauri::command]
 pub async fn stop_recording(
     state: tauri::State<'_, AppState>,
@@ -22,23 +24,42 @@ pub async fn stop_recording(
     let vad_config = vad::default_config();
     let vad_result = vad::apply_vad(&raw_audio, &vad_config);
 
-    let raw_samples = raw_audio.len();
-    let trimmed_samples = vad_result.trimmed_audio.len();
+    if !vad_result.has_speech {
+        return Ok(PipelineResult {
+            raw_text: String::new(),
+            final_text: String::new(),
+            duration_ms: 0,
+            word_count: 0,
+        });
+    }
 
-    let status = if vad_result.has_speech {
-        format!(
-            "Audio captured: {}ms speech detected ({} -> {} samples after VAD)",
-            vad_result.speech_duration_ms, raw_samples, trimmed_samples
-        )
+    let whisper: Arc<WhisperEngine> = state
+        .whisper
+        .as_ref()
+        .ok_or_else(|| "Whisper model not loaded. Place ggml-tiny.en.bin in resources/.".to_string())?
+        .clone();
+
+    let trimmed_audio = vad_result.trimmed_audio;
+
+    let raw_text = tokio::task::spawn_blocking(move || {
+        whisper.transcribe(&trimmed_audio)
+    })
+    .await
+    .map_err(|e| format!("Transcription task failed: {}", e))?
+    .map_err(|e| e.to_string())?;
+
+    let word_count = if raw_text.is_empty() {
+        0
     } else {
-        "No speech detected in recording".to_string()
+        raw_text.split_whitespace().count() as i64
     };
 
+    // final_text = raw_text for now (correction + LLM are later phases)
     Ok(PipelineResult {
-        raw_text: status.clone(),
-        final_text: status,
+        final_text: raw_text.clone(),
+        raw_text,
         duration_ms: vad_result.speech_duration_ms as i64,
-        word_count: 0,
+        word_count,
     })
 }
 

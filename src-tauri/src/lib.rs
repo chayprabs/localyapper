@@ -16,8 +16,41 @@ mod tray;
 
 use audio::capture::AudioRecorder;
 use state::AppState;
+use stt::whisper::{WhisperEngine, WHISPER_MODEL_FILENAME};
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
+
+/// Attempt to load the Whisper model from bundled resources or app data directory.
+/// Returns `None` with a warning log if the model file is not found or fails to load.
+fn load_whisper_model(app: &tauri::App) -> Option<Arc<WhisperEngine>> {
+    let candidates = [
+        // Bundled resource path (production builds)
+        app.path().resource_dir().ok().map(|p| p.join("resources").join(WHISPER_MODEL_FILENAME)),
+        // App data directory (downloaded on first launch)
+        app.path().app_data_dir().ok().map(|p| p.join(WHISPER_MODEL_FILENAME)),
+    ];
+
+    for candidate in candidates.into_iter().flatten() {
+        if candidate.exists() {
+            log::info!("Found Whisper model at {}", candidate.display());
+            match WhisperEngine::new(&candidate) {
+                Ok(engine) => {
+                    log::info!("Whisper engine loaded successfully");
+                    return Some(Arc::new(engine));
+                }
+                Err(e) => {
+                    log::warn!("Failed to load Whisper model from {}: {}", candidate.display(), e);
+                }
+            }
+        }
+    }
+
+    log::warn!(
+        "Whisper model ({}) not found. STT will be unavailable until the model is placed in resources/ or app data.",
+        WHISPER_MODEL_FILENAME
+    );
+    None
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -39,9 +72,13 @@ pub fn run() {
             let conn = db::open_database(&app_data_dir)
                 .expect("Failed to initialize database");
 
+            // Load Whisper STT model
+            let whisper = load_whisper_model(app);
+
             app.manage(AppState {
                 db: Arc::new(Mutex::new(conn)),
                 recorder: Arc::new(AudioRecorder::new()),
+                whisper,
             });
 
             log::info!("LocalYapper initialized. DB at {:?}", app_data_dir);

@@ -4,7 +4,31 @@
       "mcp__context7__resolve-library-id",
       "mcp__context7__query-docs",
       "Bash(mkdir:*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(where clang:*)",
+      "Read(//c/Program Files/LLVM/**)",
+      "Read(//c/Program Files/**)",
+      "Bash(winget list:*)",
+      "Bash(winget install:*)",
+      "Bash(mkdir -p /c/Users/chait/llvm-lib)",
+      "Bash(curl -L -o /c/Users/chait/llvm-lib/LLVM-18.1.8-win64.exe \"https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe\")",
+      "Read(//c/Users/chait/**)",
+      "Bash(where 7z)",
+      "Bash(ls \"/c/Program Files \\(x86\\)/7-Zip/7z.exe\")",
+      "Bash(where python:*)",
+      "Bash(python -m pip install libclang)",
+      "Bash(powershell -Command \"Start-Process -FilePath 'C:\\\\Users\\\\chait\\\\llvm-lib\\\\LLVM-18.1.8-win64.exe' -ArgumentList '/S', '/D=C:\\\\Users\\\\chait\\\\llvm' -Wait -NoNewWindow\" 2>&1)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); pkgs=[p for p in d[''''packages''''] if p[''''name'''']==''''whisper-rs-sys'''']; print\\(json.dumps\\([f[''''name''''] for f in pkgs[0][''''features'''']], indent=2\\)\\) if pkgs else print\\(''''not found''''\\)\")",
+      "Bash(grep -A 30 [package] ~/.cargo/registry/src/index.crates.io-*/whisper-rs-sys-0.*/Cargo.toml)",
+      "Bash(grep:*)",
+      "Bash(LIBCLANG_PATH=\"C:/Program Files/LLVM/bin\" cargo clippy -- -D warnings)",
+      "Bash(find C:UserschaitProjectlocalyapper -type f -name *training* -o -name *paragraph*)",
+      "Bash(export PATH=\"/c/Program Files/CMake/bin:/c/Program Files/LLVM/bin:$PATH\")",
+      "Bash(cmake --version)",
+      "Bash(cargo search:*)",
+      "Bash(cargo info:*)",
+      "Bash(LIBCLANG_PATH=\"C:/Program Files/LLVM/bin\" cargo doc --document-private-items -p whisper-rs --no-deps)",
+      "Bash(LIBCLANG_PATH=\"C:/Program Files/LLVM/bin\" cargo test)"
     ]
   }
 }
