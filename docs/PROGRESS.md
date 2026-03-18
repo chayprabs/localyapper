@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 7 — Full Pipeline Wire-up
+## CURRENT PHASE: Phase 8 — Overlay UI
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -43,10 +43,10 @@ Goal: App launches, database initializes, no crashes.
 - [x] check_ollama — HTTP check to localhost:11434 with 2s timeout
 - [x] test_byok_connection — OpenAI/Anthropic/Groq API key test with latency
 
-### Phase 7: Full Pipeline Wire-up
-- [ ] Wire: hotkey → capture → VAD → whisper → correction → LLM → inject
-- [ ] hotkey/manager.rs — hold + release + double-tap
-- [ ] correction/learner.rs — diff computation, DB writes, confidence calc
+### Phase 7: Full Pipeline Wire-up (COMPLETE)
+- [x] Wire: hotkey → capture → VAD → whisper → correction → LLM → inject
+- [x] hotkey/manager.rs — hold + release + double-tap
+- [x] correction/learner.rs — diff computation, DB writes, confidence calc
 
 ### Phase 8: Overlay UI
 - [ ] Overlay.tsx — transparent, always-on-top pill

@@ -122,5 +122,20 @@ pub struct ImportResult {
     pub errors: Vec<String>,
 }
 
+/// Pipeline state event emitted to frontend for overlay state transitions.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PipelineEvent {
+    /// One of: "listening", "processing", "transcribed", "injected", "cancelled", "error"
+    pub state: String,
+    /// The transcribed/final text (populated in "transcribed" and "injected" states).
+    pub text: Option<String>,
+    /// Speech duration in milliseconds.
+    pub duration_ms: Option<i64>,
+    /// Word count.
+    pub word_count: Option<i64>,
+    /// Error message (populated in "error" state).
+    pub error: Option<String>,
+}
+
 /// All settings as a key-value map.
 pub type AllSettings = HashMap<String, String>;

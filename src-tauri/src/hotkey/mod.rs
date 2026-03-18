@@ -1,1 +1,1 @@
-// Global hotkey management — implemented in Phase 7.
+pub mod manager;

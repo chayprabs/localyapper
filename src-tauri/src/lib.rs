@@ -133,6 +133,11 @@ pub fn run() {
                 download_cancel: Arc::new(AtomicBool::new(false)),
             });
 
+            // Register global hotkeys (hold-to-talk, cancel, paste-last)
+            if let Err(e) = hotkey::manager::register_hotkeys(app) {
+                log::error!("Failed to register hotkeys: {e}");
+            }
+
             log::info!("LocalYapper initialized. DB at {:?}", app_data_dir);
             Ok(())
         })
