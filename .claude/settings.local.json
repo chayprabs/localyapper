@@ -49,7 +49,13 @@
       "Bash(sed 's/\"\"\"\",\"\"\"\"namedColors\"\"\"\":.*//')",
       "mcp__stitch__fetch_screen_image",
       "mcp__stitch__fetch_screen_code",
-      "Bash(find /c/Users/chait/Project/localyapper -name *PRD* -o -name *prd* -o -name *requirements*)"
+      "Bash(find /c/Users/chait/Project/localyapper -name *PRD* -o -name *prd* -o -name *requirements*)",
+      "Bash(wc -l /c/Users/chait/Project/localyapper/src/**/*.tsx /c/Users/chait/Project/localyapper/src/**/*.ts)",
+      "Bash(find /c/Users/chait/Project/localyapper -type f \\\\\\(-name *.png -o -name *.jpg -o -name *.jpeg -o -name *.webp \\\\\\))",
+      "Bash(find /c/Users/chait/.claude -type f -name *.json -o -name *.md)",
+      "Bash(ls -d */)",
+      "Bash(find /c/Users/chait/Project/localyapper/src/lib/commands -type f -name *.ts)",
+      "Bash(find /c/Users/chait/Project/localyapper/src-tauri/src/commands -type f -name *.rs)"
     ]
   }
 }
