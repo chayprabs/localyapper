@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 12 — Dictionary Pages
+## CURRENT PHASE: Phase 13 — Hotkeys Page
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -88,8 +88,20 @@ Goal: App launches, database initializes, no crashes.
 - [x] Empty state with history icon, hotkey hint, Start Dictating button
 - [x] Matches Stitch designs exactly
 
-### Phase 12: Dictionary Pages
-- [ ] Corrections tab + Training tab + training flow
+### Phase 12: Dictionary Pages (COMPLETE)
+- [x] DictionaryPage.tsx — Tab switching (Corrections/Training), header with Export JSON + Add Correction buttons
+- [x] CorrectionsTab.tsx — Table with Whisper Heard/Corrected To/Times Used/Actions columns, pagination footer
+- [x] Inline Add Correction form (blue-tinted row, two inputs, Save/Close)
+- [x] Corrections empty state with Start Training CTA
+- [x] TrainingTab.tsx — Paragraph display (15 paragraphs), Start/Stop Recording, progress, Previous/Next nav
+- [x] TrainingComplete.tsx — Green check, corrections learned count, Done button
+- [x] useCorrections.ts hook — pagination, add, optimistic delete, count
+- [x] training-paragraphs.ts — 15 paragraph constants from docs/training-paragraphs.md
+- [x] Backend: get_corrections_count + compute_training_diffs commands (7 total corrections commands)
+- [x] Info cards (How it works + Smart Suggestions) below both tabs
+- [x] Export JSON copies to clipboard with "Copied!" feedback
+- [x] Training paragraph index persisted in settings for cross-session resume
+- [x] All 5 Stitch screens matched (Corrections, Add Active, Empty State, Training, Voice Profile Ready)
 
 ### Phase 13: Hotkeys Page
 - [ ] Remappable hotkeys with key picker

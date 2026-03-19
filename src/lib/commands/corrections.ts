@@ -29,3 +29,17 @@ export async function exportDictionary(): Promise<string> {
 export async function importDictionary(json: string): Promise<ImportResult> {
   return invoke<ImportResult>("import_dictionary", { json });
 }
+
+export async function getCorrectionsCount(): Promise<number> {
+  return invoke<number>("get_corrections_count");
+}
+
+export async function computeTrainingDiffs(
+  originalText: string,
+  transcribedText: string,
+): Promise<number> {
+  return invoke<number>("compute_training_diffs", {
+    original_text: originalText,
+    transcribed_text: transcribedText,
+  });
+}

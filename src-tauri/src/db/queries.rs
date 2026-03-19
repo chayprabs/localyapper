@@ -276,6 +276,12 @@ pub fn import_corrections(conn: &Connection, json: &str) -> Result<ImportResult,
     })
 }
 
+/// Returns the total number of corrections.
+pub fn count_corrections(conn: &Connection) -> Result<i64, LocalYapperError> {
+    conn.query_row("SELECT COUNT(*) FROM corrections", [], |row| row.get(0))
+        .map_err(LocalYapperError::DatabaseError)
+}
+
 // --- Dictionary ---
 
 /// Returns all dictionary words.

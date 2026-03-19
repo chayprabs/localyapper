@@ -162,12 +162,14 @@ pub fn run() {
             commands::modes::delete_mode,
             commands::modes::set_active_mode,
             commands::modes::get_active_mode,
-            // Corrections (5)
+            // Corrections (7)
             commands::corrections::get_corrections,
             commands::corrections::add_correction,
             commands::corrections::delete_correction,
             commands::corrections::export_dictionary,
             commands::corrections::import_dictionary,
+            commands::corrections::get_corrections_count,
+            commands::corrections::compute_training_diffs,
             // History (4)
             commands::history::get_history,
             commands::history::delete_history_entry,

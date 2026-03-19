@@ -1,3 +1,4 @@
+use crate::correction::learner;
 use crate::db::queries;
 use crate::models::{Correction, ImportResult};
 use crate::state::AppState;
@@ -75,4 +76,31 @@ pub async fn import_dictionary(
     state.correction_engine.refresh(&conn, threshold)
         .map_err(|e| e.to_string())?;
     Ok(result)
+}
+
+/// Returns the total count of corrections.
+#[tauri::command]
+pub async fn get_corrections_count(
+    state: tauri::State<'_, AppState>,
+) -> Result<i64, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    queries::count_corrections(&conn).map_err(|e| e.to_string())
+}
+
+/// Computes word-level diffs between known paragraph text and Whisper transcription,
+/// saves learned corrections to the database, and returns the count of new corrections.
+#[tauri::command]
+pub async fn compute_training_diffs(
+    state: tauri::State<'_, AppState>,
+    original_text: String,
+    transcribed_text: String,
+) -> Result<i64, String> {
+    let diffs = learner::compute_diffs(&transcribed_text, &original_text);
+    if diffs.is_empty() {
+        return Ok(0);
+    }
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    let count = learner::learn_and_refresh(&conn, &diffs, &state.correction_engine)
+        .map_err(|e| e.to_string())?;
+    Ok(count as i64)
 }
