@@ -46,7 +46,9 @@
       "mcp__stitch__get_project",
       "Bash(python -c \"import json, sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''''designTheme'''', {}\\), indent=2\\)\\)\")",
       "Bash(sed 's/\"\"\"\"designMd\"\"\"\":\"\"\"\"//')",
-      "Bash(sed 's/\"\"\"\",\"\"\"\"namedColors\"\"\"\":.*//')"
+      "Bash(sed 's/\"\"\"\",\"\"\"\"namedColors\"\"\"\":.*//')",
+      "mcp__stitch__fetch_screen_image",
+      "mcp__stitch__fetch_screen_code"
     ]
   }
 }

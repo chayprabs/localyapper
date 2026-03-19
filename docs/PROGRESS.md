@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 8 — Overlay UI
+## CURRENT PHASE: Phase 9 — Settings Window Shell
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -48,9 +48,17 @@ Goal: App launches, database initializes, no crashes.
 - [x] hotkey/manager.rs — hold + release + double-tap
 - [x] correction/learner.rs — diff computation, DB writes, confidence calc
 
-### Phase 8: Overlay UI
-- [ ] Overlay.tsx — transparent, always-on-top pill
-- [ ] All 5 overlay states wired to Tauri events
+### Phase 8: Overlay UI (COMPLETE)
+- [x] Overlay.tsx — transparent, always-on-top pill with 6 visual states
+- [x] All states wired to Tauri "pipeline-state" events
+- [x] Waveform.tsx — animated 5-bar waveform (blue/red)
+- [x] CountdownTimer.tsx — elapsed (processing) + countdown (stopping-soon)
+- [x] YappingEmoji.tsx — pulsing speaker emoji
+- [x] useOverlayState.ts — event listener, state machine, auto-hide timers
+- [x] overlayStore.ts — Jotai atoms for overlay data
+- [x] types/overlay.ts — OverlayVisualState, PipelineEvent, OverlayData
+- [x] lib/commands/recording.ts — injectText, cancelRecording wrappers
+- [x] All 6 overlay states visually verified against Stitch designs
 
 ### Phase 9: Settings Window Shell
 - [ ] Main.tsx — sidebar navigation (5 pages)
