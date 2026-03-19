@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/nicegui/static/tauri-v2-schema.json",
   "productName": "LocalYapper",
   "version": "0.1.0",
-  "identifier": "com.localyapper.app",
+  "identifier": "com.localyapper.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",

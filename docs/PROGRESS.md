@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 10 — Dashboard Page
+## CURRENT PHASE: Phase 11 — History Page
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -70,8 +70,13 @@ Goal: App launches, database initializes, no crashes.
 - [x] Colors aligned to DESIGN_SYSTEM.md across all components
 - [x] Sidebar visually matched to Stitch design
 
-### Phase 10: Dashboard Page
-- [ ] Stats cards, Ollama status, last dictation
+### Phase 10: Dashboard Page (COMPLETE)
+- [x] Stats cards (Words Today, Words This Week, Words All Time, Avg WPM, Total Sessions)
+- [x] Model/Ollama status indicator (green/red dot + model name)
+- [x] Last dictation preview card with copy/delete
+- [x] Empty state for first-time users
+- [x] Wired to get_stats(), get_history(limit=1), check_ollama() commands
+- [x] Matches Stitch designs exactly
 
 ### Phase 11: History Page
 - [ ] Card list, pagination, copy, delete, clear all
