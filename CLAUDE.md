@@ -75,6 +75,7 @@ Both instances can touch any file. If both are running, check with the user befo
 - See DESIGN_SYSTEM.md for all colors, typography, spacing, component specs
 - Light mode only
 - Apple macOS HIG design language (macOS Ventura System Settings as gold standard)
+- Primary accent: #0058bc
 - Font: SF Pro / Inter, two weights only: 400 regular, 600 bold
 
 ## Current status

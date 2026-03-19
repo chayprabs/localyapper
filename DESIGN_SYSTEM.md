@@ -5,24 +5,44 @@ Apple macOS Human Interface Guidelines. Light mode only.
 Every decision references macOS Ventura System Settings as the gold standard.
 Nothing that Apple would never put there.
 
+## No-Line Rule
+Major section boundaries (sidebar <-> content) use background color shifts only — no visible border lines.
+Cards still use 1px solid rgba(0,0,0,0.07) — this rule does NOT apply to cards.
+Boundaries defined strictly through background color shifts.
+
+## Glass & Gradient Rule
+Floating elements (overlay pill, modals, tooltips) use glassmorphism:
+- `background: rgba(255,255,255,0.80)`
+- `backdrop-filter: blur(20px)`
+- `-webkit-backdrop-filter: blur(20px)`
+
+Subtle gradient on primary buttons (top-to-bottom, slight lightening).
+
+## Elevation & Depth (Tonal Layering)
+- **Level 0 (Base):** `#f9f9f9` — window background
+- **Level 1 (Cards):** `#FFFFFF` — card surfaces, inputs
+- **Level 2 (Floating):** glassmorphism (80% white + 20px blur)
+- **Whisper Shadow:** `0 8px 32px rgba(0,0,0,0.04)` — subtle elevation
+- **Ghost Border:** outline-variant at 15% opacity — very subtle edge definition
+
 ## Colors
 | Token | Value | Usage |
 |-------|-------|-------|
-| window-bg | #EDEDED | App window background |
-| sidebar-bg | #EBEBEB | Sidebar background |
+| window-bg | #f9f9f9 | App window background |
+| sidebar-bg | #eeeeee | Sidebar background |
 | card-bg | #FFFFFF | All card surfaces |
 | card-border | rgba(0,0,0,0.07) | Card borders |
 | card-radius | 10px | Card border radius |
-| primary | #007AFF | Buttons, active states, accents |
-| primary-tint | rgba(0,122,255,0.12) | Active sidebar item bg |
-| success | #28CD41 | Running status, success states |
-| destructive | #FF3B30 | Delete, error, warning accents |
-| text-primary | #1C1C1E | All primary text |
+| primary | #0058bc | Buttons, active states, accents |
+| primary-tint | rgba(0,88,188,0.12) | Active sidebar item bg |
+| success | #006b19 | Running status, success states |
+| destructive | #ba1a1a | Delete, error, warning accents |
+| text-primary | rgba(0,0,0,0.85) | All primary text (opacity-based) |
 | text-secondary | rgba(0,0,0,0.50) | Descriptions, subtitles |
-| text-tertiary | rgba(0,0,0,0.35) | Hints, captions, timestamps |
-| text-label | rgba(0,0,0,0.40) | Uppercase section labels |
+| text-tertiary | rgba(0,0,0,0.26) | Hints, captions, timestamps |
+| text-label | rgba(0,0,0,0.26) | Uppercase section labels |
 | separator | rgba(0,0,0,0.08) | Dividers inside cards |
-| overlay-bg | rgba(255,255,255,0.95) | Floating overlay pill |
+| overlay-bg | rgba(255,255,255,0.80) | Floating overlay pill (glassmorphism) |
 | overlay-border | rgba(0,0,0,0.10) | Overlay pill border |
 
 ## Typography
@@ -48,7 +68,8 @@ Nothing that Apple would never put there.
 - Shadow: none (flat)
 
 ### Buttons — Primary
-- Background: #007AFF
+- Background: linear-gradient(180deg, #0062d0 0%, #0058bc 100%)
+- Hover: linear-gradient(180deg, #0058bc 0%, #004ea8 100%)
 - Text: white, 13px weight 500
 - Height: 36px
 - Border-radius: 8px
@@ -56,30 +77,33 @@ Nothing that Apple would never put there.
 ### Buttons — Secondary
 - Background: #FFFFFF
 - Border: 1px solid rgba(0,0,0,0.15)
-- Text: #1C1C1E, 13px
+- Text: rgba(0,0,0,0.85), 13px
 - Height: 36px
 - Border-radius: 8px
 
 ### Buttons — Destructive text
 - Background: none
-- Text: #FF3B30, 13px
+- Text: #ba1a1a, 13px
 - No border
 
 ### Sidebar
 - Width: 220px
-- Background: #EBEBEB
-- Active item: rgba(0,122,255,0.12) bg + #007AFF text + icon
+- Background: #eeeeee
+- Active item: rgba(0,88,188,0.12) bg + #0058bc text + icon
 - Item height: 36px
 - Item border-radius: 6px
-- Section labels: 10px uppercase rgba(0,0,0,0.40)
+- Section labels: 10px uppercase rgba(0,0,0,0.26)
+- No border between sidebar and content (No-Line Rule)
 
 ### Overlay pill
 - Width: 280px
 - Height: 52px (listening/processing) / 72px (transcribed/long recording)
 - Border-radius: 999px
-- Background: rgba(255,255,255,0.95)
+- Background: rgba(255,255,255,0.80)
+- Backdrop-filter: blur(20px)
+- -webkit-backdrop-filter: blur(20px)
 - Border: 1px solid rgba(0,0,0,0.10)
-- Shadow: 0 4px 24px rgba(0,0,0,0.15)
+- Shadow: 0 8px 32px rgba(0,0,0,0.08)
 - Padding: 12px 16px
 
 ### Wizard modal

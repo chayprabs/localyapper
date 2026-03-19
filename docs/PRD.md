@@ -390,49 +390,65 @@ Apple macOS Human Interface Guidelines. Light mode only. Every decision referenc
 
 ## 9. Screen Inventory
 
-Complete list of all 26 screens in the application:
+Complete list of all 29 screens in the application, grouped by feature area.
+Screen names match the Stitch design project exactly.
 
-### Onboarding wizard (8 screens)
+### Dashboard (2 screens)
 | # | Screen | Description |
 |---|---|---|
-| 1 | Welcome | App intro, Get Started CTA, Skip setup link |
-| 2 | Model selection | 4 options: Download Qwen, Use Ollama, BYOK, Whisper Only |
-| 3 | Model downloading | Progress bar, speed, time remaining, Cancel option |
-| 4 | Model download complete | Success state, model info, Continue |
-| 5 | Ollama detected | Model picker dropdown, 3 available models listed |
-| 6 | Ollama not detected | 3-step fix guide, Go Back + Retry buttons |
-| 7 | BYOK setup | Provider dropdown, API key input, Test Connection, success state |
-| 8 | Whisper only warning | What's missing list (×4 items), Go Back + Continue Anyway |
-| 9 | Hotkey setup | Key cap display card, Back + Continue |
-| 10 | You're all set | Green checkmark, key badges, Start Yapping |
+| 1 | Refined Sidebar Layout | 4 stat cards + sessions + Ollama status + last dictation |
+| 2 | Empty State Final Refined | Stat cards with "—" + empty last dictation card |
 
-### Overlay pill (5 states)
+### Onboarding (10 screens)
 | # | Screen | Description |
 |---|---|---|
-| 11 | Listening | 🗣️ emoji + blue waveform bars + "Listening..." |
-| 12 | Stopping soon | 🗣️ + red waveform + red countdown (last 15s) + red depleting bar |
-| 13 | Processing | Spinner + "X.Xs" timer + "Processing..." |
-| 14 | Processing long | Spinner + timer + "2 min recording" second line |
-| 15 | Transcribed | Text preview + Copy + blue auto-inject progress bar |
+| 3 | Welcome | App intro, Get Started CTA, Skip setup link |
+| 4 | Model Selection | 4 options: Download Qwen, Use Ollama, BYOK, Whisper Only |
+| 5 | Ollama Detected | Model picker dropdown, 3 available models listed |
+| 6 | Ollama Not Detected | 3-step fix guide, Go Back + Retry buttons |
+| 7 | Whisper Warning | What's missing list (×4 items), Go Back + Continue Anyway |
+| 8 | BYOK Setup | Provider dropdown, API key input, Test Connection, success state |
+| 9 | Model Download | Progress bar, speed, time remaining, Cancel option |
+| 10 | Model Download Complete | Success state, model info, Continue |
+| 11 | Hotkey Setup | Key cap display card, Back + Continue |
+| 12 | Ready | Green checkmark, key badges, Start Yapping |
 
-### Main app — with data (6 screens)
+### Dictionary (5 screens)
 | # | Screen | Description |
 |---|---|---|
-| 16 | Dashboard | 4 stat cards + sessions + Ollama status + last dictation |
-| 17 | History | Card list, 20/page, copy + delete per card, Load More, Clear All |
-| 18 | Dictionary — Corrections | Table: raw→corrected, count, delete. Manual add. Export JSON |
-| 19 | Dictionary — Training | Paragraph display, Start Recording, progress, Prev/Next |
-| 20 | Dictionary — Training complete | Green check, corrections learned count, Done |
-| 21 | Hotkeys | Action table with key cap dropdowns, Reset to Defaults |
-| 22 | Models — Local | Whisper dropdown + LLM segmented (Local selected) + status |
-| 23 | Models — BYOK | Same + BYOK selected + provider + API key + test |
+| 13 | Corrections Refined Layout | Table: raw→corrected, count, delete. Manual add. Export JSON |
+| 14 | Add Correction Active | Inline add-correction form in active/focused state |
+| 15 | Corrections Empty State | Centered empty state + Start Training button |
+| 16 | Training Refined Final | Paragraph display, Start Recording, progress, Prev/Next |
+| 17 | Voice Profile Ready | Green check, corrections learned count, Done |
 
-### Main app — empty states (3 screens)
+### Models (3 screens)
 | # | Screen | Description |
 |---|---|---|
-| 24 | Dashboard empty | Stat cards with "—" + empty last dictation card |
-| 25 | History empty | Centered empty state with clock icon + Start Dictating button |
-| 26 | Dictionary corrections empty | Centered empty state + Start Training button |
+| 18 | Local State Refined Final | Whisper dropdown + LLM segmented (Local selected) + status |
+| 19 | BYOK State Refined Final | BYOK selected + provider + API key + test |
+| 20 | Ollama State Refined Final | Ollama selected + model picker + connection status |
+
+### Hotkeys (1 screen)
+| # | Screen | Description |
+|---|---|---|
+| 21 | Uniform Native Shortcuts | Action table with key cap dropdowns, Reset to Defaults |
+
+### History (2 screens)
+| # | Screen | Description |
+|---|---|---|
+| 22 | History Refined Final | Card list, 20/page, copy + delete per card, Load More, Clear All |
+| 23 | History Empty State | Centered empty state with clock icon + Start Dictating button |
+
+### Floating Overlay (6 screens)
+| # | Screen | Description |
+|---|---|---|
+| 24 | Listening 1 | Blue waveform bars + "Listening..." |
+| 25 | Stopping Soon 1B | Red waveform + red countdown (last 15s) + red depleting bar |
+| 26 | Processing 2 | Spinner + "X.Xs" timer + "Processing..." |
+| 27 | Long Recording 2B | Spinner + timer + "2 min recording" second line |
+| 28 | Transcribed Short 3 | Text preview + Copy + blue auto-inject progress bar |
+| 29 | Transcribed Long 3 | Long text preview with scroll + Copy + auto-inject bar |
 
 ---
 

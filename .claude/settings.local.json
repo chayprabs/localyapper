@@ -36,7 +36,17 @@
       "Bash(done)",
       "Bash(cargo doc:*)",
       "Bash(cargo tree:*)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(find /c/Users/chait/.claude -type f -name *.json)",
+      "Bash(find /c/Users/chait/.claude/sessions -type f -name *.jsonl)",
+      "Bash(xargs cat:*)",
+      "Bash(find /c/Users/chait -maxdepth 2 -type f -name *.json)",
+      "mcp__stitch__list_projects",
+      "mcp__stitch__list_screens",
+      "mcp__stitch__get_project",
+      "Bash(python -c \"import json, sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''''designTheme'''', {}\\), indent=2\\)\\)\")",
+      "Bash(sed 's/\"\"\"\"designMd\"\"\"\":\"\"\"\"//')",
+      "Bash(sed 's/\"\"\"\",\"\"\"\"namedColors\"\"\"\":.*//')"
     ]
   }
 }
