@@ -27,7 +27,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="text-[11px] font-semibold text-[#007AFF] hover:text-[#0051a8] transition-colors"
+      className="text-[11px] font-semibold text-primary hover:text-[#004ea8] transition-colors"
     >
       {copied ? "\u2713" : "Copy"}
     </button>
@@ -72,7 +72,7 @@ export function Overlay() {
             <Waveform color="red" />
             <CountdownTimer mode="countdown" seconds={remainingSeconds} />
             <div
-              className="absolute bottom-0 left-0 h-[2px] bg-[#FF3B30]"
+              className="absolute bottom-0 left-0 h-[2px] bg-destructive"
               style={{
                 width: `${(remainingSeconds / (MAX_RECORDING_SECONDS - 105)) * 100}%`,
               }}
@@ -94,7 +94,7 @@ export function Overlay() {
           <div className="flex items-center justify-between h-full">
             <Spinner slow />
             <div className="flex flex-col items-center">
-              <span className="text-[17px] font-semibold text-[#1C1C1E]">
+              <span className="text-[17px] font-semibold text-black/85">
                 {elapsedSeconds.toFixed(1)}s
               </span>
               <span className="text-[11px] text-black/40">
@@ -117,7 +117,7 @@ export function Overlay() {
                   <CopyButton text={text} />
                 </div>
                 <div className="flex items-center h-full px-6">
-                  <span className="text-[13px] font-medium text-[#1C1C1E] truncate pr-12">
+                  <span className="text-[13px] font-medium text-black/85 truncate pr-12">
                     {text}
                   </span>
                 </div>
@@ -128,7 +128,7 @@ export function Overlay() {
                   <CopyButton text={text} />
                 </div>
                 <div className="flex items-center h-full px-6">
-                  <span className="text-[13px] font-medium text-[#1C1C1E] line-clamp-2 leading-tight pr-8">
+                  <span className="text-[13px] font-medium text-black/85 line-clamp-2 leading-tight pr-8">
                     {text}
                   </span>
                 </div>
@@ -136,7 +136,7 @@ export function Overlay() {
             )}
             <div className="absolute bottom-0 left-0 w-full h-[2px] bg-black/[0.05]">
               <div
-                className="h-full bg-[#007AFF] transition-none"
+                className="h-full bg-primary transition-none"
                 style={{ width: `${autoInjectProgress * 100}%` }}
               />
             </div>

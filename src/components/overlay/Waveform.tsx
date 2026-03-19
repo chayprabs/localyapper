@@ -12,7 +12,7 @@ const animations = [
 ] as const;
 
 export function Waveform({ color }: WaveformProps) {
-  const barColor = color === "blue" ? "bg-[#007AFF]" : "bg-[#FF3B30]";
+  const barColor = color === "blue" ? "bg-primary" : "bg-destructive";
 
   return (
     <div className="flex items-center gap-[4px]">

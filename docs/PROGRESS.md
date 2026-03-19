@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 9 — Settings Window Shell
+## CURRENT PHASE: Phase 10 — Dashboard Page
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -60,9 +60,15 @@ Goal: App launches, database initializes, no crashes.
 - [x] lib/commands/recording.ts — injectText, cancelRecording wrappers
 - [x] All 6 overlay states visually verified against Stitch designs
 
-### Phase 9: Settings Window Shell
-- [ ] Main.tsx — sidebar navigation (5 pages)
-- [ ] Jotai stores + typed invoke wrappers
+### Phase 9: Settings Window Shell (COMPLETE)
+- [x] SettingsLayout.tsx — sidebar + content area shell
+- [x] Sidebar.tsx — 240px sidebar with Material Symbols icons, 5 nav items
+- [x] Jotai appStore.ts — PageId type + activePageAtom
+- [x] 5 page stub components (Dashboard, History, Dictionary, Hotkeys, Models)
+- [x] Typed invoke wrappers — all 34 IPC commands covered across 7 files
+- [x] shadcn/ui foundation — components.json + cn() utility
+- [x] Colors aligned to DESIGN_SYSTEM.md across all components
+- [x] Sidebar visually matched to Stitch design
 
 ### Phase 10: Dashboard Page
 - [ ] Stats cards, Ollama status, last dictation

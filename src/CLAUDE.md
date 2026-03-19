@@ -40,12 +40,15 @@ All invoke() calls go through lib/commands/ wrappers — components never call i
 
 ## Design system compliance
 - See DESIGN_SYSTEM.md in repo root for ALL design tokens
-- Window background: bg-[#EDEDED]
-- Card: bg-white rounded-[10px] border border-black/[0.07] p-4
-- Primary button: bg-[#007AFF] text-white rounded-lg h-9 text-[13px] font-medium
-- Text primary: text-[#1C1C1E]
+- Window background: bg-window-bg (#f9f9f9)
+- Sidebar background: bg-sidebar-bg (#eeeeee)
+- Card: bg-white rounded-[10px] border border-card-border p-4
+- Primary button: bg-primary text-white rounded-lg h-9 text-[13px] font-medium
+- Primary accent: #0058bc
+- Text primary: text-black/85
 - Text secondary: text-black/50
-- Section labels: text-[10px] uppercase tracking-[0.06em] text-black/40
+- Text tertiary: text-black/[0.26]
+- Section labels: text-[10px] uppercase tracking-[0.06em] text-black/[0.26]
 - Font: font-['Inter'] — weights 400 and 600 only
 - Light mode only. No dark mode.
 

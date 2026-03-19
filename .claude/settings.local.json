@@ -48,7 +48,8 @@
       "Bash(sed 's/\"\"\"\"designMd\"\"\"\":\"\"\"\"//')",
       "Bash(sed 's/\"\"\"\",\"\"\"\"namedColors\"\"\"\":.*//')",
       "mcp__stitch__fetch_screen_image",
-      "mcp__stitch__fetch_screen_code"
+      "mcp__stitch__fetch_screen_code",
+      "Bash(find /c/Users/chait/Project/localyapper -name *PRD* -o -name *prd* -o -name *requirements*)"
     ]
   }
 }
