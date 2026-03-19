@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 14 — Models Page
+## CURRENT PHASE: Phase 15 — First-Launch Wizard
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -115,8 +115,16 @@ Goal: App launches, database initializes, no crashes.
 - [x] Reset to Defaults button restores all 5 hotkeys
 - [x] All changes take effect immediately (reload_hotkeys on every update)
 
-### Phase 14: Models Page
-- [ ] Whisper dropdown + LLM config + BYOK test connection
+### Phase 14: Models Page (COMPLETE)
+- [x] ModelsPage.tsx — full page with two sections (Speech Recognition + Language Model)
+- [x] useModels.ts hook — settings load, optimistic updates, Ollama check, BYOK test
+- [x] Whisper model dropdown (tiny.en/base.en/small.en/medium.en) with custom pill-style selector
+- [x] LLM segmented control (Local Model | Ollama | BYOK) with 3 tab views
+- [x] Local tab: active model name + service status (green dot)
+- [x] Ollama tab: model dropdown from Ollama API, status with model count, URL display
+- [x] BYOK tab: provider dropdown (OpenAI/Anthropic/Groq), API key input with visibility toggle, Test Connection
+- [x] Connection result feedback (green success with latency, red error message)
+- [x] All 3 Stitch screens matched (Local, BYOK, Ollama states)
 
 ### Phase 15: First-Launch Wizard
 - [ ] All 10 wizard screens + model download flow

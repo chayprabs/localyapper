@@ -69,7 +69,10 @@
       "Bash(python -c \":*)",
       "Bash(xargs ls:*)",
       "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(s.get\\(''''name'''',''''''''\\), s.get\\(''''screenId'''',''''''''\\), s.get\\(''''displayName'''',''''''''\\)\\) for s in data.get\\(''''screens'''',[]\\)]\")",
-      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(s.get\\(''''name'''',''''''''\\), s.get\\(''''screenId'''',''''''''\\), s.get\\(''''displayName'''',''''''''\\)\\) for s in data.get\\(''''screens'''',[]\\)]\")"
+      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(s.get\\(''''name'''',''''''''\\), s.get\\(''''screenId'''',''''''''\\), s.get\\(''''displayName'''',''''''''\\)\\) for s in data.get\\(''''screens'''',[]\\)]\")",
+      "Bash(find C:UserschaitProjectlocalyapper -name *Models* -o -name *models*)",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(f''''{s.get\\(name,?\\)} | {s.get\\(screenId,?\\)}''''\\) for s in data.get\\(''''screens'''',[]\\)]\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(f''''{s.get\\(\"\"name\"\",\"\"?\"\"\\)} | {s.get\\(\"\"screenId\"\",\"\"?\"\"\\)}''''\\) for s in data.get\\(''''screens'''',[]\\)]\")"
     ]
   }
 }
