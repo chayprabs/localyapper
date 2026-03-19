@@ -66,7 +66,10 @@
       "mcp__playwright__browser_snapshot",
       "mcp__playwright__browser_take_screenshot",
       "Bash(file /c/Users/chait/Project/localyapper/screen_*.png)",
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Bash(xargs ls:*)",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(s.get\\(''''name'''',''''''''\\), s.get\\(''''screenId'''',''''''''\\), s.get\\(''''displayName'''',''''''''\\)\\) for s in data.get\\(''''screens'''',[]\\)]\")",
+      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(s.get\\(''''name'''',''''''''\\), s.get\\(''''screenId'''',''''''''\\), s.get\\(''''displayName'''',''''''''\\)\\) for s in data.get\\(''''screens'''',[]\\)]\")"
     ]
   }
 }

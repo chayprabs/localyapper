@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 13 — Hotkeys Page
+## CURRENT PHASE: Phase 14 — Models Page
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -103,8 +103,17 @@ Goal: App launches, database initializes, no crashes.
 - [x] Training paragraph index persisted in settings for cross-session resume
 - [x] All 5 Stitch screens matched (Corrections, Add Active, Empty State, Training, Voice Profile Ready)
 
-### Phase 13: Hotkeys Page
-- [ ] Remappable hotkeys with key picker
+### Phase 13: Hotkeys Page (COMPLETE)
+- [x] hotkey/manager.rs — refactored to take AppHandle, added reload_hotkeys(), open-app registration
+- [x] commands/hotkeys.rs — update_hotkey (validates key, auto-syncs hands_free) + reset_hotkeys (defaults + reload)
+- [x] lib.rs — 2 new commands registered (38 total), setup call updated to AppHandle
+- [x] Frontend: hotkeys.ts command wrappers, useHotkeys.ts hook with optimistic updates
+- [x] HotkeysPage.tsx — 5 rows matching Stitch design, KeySelector with capture mode
+- [x] Key capture: keydown listener, Escape cancels, click outside cancels, modifier-only ignored
+- [x] Platform-aware key display (macOS symbols vs Windows text)
+- [x] Hands-free row read-only, auto-synced with Record
+- [x] Reset to Defaults button restores all 5 hotkeys
+- [x] All changes take effect immediately (reload_hotkeys on every update)
 
 ### Phase 14: Models Page
 - [ ] Whisper dropdown + LLM config + BYOK test connection

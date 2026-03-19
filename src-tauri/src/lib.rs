@@ -133,8 +133,8 @@ pub fn run() {
                 download_cancel: Arc::new(AtomicBool::new(false)),
             });
 
-            // Register global hotkeys (hold-to-talk, cancel, paste-last)
-            if let Err(e) = hotkey::manager::register_hotkeys(app) {
+            // Register global hotkeys (hold-to-talk, cancel, paste-last, open-app)
+            if let Err(e) = hotkey::manager::register_hotkeys(app.handle()) {
                 log::error!("Failed to register hotkeys: {e}");
             }
 
@@ -179,6 +179,9 @@ pub fn run() {
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::settings::get_all_settings,
+            // Hotkeys (2)
+            commands::hotkeys::update_hotkey,
+            commands::hotkeys::reset_hotkeys,
             // System (5)
             commands::system::get_focused_app,
             commands::system::check_update,

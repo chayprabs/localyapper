@@ -27,7 +27,7 @@ struct HotkeyState {
 }
 
 /// Initialize global hotkeys. Must be called from Tauri setup() after AppState is managed.
-pub fn register_hotkeys(app: &tauri::App) -> Result<(), String> {
+pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
     let hotkey_state = Arc::new(HotkeyState {
         mode: AtomicU8::new(MODE_IDLE),
         last_press_time: TokioMutex::new(None),
@@ -47,9 +47,15 @@ pub fn register_hotkeys(app: &tauri::App) -> Result<(), String> {
             .unwrap_or_else(|_| "Alt+Shift+V".to_string())
     };
 
+    let open_app_hotkey = {
+        let state = app.state::<AppState>();
+        let conn = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
+        queries::get_setting(&conn, "hotkey_open_app").unwrap_or_else(|_| "Alt+L".to_string())
+    };
+
     // Register the record hotkey (hold-to-talk + double-tap hands-free)
     let state_clone = hotkey_state.clone();
-    let app_handle = app.handle().clone();
+    let app_handle = app.clone();
     app.global_shortcut()
         .on_shortcut(record_hotkey.as_str(), move |_app, _shortcut, event| {
             let state = state_clone.clone();
@@ -72,7 +78,7 @@ pub fn register_hotkeys(app: &tauri::App) -> Result<(), String> {
     log::info!("Record hotkey registered: {record_hotkey}");
 
     // Register paste-last hotkey
-    let app_handle = app.handle().clone();
+    let app_handle = app.clone();
     app.global_shortcut()
         .on_shortcut(paste_last_hotkey.as_str(), move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
@@ -86,10 +92,33 @@ pub fn register_hotkeys(app: &tauri::App) -> Result<(), String> {
 
     log::info!("Paste-last hotkey registered: {paste_last_hotkey}");
 
+    // Register open-app hotkey
+    let app_handle = app.clone();
+    app.global_shortcut()
+        .on_shortcut(open_app_hotkey.as_str(), move |_app, _shortcut, event| {
+            if event.state == ShortcutState::Pressed {
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        })
+        .map_err(|e| format!("Failed to register open-app hotkey '{open_app_hotkey}': {e}"))?;
+
+    log::info!("Open-app hotkey registered: {open_app_hotkey}");
+
     // NOTE: Escape is registered dynamically when recording starts to avoid
     // capturing all Escape keypresses system-wide.
 
     Ok(())
+}
+
+/// Unregister all global shortcuts and re-register from current DB settings.
+pub fn reload_hotkeys(app: &AppHandle) -> Result<(), String> {
+    app.global_shortcut()
+        .unregister_all()
+        .map_err(|e| format!("Failed to unregister shortcuts: {e}"))?;
+    register_hotkeys(app)
 }
 
 /// Handle record hotkey pressed — start recording or stop hands-free.
