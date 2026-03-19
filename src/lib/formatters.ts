@@ -26,3 +26,40 @@ export function formatRelativeTime(isoDate: string): string {
   const days = Math.floor(diff / DAY);
   return `${days} days ago`;
 }
+
+const timeFormatter = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+export function formatHistoryTimestamp(isoDate: string): string {
+  const timestamp = new Date(isoDate.endsWith("Z") ? isoDate : isoDate + "Z");
+  const now = new Date();
+
+  const isToday =
+    timestamp.getFullYear() === now.getFullYear() &&
+    timestamp.getMonth() === now.getMonth() &&
+    timestamp.getDate() === now.getDate();
+
+  if (isToday) return `Today, ${timeFormatter.format(timestamp)}`;
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday =
+    timestamp.getFullYear() === yesterday.getFullYear() &&
+    timestamp.getMonth() === yesterday.getMonth() &&
+    timestamp.getDate() === yesterday.getDate();
+
+  if (isYesterday) return `Yesterday, ${timeFormatter.format(timestamp)}`;
+
+  return dateTimeFormatter.format(timestamp);
+}

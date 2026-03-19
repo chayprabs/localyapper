@@ -55,7 +55,16 @@
       "Bash(find /c/Users/chait/.claude -type f -name *.json -o -name *.md)",
       "Bash(ls -d */)",
       "Bash(find /c/Users/chait/Project/localyapper/src/lib/commands -type f -name *.ts)",
-      "Bash(find /c/Users/chait/Project/localyapper/src-tauri/src/commands -type f -name *.rs)"
+      "Bash(find /c/Users/chait/Project/localyapper/src-tauri/src/commands -type f -name *.rs)",
+      "Bash(find /c/Users/chait/Project/localyapper/docs -type f -name *.md)",
+      "Bash(find /c/Users/chait/Project/localyapper -type f \\\\\\(-name *.json -o -name *.md \\\\\\))",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(s.get\\(''''name'''',''''''''\\), s.get\\(''''screenId'''',''''''''\\)\\) for s in data.get\\(''''screens'''',[]\\)]\")",
+      "Bash(node:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:1420)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_take_screenshot"
     ]
   }
 }

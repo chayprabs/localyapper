@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 11 — History Page
+## CURRENT PHASE: Phase 12 — Dictionary Pages
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -78,8 +78,15 @@ Goal: App launches, database initializes, no crashes.
 - [x] Wired to get_stats(), get_history(limit=1), check_ollama() commands
 - [x] Matches Stitch designs exactly
 
-### Phase 11: History Page
-- [ ] Card list, pagination, copy, delete, clear all
+### Phase 11: History Page (COMPLETE)
+- [x] HistoryPage.tsx — scrollable card list with empty state
+- [x] HistoryCard.tsx — timestamp, word count, app badge, copy/delete
+- [x] useHistory.ts hook — pagination (20/page), optimistic delete, clear all
+- [x] formatHistoryTimestamp() — "Today, 2:34 PM" / "Yesterday" / "Mar 15" format
+- [x] Load More button for pagination (hasMore detection)
+- [x] Clear All with confirmation dialog
+- [x] Empty state with history icon, hotkey hint, Start Dictating button
+- [x] Matches Stitch designs exactly
 
 ### Phase 12: Dictionary Pages
 - [ ] Corrections tab + Training tab + training flow
