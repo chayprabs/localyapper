@@ -73,7 +73,9 @@
       "Bash(find C:UserschaitProjectlocalyapper -name *Models* -o -name *models*)",
       "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(f''''{s.get\\(name,?\\)} | {s.get\\(screenId,?\\)}''''\\) for s in data.get\\(''''screens'''',[]\\)]\")",
       "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(f''''{s.get\\(\"\"name\"\",\"\"?\"\"\\)} | {s.get\\(\"\"screenId\"\",\"\"?\"\"\\)}''''\\) for s in data.get\\(''''screens'''',[]\\)]\")",
-      "Bash(find /c/Users/chait/Project/localyapper -name *.md -type f)"
+      "Bash(find /c/Users/chait/Project/localyapper -name *.md -type f)",
+      "Bash(find /c/Users/chait/Project/localyapper -name PROGRESS.md -o -name Phase*.md -o -name *phase*.md)",
+      "Bash(taskkill //F //IM localyapper.exe)"
     ]
   }
 }

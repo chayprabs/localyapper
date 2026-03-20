@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 16 — System Tray + Autostart
+## CURRENT PHASE: Phase 17 — Cross-Platform Polish
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -134,8 +134,14 @@ Goal: App launches, database initializes, no crashes.
 - [x] Skip setup and full flow both transition to SettingsLayout
 - [x] Verification: eslint, tsc --noEmit, cargo clippy — all zero errors
 
-### Phase 16: System Tray + Autostart
-- [ ] Tray icon, states, menu, autostart
+### Phase 16: System Tray + Autostart (COMPLETE)
+- [x] Cargo.toml — enabled `tray-icon` feature on tauri crate
+- [x] tray/mod.rs — TrayIconBuilder with context menu (Show Window, Paste Last, Launch at Login, Quit)
+- [x] Left-click tray icon toggles main window show/hide
+- [x] Autostart toggle via tauri-plugin-autostart (ManagerExt), checkmark label updates
+- [x] Close-to-tray: main window close intercepted, hides instead of quitting
+- [x] Reuses app default icon for tray icon
+- [x] Verification: cargo clippy, eslint, tsc — all zero errors
 
 ### Phase 17: Cross-Platform Polish
 - [ ] Test all features on Windows, macOS, Linux
