@@ -1,6 +1,6 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 15 — First-Launch Wizard
+## CURRENT PHASE: Phase 16 — System Tray + Autostart
 
 ### Phase 1: Foundation (COMPLETE)
 Goal: App launches, database initializes, no crashes.
@@ -126,8 +126,13 @@ Goal: App launches, database initializes, no crashes.
 - [x] Connection result feedback (green success with latency, red error message)
 - [x] All 3 Stitch screens matched (Local, BYOK, Ollama states)
 
-### Phase 15: First-Launch Wizard
-- [ ] All 10 wizard screens + model download flow
+### Phase 15: First-Launch Wizard (COMPLETE)
+- [x] Wizard.tsx — full-screen modal wrapper, step routing via useWizard hook
+- [x] App.tsx — MainWindow extracts setup_complete check, tri-state loading/wizard/settings
+- [x] useWizard.ts — added goToWelcome navigation for ModelSelectionStep back button
+- [x] All 9 step components wired: Welcome, ModelSelection, Download, DownloadComplete, Ollama, Byok, WhisperWarning, Hotkey, Ready
+- [x] Skip setup and full flow both transition to SettingsLayout
+- [x] Verification: eslint, tsc --noEmit, cargo clippy — all zero errors
 
 ### Phase 16: System Tray + Autostart
 - [ ] Tray icon, states, menu, autostart

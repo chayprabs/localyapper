@@ -47,6 +47,10 @@ export function useWizard(onComplete: () => void) {
   const modelChoiceRef = useRef(modelChoice);
   modelChoiceRef.current = modelChoice;
 
+  const goToWelcome = useCallback(() => {
+    setStep("welcome");
+  }, []);
+
   const goToModelSelection = useCallback(() => {
     setStep("model-selection");
   }, []);
@@ -108,7 +112,7 @@ export function useWizard(onComplete: () => void) {
     try {
       const status = await checkOllama();
       setOllamaStatus(status);
-      if (status.running && status.models.length > 0 && !ollamaModel) {
+      if (status.running && status.models.length > 0 && !ollamaModel && status.models[0]) {
         setOllamaModel(status.models[0]);
       }
     } catch {
@@ -215,6 +219,7 @@ export function useWizard(onComplete: () => void) {
     hotkey,
     setHotkey,
     // Navigation
+    goToWelcome,
     goToModelSelection,
     selectModelAndContinue,
     goToHotkey,
