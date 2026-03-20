@@ -34,9 +34,12 @@ cpal = "0.15"
 whisper-rs = "0.16"
 arboard = "3"
 enigo = "0.2"
-llama-cpp-2 = "0.1"
-encoding_rs = "0.8"
 futures-util = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
+
+# Build whisper C dependency in release mode even in debug Rust builds.
+# Suppresses MSVC CRT debug assertions in whisper.cpp/ggml.
+[profile.dev.package.whisper-rs-sys]
+opt-level = 3

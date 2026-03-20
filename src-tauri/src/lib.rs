@@ -122,11 +122,11 @@ pub fn run() {
             let conn = db::open_database(&app_data_dir)
                 .expect("Failed to initialize database");
 
-            // Load Whisper STT model
-            let whisper = load_whisper_model(app);
-
-            // Load LLM model
-            let llm = load_llm_model(app);
+            // Models are loaded on-demand via reload_models command.
+            // Loading at startup can crash in debug builds due to ggml symbol conflicts.
+            let whisper: Option<Arc<WhisperEngine>> = None;
+            let llm: Option<Arc<LlmEngine>> = None;
+            log::info!("Models will be loaded on-demand via reload_models command");
 
             // Initialize correction engine
             let correction_engine = Arc::new(CorrectionEngine::new());
