@@ -10,8 +10,10 @@ use std::sync::{Arc, Mutex};
 pub struct AppState {
     pub db: Arc<Mutex<Connection>>,
     pub recorder: Arc<AudioRecorder>,
-    pub whisper: Option<Arc<WhisperEngine>>,
-    pub llm: Option<Arc<LlmEngine>>,
+    /// Hot-reloadable: locked briefly to clone the inner Arc, then released.
+    pub whisper: Arc<Mutex<Option<Arc<WhisperEngine>>>>,
+    /// Hot-reloadable: locked briefly to clone the inner Arc, then released.
+    pub llm: Arc<Mutex<Option<Arc<LlmEngine>>>>,
     pub last_injection: Arc<Mutex<Option<String>>>,
     pub correction_engine: Arc<CorrectionEngine>,
     pub download_cancel: Arc<AtomicBool>,

@@ -25,23 +25,29 @@ export function DownloadStep({
     if (startedRef.current) return;
     startedRef.current = true;
 
-    // Listen for progress events
-    const unlistenPromise = listen<DownloadProgress>(
+    // Listen for progress events from both downloads
+    const unlistenWhisper = listen<DownloadProgress>(
+      "whisper_download_progress",
+      (event) => {
+        onProgress(event.payload);
+      },
+    );
+    const unlistenLlm = listen<DownloadProgress>(
       "model_download_progress",
       (event) => {
         onProgress(event.payload);
       },
     );
 
-    // Start the download
-    onStartDownload().then(() => {
-      onComplete();
-    }).catch((e) => {
+    // Start the download — startDownload handles its own state transitions,
+    // so we only need to catch unexpected errors here.
+    onStartDownload().catch((e) => {
       onError(e instanceof Error ? e.message : "Download failed");
     });
 
     return () => {
-      void unlistenPromise.then((unlisten) => unlisten());
+      void unlistenWhisper.then((unlisten) => unlisten());
+      void unlistenLlm.then((unlisten) => unlisten());
     };
   }, [onProgress, onComplete, onError, onStartDownload]);
 
@@ -60,12 +66,12 @@ export function DownloadStep({
       </div>
 
       <h2 className="text-[20px] font-semibold text-black/85 mb-1">
-        Downloading Qwen 2.5
+        Downloading Models
       </h2>
       <p className="text-[13px] text-black/50 mb-6">
         {downloadError
           ? "Download failed"
-          : `${downloadedMb.toFixed(0)} MB / ${totalMb.toFixed(0)} MB`}
+          : `${downloadedMb.toFixed(0)} MB / ${totalMb > 0 ? totalMb.toFixed(0) : "?"} MB`}
       </p>
 
       {/* Progress bar */}

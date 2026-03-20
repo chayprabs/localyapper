@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { OllamaStatus, ConnectionResult } from "@/types/commands";
+import type { OllamaStatus, ConnectionResult, ModelsStatus } from "@/types/commands";
 
 export async function checkOllama(): Promise<OllamaStatus> {
   return invoke<OllamaStatus>("check_ollama");
@@ -7,6 +7,10 @@ export async function checkOllama(): Promise<OllamaStatus> {
 
 export async function downloadModel(): Promise<void> {
   return invoke<void>("download_model");
+}
+
+export async function downloadWhisperModel(): Promise<void> {
+  return invoke<void>("download_whisper_model");
 }
 
 export async function cancelModelDownload(): Promise<void> {
@@ -25,4 +29,12 @@ export async function testByokConnection(
     provider,
     api_key: apiKey,
   });
+}
+
+export async function reloadModels(): Promise<void> {
+  return invoke<void>("reload_models");
+}
+
+export async function checkModelsStatus(): Promise<ModelsStatus> {
+  return invoke<ModelsStatus>("check_models_status");
 }

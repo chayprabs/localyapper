@@ -137,5 +137,12 @@ pub struct PipelineEvent {
     pub error: Option<String>,
 }
 
+/// Status of loaded models.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ModelsStatus {
+    pub whisper_loaded: bool,
+    pub llm_loaded: bool,
+}
+
 /// All settings as a key-value map.
 pub type AllSettings = HashMap<String, String>;

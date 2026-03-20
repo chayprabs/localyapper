@@ -93,4 +93,9 @@ export interface ImportResult {
   errors: string[];
 }
 
+export interface ModelsStatus {
+  whisper_loaded: boolean;
+  llm_loaded: boolean;
+}
+
 export type AllSettings = Record<string, string>;

@@ -23,20 +23,37 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
-/// Attempt to load the Whisper model from bundled resources or app data directory.
+/// Candidate paths where the Whisper model might be found.
+pub(crate) fn whisper_model_candidates(app: &tauri::AppHandle) -> Vec<std::path::PathBuf> {
+    [
+        app.path().resource_dir().ok().map(|p| p.join("resources").join(WHISPER_MODEL_FILENAME)),
+        app.path().app_data_dir().ok().map(|p| p.join("models").join(WHISPER_MODEL_FILENAME)),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+/// Candidate paths where the LLM model might be found.
+pub(crate) fn llm_model_candidates(app: &tauri::AppHandle) -> Vec<std::path::PathBuf> {
+    [
+        app.path().app_data_dir().ok().map(|p| p.join("models").join(LLM_MODEL_FILENAME)),
+        app.path().resource_dir().ok().map(|p| p.join("resources").join(LLM_MODEL_FILENAME)),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+/// Attempt to load the Whisper model by scanning candidate paths.
 /// Returns `None` with a warning log if the model file is not found or fails to load.
 fn load_whisper_model(app: &tauri::App) -> Option<Arc<WhisperEngine>> {
-    let candidates = [
-        // Bundled resource path (production builds)
-        app.path().resource_dir().ok().map(|p| p.join("resources").join(WHISPER_MODEL_FILENAME)),
-        // App data directory (downloaded on first launch)
-        app.path().app_data_dir().ok().map(|p| p.join(WHISPER_MODEL_FILENAME)),
-    ];
+    let candidates = whisper_model_candidates(app.handle());
 
-    for candidate in candidates.into_iter().flatten() {
+    for candidate in &candidates {
         if candidate.exists() {
             log::info!("Found Whisper model at {}", candidate.display());
-            match WhisperEngine::new(&candidate) {
+            match WhisperEngine::new(candidate) {
                 Ok(engine) => {
                     log::info!("Whisper engine loaded successfully");
                     return Some(Arc::new(engine));
@@ -49,26 +66,21 @@ fn load_whisper_model(app: &tauri::App) -> Option<Arc<WhisperEngine>> {
     }
 
     log::warn!(
-        "Whisper model ({}) not found. STT will be unavailable until the model is placed in resources/ or app data.",
+        "Whisper model ({}) not found. STT will be unavailable until the model is downloaded.",
         WHISPER_MODEL_FILENAME
     );
     None
 }
 
-/// Attempt to load the LLM model from app data models dir or bundled resources.
+/// Attempt to load the LLM model by scanning candidate paths.
 /// Returns `None` with a warning log if the model file is not found or fails to load.
 fn load_llm_model(app: &tauri::App) -> Option<Arc<LlmEngine>> {
-    let candidates = [
-        // App data models directory (downloaded on first launch)
-        app.path().app_data_dir().ok().map(|p| p.join("models").join(LLM_MODEL_FILENAME)),
-        // Bundled resource path (production builds)
-        app.path().resource_dir().ok().map(|p| p.join("resources").join(LLM_MODEL_FILENAME)),
-    ];
+    let candidates = llm_model_candidates(app.handle());
 
-    for candidate in candidates.into_iter().flatten() {
+    for candidate in &candidates {
         if candidate.exists() {
             log::info!("Found LLM model at {}", candidate.display());
-            match LlmEngine::new(&candidate) {
+            match LlmEngine::new(candidate) {
                 Ok(engine) => {
                     log::info!("LLM engine loaded successfully");
                     return Some(Arc::new(engine));
@@ -89,6 +101,9 @@ fn load_llm_model(app: &tauri::App) -> Option<Arc<LlmEngine>> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .init();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
@@ -126,8 +141,8 @@ pub fn run() {
             app.manage(AppState {
                 db: Arc::new(Mutex::new(conn)),
                 recorder: Arc::new(AudioRecorder::new()),
-                whisper,
-                llm,
+                whisper: Arc::new(Mutex::new(whisper)),
+                llm: Arc::new(Mutex::new(llm)),
                 last_injection: Arc::new(Mutex::new(None)),
                 correction_engine,
                 download_cancel: Arc::new(AtomicBool::new(false)),
@@ -162,12 +177,15 @@ pub fn run() {
             commands::recording::inject_text,
             commands::recording::paste_last,
             commands::recording::cancel_recording,
-            // Model management (5)
+            // Model management (8)
             commands::models::check_ollama,
             commands::models::download_model,
+            commands::models::download_whisper_model,
             commands::models::cancel_model_download,
             commands::models::get_ollama_models,
             commands::models::test_byok_connection,
+            commands::models::reload_models,
+            commands::models::check_models_status,
             // Modes (6)
             commands::modes::get_modes,
             commands::modes::create_mode,

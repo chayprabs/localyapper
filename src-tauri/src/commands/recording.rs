@@ -30,8 +30,10 @@ pub(crate) async fn execute_pipeline(
 
     let whisper: Arc<WhisperEngine> = state
         .whisper
+        .lock()
+        .map_err(|e| format!("Whisper lock error: {e}"))?
         .as_ref()
-        .ok_or_else(|| "Whisper model not loaded. Place ggml-tiny.en.bin in resources/.".to_string())?
+        .ok_or_else(|| "Whisper model not loaded. Download it via the wizard or Models page.".to_string())?
         .clone();
 
     let trimmed_audio = vad_result.trimmed_audio;
@@ -54,7 +56,10 @@ pub(crate) async fn execute_pipeline(
 
     // LLM cleanup step — skipped if no model or mode says skip_llm
     let final_text = {
-        let should_run_llm = state.llm.is_some() && {
+        let llm_available = state.llm.lock()
+            .map(|g| g.is_some())
+            .unwrap_or(false);
+        let should_run_llm = llm_available && {
             let db = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
             match queries::get_active_mode(&db) {
                 Ok(mode) => !mode.skip_llm,
@@ -63,7 +68,9 @@ pub(crate) async fn execute_pipeline(
         };
 
         if should_run_llm {
-            let llm: Arc<LlmEngine> = state.llm.as_ref().expect("checked above").clone();
+            let llm: Arc<LlmEngine> = state.llm.lock()
+                .map_err(|e| format!("LLM lock error: {e}"))?
+                .as_ref().expect("checked above").clone();
 
             let system_prompt = {
                 let db = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;

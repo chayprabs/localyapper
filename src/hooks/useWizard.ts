@@ -3,9 +3,11 @@ import type { OllamaStatus, ConnectionResult, DownloadProgress } from "@/types/c
 import { setSetting } from "@/lib/commands/settings";
 import {
   downloadModel,
+  downloadWhisperModel,
   cancelModelDownload,
   checkOllama,
   testByokConnection,
+  reloadModels,
 } from "@/lib/commands/models";
 import { updateHotkey } from "@/lib/commands/hotkeys";
 
@@ -90,10 +92,16 @@ export function useWizard(onComplete: () => void) {
     setDownloadError(null);
     setDownloadProgress(null);
     try {
+      // Download Whisper STT model first (~75 MB)
+      await downloadWhisperModel();
+      // Download LLM model (~400 MB)
       await downloadModel();
+      // Hot-load both models into the engine
+      await reloadModels();
       setStep("download-complete");
     } catch (e) {
-      setDownloadError(e instanceof Error ? e.message : "Download failed");
+      const msg = typeof e === "string" ? e : (e instanceof Error ? e.message : "Download failed");
+      setDownloadError(msg);
     }
   }, []);
 
@@ -169,6 +177,11 @@ export function useWizard(onComplete: () => void) {
         await setSetting("byok_provider", byokProvider);
         await setSetting("byok_api_key", byokApiKey);
       }
+
+      // Ensure Whisper model is downloaded (needed for all paths)
+      await downloadWhisperModel();
+      // Hot-load any newly downloaded models
+      await reloadModels();
 
       // Save hotkey
       await updateHotkey("hotkey_record", hotkey);

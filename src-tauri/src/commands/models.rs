@@ -3,12 +3,16 @@ use std::sync::atomic::Ordering;
 use futures_util::StreamExt;
 use tauri::{Emitter, Manager};
 
-use crate::models::{ConnectionResult, DownloadProgress, OllamaStatus};
+use crate::models::{ConnectionResult, DownloadProgress, ModelsStatus, OllamaStatus};
 use crate::state::AppState;
 
 /// HuggingFace URL for the bundled LLM model.
 const MODEL_DOWNLOAD_URL: &str =
     "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf";
+
+/// HuggingFace URL for the Whisper tiny.en model.
+const WHISPER_DOWNLOAD_URL: &str =
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin";
 
 /// Check if Ollama is running and return available models.
 #[tauri::command]
@@ -243,4 +247,191 @@ pub async fn test_byok_connection(
             error: Some(format!("Request failed: {e}")),
         }),
     }
+}
+
+/// Download the Whisper STT model (ggml-tiny.en.bin) to app data dir.
+///
+/// Emits `whisper_download_progress` events with `DownloadProgress` payload.
+#[tauri::command]
+pub async fn download_whisper_model(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    state.download_cancel.store(false, Ordering::SeqCst);
+
+    let models_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("models");
+
+    std::fs::create_dir_all(&models_dir).map_err(|e| format!("Failed to create models dir: {e}"))?;
+
+    let dest_path = models_dir.join(crate::stt::whisper::WHISPER_MODEL_FILENAME);
+
+    // Skip if already downloaded
+    if dest_path.exists() {
+        log::info!("Whisper model already exists at {}", dest_path.display());
+        return Ok(());
+    }
+
+    let temp_path = models_dir.join(format!("{}.download", crate::stt::whisper::WHISPER_MODEL_FILENAME));
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(WHISPER_DOWNLOAD_URL)
+        .send()
+        .await
+        .map_err(|e| format!("Download request failed: {e}"))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Download failed with status: {}", resp.status()));
+    }
+
+    let total_bytes = resp.content_length().unwrap_or(0);
+    let total_mb = total_bytes / (1024 * 1024);
+
+    let mut stream = resp.bytes_stream();
+    let mut file = std::fs::File::create(&temp_path)
+        .map_err(|e| format!("Failed to create temp file: {e}"))?;
+
+    let mut downloaded: u64 = 0;
+    let start = std::time::Instant::now();
+    let cancel_flag = state.download_cancel.clone();
+
+    use std::io::Write;
+    while let Some(chunk) = stream.next().await {
+        if cancel_flag.load(Ordering::SeqCst) {
+            drop(file);
+            let _ = std::fs::remove_file(&temp_path);
+            return Err("Download cancelled".to_string());
+        }
+
+        let chunk = chunk.map_err(|e| format!("Download stream error: {e}"))?;
+        file.write_all(&chunk)
+            .map_err(|e| format!("Failed to write chunk: {e}"))?;
+
+        downloaded += chunk.len() as u64;
+        let elapsed = start.elapsed().as_secs_f64();
+        let speed_mbps = if elapsed > 0.0 {
+            (downloaded as f64 / (1024.0 * 1024.0)) / elapsed
+        } else {
+            0.0
+        };
+        let percent = if total_bytes > 0 {
+            (downloaded as f64 / total_bytes as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        let _ = app_handle.emit(
+            "whisper_download_progress",
+            DownloadProgress {
+                percent,
+                downloaded_mb: downloaded / (1024 * 1024),
+                total_mb,
+                speed_mbps,
+            },
+        );
+    }
+
+    drop(file);
+
+    std::fs::rename(&temp_path, &dest_path)
+        .map_err(|e| format!("Failed to rename downloaded model: {e}"))?;
+
+    log::info!("Whisper model downloaded to {}", dest_path.display());
+    Ok(())
+}
+
+/// Reload models from disk into AppState. Call after downloading new models.
+///
+/// Model loading is done on a blocking thread since whisper-rs and llama-cpp
+/// perform heavy C FFI operations that need a full OS thread stack.
+#[tauri::command]
+pub async fn reload_models(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    // Reload Whisper if not already loaded
+    let whisper_loaded = state.whisper.lock()
+        .map(|g| g.is_some())
+        .unwrap_or(false);
+
+    if !whisper_loaded {
+        let candidates = crate::whisper_model_candidates(&app_handle);
+        let whisper_mutex = state.whisper.clone();
+
+        tokio::task::spawn_blocking(move || {
+            for candidate in &candidates {
+                if candidate.exists() {
+                    match crate::stt::whisper::WhisperEngine::new(candidate) {
+                        Ok(engine) => {
+                            log::info!("Hot-loaded Whisper engine from {}", candidate.display());
+                            if let Ok(mut g) = whisper_mutex.lock() {
+                                *g = Some(std::sync::Arc::new(engine));
+                            }
+                            break;
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to load Whisper from {}: {e}", candidate.display());
+                        }
+                    }
+                }
+            }
+        })
+        .await
+        .map_err(|e| format!("Whisper load task failed: {e}"))?;
+    }
+
+    // Reload LLM if not already loaded
+    let llm_loaded = state.llm.lock()
+        .map(|g| g.is_some())
+        .unwrap_or(false);
+
+    if !llm_loaded {
+        let candidates = crate::llm_model_candidates(&app_handle);
+        let llm_mutex = state.llm.clone();
+
+        tokio::task::spawn_blocking(move || {
+            for candidate in &candidates {
+                if candidate.exists() {
+                    match crate::llm::engine::LlmEngine::new(candidate) {
+                        Ok(engine) => {
+                            log::info!("Hot-loaded LLM engine from {}", candidate.display());
+                            if let Ok(mut g) = llm_mutex.lock() {
+                                *g = Some(std::sync::Arc::new(engine));
+                            }
+                            break;
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to load LLM from {}: {e}", candidate.display());
+                        }
+                    }
+                }
+            }
+        })
+        .await
+        .map_err(|e| format!("LLM load task failed: {e}"))?;
+    }
+
+    Ok(())
+}
+
+/// Check which models are currently loaded.
+#[tauri::command]
+pub async fn check_models_status(
+    state: tauri::State<'_, AppState>,
+) -> Result<ModelsStatus, String> {
+    let whisper_loaded = state.whisper.lock()
+        .map(|g| g.is_some())
+        .unwrap_or(false);
+    let llm_loaded = state.llm.lock()
+        .map(|g| g.is_some())
+        .unwrap_or(false);
+
+    Ok(ModelsStatus {
+        whisper_loaded,
+        llm_loaded,
+    })
 }
