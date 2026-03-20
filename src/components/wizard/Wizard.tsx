@@ -42,7 +42,6 @@ export function Wizard() {
             downloadProgress={wizard.downloadProgress}
             downloadError={wizard.downloadError}
             onProgress={wizard.handleDownloadProgress}
-            onComplete={wizard.handleDownloadComplete}
             onError={wizard.handleDownloadError}
             onStartDownload={wizard.startDownload}
             onCancel={wizard.cancelDownload}

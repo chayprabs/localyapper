@@ -6,7 +6,6 @@ export function DownloadStep({
   downloadProgress,
   downloadError,
   onProgress,
-  onComplete,
   onError,
   onStartDownload,
   onCancel,
@@ -14,7 +13,6 @@ export function DownloadStep({
   downloadProgress: DownloadProgress | null;
   downloadError: string | null;
   onProgress: (progress: DownloadProgress) => void;
-  onComplete: () => void;
   onError: (error: string) => void;
   onStartDownload: () => Promise<void>;
   onCancel: () => void;
@@ -25,31 +23,39 @@ export function DownloadStep({
     if (startedRef.current) return;
     startedRef.current = true;
 
-    // Listen for progress events from both downloads
-    const unlistenWhisper = listen<DownloadProgress>(
-      "whisper_download_progress",
-      (event) => {
-        onProgress(event.payload);
-      },
-    );
-    const unlistenLlm = listen<DownloadProgress>(
-      "model_download_progress",
-      (event) => {
-        onProgress(event.payload);
-      },
-    );
+    let unlistenWhisperFn: (() => void) | null = null;
+    let unlistenLlmFn: (() => void) | null = null;
 
-    // Start the download — startDownload handles its own state transitions,
-    // so we only need to catch unexpected errors here.
-    onStartDownload().catch((e) => {
-      onError(e instanceof Error ? e.message : "Download failed");
-    });
+    async function run() {
+      // Register listeners FIRST and wait for them to be ready
+      unlistenWhisperFn = await listen<DownloadProgress>(
+        "whisper_download_progress",
+        (event) => onProgress(event.payload),
+      );
+      unlistenLlmFn = await listen<DownloadProgress>(
+        "model_download_progress",
+        (event) => onProgress(event.payload),
+      );
+
+      // NOW start the download
+      onStartDownload().catch((e) => {
+        onError(
+          typeof e === "string"
+            ? e
+            : e instanceof Error
+              ? e.message
+              : "Download failed",
+        );
+      });
+    }
+
+    run();
 
     return () => {
-      void unlistenWhisper.then((unlisten) => unlisten());
-      void unlistenLlm.then((unlisten) => unlisten());
+      unlistenWhisperFn?.();
+      unlistenLlmFn?.();
     };
-  }, [onProgress, onComplete, onError, onStartDownload]);
+  }, [onProgress, onError, onStartDownload]);
 
   const percent = downloadProgress?.percent ?? 0;
   const downloadedMb = downloadProgress?.downloaded_mb ?? 0;
@@ -99,7 +105,7 @@ export function DownloadStep({
           <button
             onClick={() => {
               startedRef.current = false;
-              onStartDownload().then(onComplete).catch((e) =>
+              onStartDownload().catch((e) =>
                 onError(e instanceof Error ? e.message : "Download failed"),
               );
             }}
