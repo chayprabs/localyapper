@@ -38,31 +38,13 @@ export function Sidebar() {
     <aside
       className={cn(
         "bg-[#eeeeee] flex flex-col h-full shrink-0 transition-[width] duration-200 overflow-hidden",
-        isCollapsed ? "w-12" : "w-[240px]"
+        isCollapsed ? "w-12" : "w-[220px]"
       )}
     >
-      {/* Collapse toggle button */}
-      <div
-        className={cn(
-          "flex pt-2 pb-1",
-          isCollapsed ? "justify-center" : "justify-end px-3"
-        )}
-      >
-        <button
-          onClick={toggle}
-          className="w-8 h-8 flex items-center justify-center text-black/35 hover:bg-black/[0.08] rounded-md transition-colors"
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <span className="material-symbols-outlined text-[18px]">
-            view_sidebar
-          </span>
-        </button>
-      </div>
-
       {/* Nav items */}
       <nav
         className={cn(
-          "flex flex-col gap-1",
+          "flex flex-col gap-1 pt-4 flex-1",
           isCollapsed ? "px-1.5" : "px-3"
         )}
       >
@@ -96,6 +78,21 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Bottom: collapse toggle */}
+      <div className="flex justify-center py-3">
+        <button
+          onClick={toggle}
+          className="w-8 h-8 flex items-center justify-center text-black/35 hover:bg-black/[0.08] rounded-md transition-colors"
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <span className="material-symbols-outlined text-[18px]">
+            {isCollapsed
+              ? "keyboard_double_arrow_right"
+              : "keyboard_double_arrow_left"}
+          </span>
+        </button>
+      </div>
     </aside>
   );
 }
