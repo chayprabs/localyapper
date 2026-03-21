@@ -19,7 +19,7 @@ Goal: App launches, database initializes, no crashes.
 - [x] Expose start_recording() and stop_recording() commands
 
 ### Phase 3: Speech to Text (COMPLETE)
-- [x] stt/whisper.rs — whisper-rs wrapper loading bundled ggml-tiny.en.bin
+- [x] stt/whisper.rs — whisper-rs wrapper loading ggml-base.en.bin from app data
 - [x] Model loaded once at startup, reused for all transcriptions
 - [x] Run transcription on blocking thread (whisper-rs is sync)
 
@@ -118,7 +118,7 @@ Goal: App launches, database initializes, no crashes.
 ### Phase 14: Models Page (COMPLETE)
 - [x] ModelsPage.tsx — full page with two sections (Speech Recognition + Language Model)
 - [x] useModels.ts hook — settings load, optimistic updates, Ollama check, BYOK test
-- [x] Whisper model dropdown (tiny.en/base.en/small.en/medium.en) with custom pill-style selector
+- [x] Whisper base.en model with download/status UI
 - [x] LLM segmented control (Local Model | Ollama | BYOK) with 3 tab views
 - [x] Local tab: active model name + service status (green dot)
 - [x] Ollama tab: model dropdown from Ollama API, status with model count, URL display

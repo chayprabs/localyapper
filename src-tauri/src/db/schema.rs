@@ -75,7 +75,7 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
         ("hotkey_cancel", "Escape"),
         ("hotkey_paste_last", "Alt+Shift+V"),
         ("hotkey_open_app", "Alt+L"),
-        ("whisper_model", "tiny.en"),
+        ("whisper_model", "base.en"),
         ("llm_mode", "local"),
         ("ollama_model", "qwen2.5:0.5b"),
         ("byok_provider", "openai"),

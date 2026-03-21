@@ -42,8 +42,8 @@ The user holds a configurable hotkey, speaks naturally, releases the key, and po
 
 **Platform:** Windows 10+, macOS 12+, Linux (X11 + Wayland)  
 **License:** MIT  
-**App download size:** ~90MB (Whisper model bundled)  
-**LLM download:** ~400MB on first launch (optional, can skip)  
+**App download size:** ~15MB (models downloaded on first launch, ~545MB total)
+**LLM download:** ~397MB on first launch (optional, can skip)  
 
 ---
 
@@ -180,7 +180,7 @@ Voice dictation tools in 2026 fall into two categories:
 | Charts | Recharts | 2.x | Dashboard stats |
 | Database | SQLite via rusqlite | 0.31 (bundled) | All persistence |
 | Audio capture | cpal | 0.15 | Cross-platform audio |
-| Speech-to-text | whisper-rs | 0.11 | Whisper model wrapper |
+| Speech-to-text | whisper-rs | 0.16 | Whisper model wrapper |
 | LLM inference | llama-cpp-rs | latest | Local LLM runtime |
 | HTTP client | reqwest | 0.12 | Model download + BYOK |
 | Async runtime | tokio | 1.x (full) | Async Rust |
@@ -195,7 +195,7 @@ Voice dictation tools in 2026 fall into two categories:
 ### Bundled model files
 | File | Size | Location | Purpose |
 |---|---|---|---|
-| ggml-tiny.en.bin | ~75MB | src-tauri/resources/ | Whisper STT — always bundled |
+| ggml-base.en.bin | ~148MB | {APP_DATA}/models/ | Whisper STT — downloaded on first launch |
 | qwen2.5-0.5b-q4.gguf | ~400MB | {APP_DATA}/models/ | LLM cleanup — downloaded on first launch |
 
 ### Platform-specific injection dependencies
@@ -237,7 +237,7 @@ Voice dictation tools in 2026 fall into two categories:
         ↓ 16kHz mono PCM f32 samples
 [audio/vad.rs] — energy-based silence filter
         ↓ filtered audio buffer (includes 0.5s pre-roll)
-[stt/whisper.rs] — whisper-rs with ggml-tiny.en.bin
+[stt/whisper.rs] — whisper-rs with ggml-base.en.bin
         ↓ raw text string (e.g. "helli can you schedule a meeting")
 [correction/engine.rs] — exact-match substitution from personal_dictionary
         ↓ corrected text (e.g. "hello can you schedule a meeting")
@@ -1000,7 +1000,7 @@ INSERT OR IGNORE INTO settings VALUES ('hotkey_hands_free',       'Alt+Alt+Space
 INSERT OR IGNORE INTO settings VALUES ('hotkey_cancel',           'Escape',         datetime('now'));
 INSERT OR IGNORE INTO settings VALUES ('hotkey_paste_last',       'Alt+Shift+V',    datetime('now'));
 INSERT OR IGNORE INTO settings VALUES ('hotkey_open_app',         'Alt+L',          datetime('now'));
-INSERT OR IGNORE INTO settings VALUES ('whisper_model',           'tiny.en',        datetime('now'));
+INSERT OR IGNORE INTO settings VALUES ('whisper_model',           'base.en',        datetime('now'));
 INSERT OR IGNORE INTO settings VALUES ('llm_mode',                'local',          datetime('now')); -- local | byok | whisper_only
 INSERT OR IGNORE INTO settings VALUES ('ollama_model',            'qwen2.5:0.5b',   datetime('now'));
 INSERT OR IGNORE INTO settings VALUES ('byok_provider',           'openai',         datetime('now')); -- openai | anthropic | groq
@@ -1214,7 +1214,7 @@ Dependencies must be respected. Each phase must compile and run before the next 
 
 ### Phase 3 — Speech to text
 **Goal:** Audio is transcribed to raw text.
-- Implement `stt/whisper.rs` — whisper-rs wrapper loading bundled ggml-tiny.en.bin
+- Implement `stt/whisper.rs` — whisper-rs wrapper loading ggml-base.en.bin from app data
 - Model loaded once at startup, reused for all transcriptions
 - Run transcription on a blocking thread (not async — whisper-rs is sync)
 - Emit `transcription_complete` event to frontend when done
@@ -1445,7 +1445,7 @@ localyapper/
 │       └── release.yml      ← tauri-action CI/CD
 ├── src-tauri/
 │   ├── src/                 ← All Rust code
-│   ├── resources/           ← Bundled assets (Whisper model, icons)
+│   ├── resources/           ← Bundled assets (icons)
 │   ├── capabilities/        ← IPC security permissions
 │   ├── Cargo.toml
 │   ├── build.rs
@@ -1630,18 +1630,19 @@ Output: up to 8,192 tokens
 
 ### C. Whisper model specs
 
-**ggml-tiny.en.bin**
-- Download: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin`
-- Size: 75MB
-- Language: English only
-- Speed: ~1-3s for 30s audio on modern CPU
-- Accuracy: Good for clear speech, struggles with heavy accents
-
-**ggml-base.en.bin** (upgrade option in settings)
+**ggml-base.en.bin** (default)
 - Download: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin`
 - Size: 148MB
-- Speed: ~2-5s for 30s audio
-- Accuracy: Noticeably better, handles accents better
+- Language: English only
+- Speed: ~4.5s for 30s audio on modern CPU
+- WER: 4.3% clean, 12.8% noisy
+- Accuracy: Good balance of speed and accuracy for dictation
+
+**ggml-tiny.en.bin** (legacy fallback)
+- Download: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin`
+- Size: 75MB
+- Speed: ~1-3s for 30s audio
+- Accuracy: Fast but lower quality, struggles with accents
 
 ### D. Platform text injection implementation details
 

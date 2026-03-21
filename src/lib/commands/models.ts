@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { OllamaStatus, ConnectionResult, ModelsStatus, LlmFileStatus } from "@/types/commands";
+import type { OllamaStatus, ConnectionResult, ModelsStatus, LlmFileStatus, WhisperFileStatus } from "@/types/commands";
 
 export async function checkOllama(): Promise<OllamaStatus> {
   return invoke<OllamaStatus>("check_ollama");
@@ -9,8 +9,8 @@ export async function downloadModel(): Promise<void> {
   return invoke<void>("download_model");
 }
 
-export async function downloadWhisperModel(): Promise<void> {
-  return invoke<void>("download_whisper_model");
+export async function downloadWhisperModel(model?: string): Promise<void> {
+  return invoke<void>("download_whisper_model", { model: model ?? null });
 }
 
 export async function cancelModelDownload(): Promise<void> {
@@ -45,4 +45,12 @@ export async function checkLlmFileExists(): Promise<LlmFileStatus> {
 
 export async function deleteLlmModel(): Promise<void> {
   return invoke<void>("delete_llm_model");
+}
+
+export async function checkWhisperFileExists(model?: string): Promise<WhisperFileStatus> {
+  return invoke<WhisperFileStatus>("check_whisper_file_exists", { model: model ?? null });
+}
+
+export async function deleteWhisperModel(model: string): Promise<void> {
+  return invoke<void>("delete_whisper_model", { model });
 }

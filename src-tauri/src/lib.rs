@@ -18,27 +18,46 @@ use audio::capture::AudioRecorder;
 use correction::engine::CorrectionEngine;
 use llm::engine::LlmEngine;
 use state::AppState;
-use stt::whisper::{WhisperEngine, WHISPER_MODEL_FILENAME};
+use stt::whisper::WhisperEngine;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 /// Candidate paths where the Whisper model might be found.
-pub(crate) fn whisper_model_candidates(app: &tauri::AppHandle) -> Vec<std::path::PathBuf> {
-    [
-        app.path().resource_dir().ok().map(|p| p.join("resources").join(WHISPER_MODEL_FILENAME)),
-        app.path().app_data_dir().ok().map(|p| p.join("models").join(WHISPER_MODEL_FILENAME)),
-    ]
-    .into_iter()
-    .flatten()
-    .collect()
+///
+/// Checks for the selected model first, then falls back to other variants
+/// for backwards compatibility (e.g. user had tiny.en before upgrading).
+pub(crate) fn whisper_model_candidates(app: &tauri::AppHandle, model_setting: &str) -> Vec<std::path::PathBuf> {
+    let models_dir = match app.path().app_data_dir() {
+        Ok(d) => d.join("models"),
+        Err(_) => return vec![],
+    };
+
+    let primary = models_dir.join(stt::whisper::whisper_model_filename(model_setting));
+
+    // Fallback: if selected model isn't found, try tiny.en (backwards compat)
+    let fallback = if model_setting != "tiny.en" {
+        Some(models_dir.join(stt::whisper::whisper_model_filename("tiny.en")))
+    } else {
+        None
+    };
+
+    let mut candidates = vec![primary];
+    if let Some(fb) = fallback {
+        candidates.push(fb);
+    }
+    candidates
 }
 
 
 /// Attempt to load the Whisper model by scanning candidate paths.
+/// Reads the `whisper_model` setting from DB to determine which model to load.
 /// Returns `None` with a warning log if the model file is not found or fails to load.
-fn load_whisper_model(app: &tauri::App) -> Option<Arc<WhisperEngine>> {
-    let candidates = whisper_model_candidates(app.handle());
+fn load_whisper_model(app: &tauri::App, conn: &rusqlite::Connection) -> Option<Arc<WhisperEngine>> {
+    let model_setting = db::queries::get_setting(conn, "whisper_model")
+        .unwrap_or_else(|_| stt::whisper::DEFAULT_WHISPER_MODEL.to_string());
+
+    let candidates = whisper_model_candidates(app.handle(), &model_setting);
 
     for candidate in &candidates {
         if candidate.exists() {
@@ -57,7 +76,7 @@ fn load_whisper_model(app: &tauri::App) -> Option<Arc<WhisperEngine>> {
 
     log::warn!(
         "Whisper model ({}) not found. STT will be unavailable until the model is downloaded.",
-        WHISPER_MODEL_FILENAME
+        stt::whisper::whisper_model_filename(&model_setting)
     );
     None
 }
@@ -87,7 +106,7 @@ pub fn run() {
                 .expect("Failed to initialize database");
 
             // Load Whisper at startup (safe now that llama-cpp-2 is removed).
-            let whisper = load_whisper_model(app);
+            let whisper = load_whisper_model(app, &conn);
             if whisper.is_some() {
                 log::info!("Whisper model loaded at startup");
             } else {
@@ -146,7 +165,7 @@ pub fn run() {
             commands::recording::inject_text,
             commands::recording::paste_last,
             commands::recording::cancel_recording,
-            // Model management (8)
+            // Model management (12)
             commands::models::check_ollama,
             commands::models::download_model,
             commands::models::download_whisper_model,
@@ -157,6 +176,8 @@ pub fn run() {
             commands::models::check_models_status,
             commands::models::check_llm_file_exists,
             commands::models::delete_llm_model,
+            commands::models::check_whisper_file_exists,
+            commands::models::delete_whisper_model,
             // Modes (6)
             commands::modes::get_modes,
             commands::modes::create_mode,

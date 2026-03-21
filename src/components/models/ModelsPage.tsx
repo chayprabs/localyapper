@@ -1,16 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useModels } from "@/hooks/useModels";
 
-/* ------------------------------------------------------------------ */
-/*  Whisper model options                                              */
-/* ------------------------------------------------------------------ */
-const WHISPER_OPTIONS: { value: string; label: string }[] = [
-  { value: "tiny.en", label: "tiny.en \u2014 Fast" },
-  { value: "base.en", label: "base.en \u2014 Balanced" },
-  { value: "small.en", label: "small.en \u2014 Accurate" },
-  { value: "medium.en", label: "medium.en \u2014 Best" },
-];
-
 const PROVIDER_OPTIONS: { value: string; label: string }[] = [
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
@@ -368,7 +358,6 @@ function ByokRows({
 /* ------------------------------------------------------------------ */
 export function ModelsPage() {
   const {
-    whisperModel,
     llmMode,
     ollamaModel,
     byokProvider,
@@ -377,7 +366,6 @@ export function ModelsPage() {
     connectionResult,
     isLoading,
     isTesting,
-    setWhisperModel,
     setLlmMode,
     setOllamaModel,
     setByokProvider,
@@ -391,6 +379,14 @@ export function ModelsPage() {
     cancelLocalModelDownload,
     deleteLocalModel,
     loadLocalModel,
+    whisperFileStatus,
+    whisperLoaded,
+    whisperDownloading,
+    whisperDownloadProgress,
+    downloadWhisperModelAction,
+    cancelWhisperDownload,
+    deleteWhisperModelAction,
+    loadWhisperModel,
   } = useModels();
 
   if (isLoading) {
@@ -414,26 +410,86 @@ export function ModelsPage() {
           SPEECH RECOGNITION
         </h2>
         <div className="bg-white rounded-[10px] border border-black/[0.07] shadow-sm overflow-hidden">
-          <div className="h-[52px] px-4 flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="text-[13px] font-semibold text-black/85">
-                Whisper Model
-              </span>
-              <span className="text-[12px] text-black/[0.40]">
-                Transcribes your voice locally
-              </span>
+          <Row label="Model">
+            <span className="text-[13px] text-black/50">Whisper base.en (148 MB)</span>
+          </Row>
+
+          {whisperDownloading ? (
+            <div className="px-4 pb-3 pt-1">
+              <div className="w-full h-1.5 rounded-full bg-black/[0.06] mb-1.5">
+                <div
+                  className="h-full rounded-full bg-[#0058bc] transition-all duration-300"
+                  style={{ width: `${Math.min(whisperDownloadProgress?.percent ?? 0, 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] text-black/[0.40] mb-2">
+                <span>{(whisperDownloadProgress?.percent ?? 0).toFixed(0)}% — {whisperDownloadProgress?.downloaded_mb ?? 0} / {whisperDownloadProgress?.total_mb ?? 148} MB</span>
+                <span>{(whisperDownloadProgress?.speed_mbps ?? 0) > 0 ? `${(whisperDownloadProgress?.speed_mbps ?? 0).toFixed(1)} MB/s` : "Starting..."}</span>
+              </div>
+              <button
+                onClick={cancelWhisperDownload}
+                className="text-[12px] text-[#ba1a1a] hover:underline"
+              >
+                Cancel
+              </button>
             </div>
-            <Dropdown
-              value={whisperModel}
-              options={WHISPER_OPTIONS}
-              onChange={(v) =>
-                setWhisperModel(
-                  v as "tiny.en" | "base.en" | "small.en" | "medium.en",
-                )
-              }
-              variant="pill"
-            />
-          </div>
+          ) : (
+            <Row label="File Status">
+              {whisperFileStatus.exists ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-[#28CD41]" />
+                    <span className="text-[13px] font-medium text-[#28CD41]">
+                      Downloaded ({whisperFileStatus.size_mb} MB)
+                    </span>
+                  </div>
+                  <button
+                    onClick={deleteWhisperModelAction}
+                    className="text-[12px] text-[#ba1a1a] hover:underline"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-[#FF9500]" />
+                    <span className="text-[13px] font-medium text-black/50">Not downloaded</span>
+                  </div>
+                  <button
+                    onClick={downloadWhisperModelAction}
+                    className="h-6 px-3 bg-[#0058bc] text-white text-[12px] font-medium rounded-md hover:bg-[#004ea8] transition-colors"
+                  >
+                    Download
+                  </button>
+                </div>
+              )}
+            </Row>
+          )}
+
+          {whisperFileStatus.exists && !whisperDownloading && (
+            <Row label="Engine Status" isLast>
+              {whisperLoaded ? (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-[#28CD41]" />
+                  <span className="text-[13px] font-medium text-[#28CD41]">Loaded</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-black/[0.25]" />
+                    <span className="text-[13px] font-medium text-black/50">Not loaded</span>
+                  </div>
+                  <button
+                    onClick={loadWhisperModel}
+                    className="h-6 px-3 bg-[#0058bc] text-white text-[12px] font-medium rounded-md hover:bg-[#004ea8] transition-colors"
+                  >
+                    Load Model
+                  </button>
+                </div>
+              )}
+            </Row>
+          )}
         </div>
       </section>
 

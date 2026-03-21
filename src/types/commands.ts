@@ -103,4 +103,10 @@ export interface LlmFileStatus {
   size_mb: number;
 }
 
+export interface WhisperFileStatus {
+  exists: boolean;
+  size_mb: number;
+  model_name: string;
+}
+
 export type AllSettings = Record<string, string>;

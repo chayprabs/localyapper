@@ -7,7 +7,7 @@ Windows 10+ / macOS 12+ / Linux (X11 + Wayland).
 License: MIT.
 
 ## Stack — exact versions, do not deviate
-- **Backend**: Tauri 2, Rust (stable 1.75+), rusqlite 0.31 (bundled), cpal 0.15, whisper-rs 0.11, llama-cpp-rs, tokio 1.x, serde, enigo 0.2
+- **Backend**: Tauri 2, Rust (stable 1.75+), rusqlite 0.31 (bundled), cpal 0.15, whisper-rs 0.16, mistralrs 0.7, tokio 1.x, serde, enigo 0.2
 - **Frontend**: React 19, TypeScript 5, Vite 5, Tailwind CSS 3, shadcn/ui, Jotai 2, Recharts 2
 - **IPC**: Tauri command system — frontend calls Rust via invoke() from @tauri-apps/api/core
 
@@ -20,12 +20,12 @@ License: MIT.
 - No cloud processing ever — everything local
 
 ## Voice pipeline data flow
-hotkey → audio/capture.rs (cpal 16kHz mono + 0.5s pre-roll) → audio/vad.rs (energy filter) → stt/whisper.rs (ggml-tiny.en.bin) → correction/engine.rs (dictionary lookup) → context/detector.rs (focused app) → llm/prompt.rs (mode system prompt) → llm/engine.rs (llama-cpp-rs) → injection/injector.rs (clipboard save → paste → restore) → text appears in app
+hotkey → audio/capture.rs (cpal 16kHz mono + 0.5s pre-roll) → audio/vad.rs (energy filter) → stt/whisper.rs (ggml-base.en.bin) → correction/engine.rs (dictionary lookup) → context/detector.rs (focused app) → llm/prompt.rs (mode system prompt) → llm/engine.rs (mistralrs) → injection/injector.rs (clipboard save → paste → restore) → text appears in app
 
 ## Models — FINAL, never change
-- STT: ggml-tiny.en.bin bundled in src-tauri/resources/ (~75MB)
-- LLM: qwen2.5-0.5b-q4.gguf downloaded to app data dir on first launch (~400MB)
-- LLM runtime: llama-cpp-rs crate (no Ollama dependency)
+- STT: ggml-base.en.bin downloaded to app data dir on first launch (~148MB)
+- LLM: Qwen3-0.6B-Q4_K_M.gguf downloaded to app data dir on first launch (~397MB)
+- LLM runtime: mistralrs crate (Candle backend, no Ollama dependency)
 - BYOK alternative: OpenAI / Anthropic / Groq via user API key
 
 ## Session limits

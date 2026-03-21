@@ -151,5 +151,13 @@ pub struct LlmFileStatus {
     pub size_mb: u64,
 }
 
+/// Whisper model file status (exists on disk + size).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WhisperFileStatus {
+    pub exists: bool,
+    pub size_mb: u64,
+    pub model_name: String,
+}
+
 /// All settings as a key-value map.
 pub type AllSettings = HashMap<String, String>;

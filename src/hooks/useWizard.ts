@@ -92,9 +92,9 @@ export function useWizard(onComplete: () => void) {
     setDownloadError(null);
     setDownloadProgress(null);
     try {
-      // Download Whisper STT model first (~75 MB)
+      // Download Whisper base.en first (~148 MB)
       await downloadWhisperModel();
-      // Download LLM model (~400 MB)
+      // Download LLM model (~397 MB)
       await downloadModel();
       // Hot-load both models into the engine
       await reloadModels();

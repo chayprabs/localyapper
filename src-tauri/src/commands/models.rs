@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use futures_util::StreamExt;
 use tauri::{Emitter, Manager};
 
-use crate::models::{ConnectionResult, DownloadProgress, LlmFileStatus, ModelsStatus, OllamaStatus};
+use crate::models::{ConnectionResult, DownloadProgress, LlmFileStatus, ModelsStatus, OllamaStatus, WhisperFileStatus};
 use crate::state::AppState;
 
 /// HuggingFace URL for the Qwen3 0.6B GGUF model.
@@ -14,9 +14,7 @@ const MODEL_DOWNLOAD_URL: &str =
 const TOKENIZER_DOWNLOAD_URL: &str =
     "https://huggingface.co/Qwen/Qwen3-0.6B/resolve/main/tokenizer.json";
 
-/// HuggingFace URL for the Whisper tiny.en model.
-const WHISPER_DOWNLOAD_URL: &str =
-    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin";
+// Whisper download URLs are now dynamic — see stt::whisper::whisper_download_url()
 
 /// Check if Ollama is running and return available models.
 #[tauri::command]
@@ -296,15 +294,22 @@ pub async fn test_byok_connection(
     }
 }
 
-/// Download the Whisper STT model (ggml-tiny.en.bin) to app data dir.
+/// Download a Whisper STT model to app data dir.
 ///
+/// Accepts an optional model variant (e.g. "base.en", "tiny.en"). Defaults to `DEFAULT_WHISPER_MODEL`.
 /// Emits `whisper_download_progress` events with `DownloadProgress` payload.
+/// Supports resume via HTTP Range headers.
 #[tauri::command]
 pub async fn download_whisper_model(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
+    model: Option<String>,
 ) -> Result<(), String> {
     state.download_cancel.store(false, Ordering::SeqCst);
+
+    let model_name = model.as_deref().unwrap_or(crate::stt::whisper::DEFAULT_WHISPER_MODEL);
+    let filename = crate::stt::whisper::whisper_model_filename(model_name);
+    let url = crate::stt::whisper::whisper_download_url(model_name);
 
     let models_dir = app_handle
         .path()
@@ -314,39 +319,67 @@ pub async fn download_whisper_model(
 
     std::fs::create_dir_all(&models_dir).map_err(|e| format!("Failed to create models dir: {e}"))?;
 
-    let dest_path = models_dir.join(crate::stt::whisper::WHISPER_MODEL_FILENAME);
+    let dest_path = models_dir.join(&filename);
 
-    // Skip if already downloaded
+    // Skip if already downloaded and file is not corrupt (> 1 MB)
     if dest_path.exists() {
-        log::info!("Whisper model already exists at {}", dest_path.display());
-        return Ok(());
+        let size = std::fs::metadata(&dest_path).map(|m| m.len()).unwrap_or(0);
+        if size > 1_000_000 {
+            log::info!("Whisper model already exists at {} ({} bytes)", dest_path.display(), size);
+            return Ok(());
+        }
+        log::warn!("Whisper model at {} is too small ({} bytes), re-downloading", dest_path.display(), size);
+        let _ = std::fs::remove_file(&dest_path);
     }
 
-    let temp_path = models_dir.join(format!("{}.download", crate::stt::whisper::WHISPER_MODEL_FILENAME));
+    let temp_path = models_dir.join(format!("{filename}.download"));
 
     let client = reqwest::Client::new();
-    let resp = client
-        .get(WHISPER_DOWNLOAD_URL)
-        .send()
-        .await
-        .map_err(|e| format!("Download request failed: {e}"))?;
 
-    if !resp.status().is_success() {
-        return Err(format!("Download failed with status: {}", resp.status()));
+    // Check for partial download to support resume
+    let existing_bytes = if temp_path.exists() {
+        std::fs::metadata(&temp_path).map(|m| m.len()).unwrap_or(0)
+    } else {
+        0
+    };
+
+    let mut req = client.get(&url);
+    if existing_bytes > 0 {
+        req = req.header("Range", format!("bytes={existing_bytes}-"));
+        log::info!("Resuming Whisper download from {} bytes", existing_bytes);
     }
 
-    let total_bytes = resp.content_length().unwrap_or(0);
+    let resp = req.send().await
+        .map_err(|e| format!("Download request failed: {e}"))?;
+
+    let status = resp.status();
+    if !status.is_success() && status != reqwest::StatusCode::PARTIAL_CONTENT {
+        return Err(format!("Download failed with status: {status}"));
+    }
+
+    let is_resume = status == reqwest::StatusCode::PARTIAL_CONTENT;
+    let total_bytes = if is_resume {
+        resp.content_length().unwrap_or(0) + existing_bytes
+    } else {
+        resp.content_length().unwrap_or(0)
+    };
     let total_mb = total_bytes / (1024 * 1024);
 
     let mut stream = resp.bytes_stream();
-    let mut file = std::fs::File::create(&temp_path)
-        .map_err(|e| format!("Failed to create temp file: {e}"))?;
 
-    let mut downloaded: u64 = 0;
+    use std::io::Write;
+    let mut file = if existing_bytes > 0 && is_resume {
+        std::fs::OpenOptions::new().append(true).open(&temp_path)
+            .map_err(|e| format!("Failed to open temp file for resume: {e}"))?
+    } else {
+        std::fs::File::create(&temp_path)
+            .map_err(|e| format!("Failed to create temp file: {e}"))?
+    };
+
+    let mut downloaded: u64 = if is_resume { existing_bytes } else { 0 };
     let start = std::time::Instant::now();
     let cancel_flag = state.download_cancel.clone();
 
-    use std::io::Write;
     while let Some(chunk) = stream.next().await {
         if cancel_flag.load(Ordering::SeqCst) {
             drop(file);
@@ -387,7 +420,73 @@ pub async fn download_whisper_model(
     std::fs::rename(&temp_path, &dest_path)
         .map_err(|e| format!("Failed to rename downloaded model: {e}"))?;
 
-    log::info!("Whisper model downloaded to {}", dest_path.display());
+    log::info!("Whisper model ({}) downloaded to {}", model_name, dest_path.display());
+    Ok(())
+}
+
+/// Check if a Whisper model file exists on disk.
+#[tauri::command]
+pub async fn check_whisper_file_exists(
+    app_handle: tauri::AppHandle,
+    model: Option<String>,
+) -> Result<WhisperFileStatus, String> {
+    let model_name = model.unwrap_or_else(|| {
+        crate::stt::whisper::DEFAULT_WHISPER_MODEL.to_string()
+    });
+    let filename = crate::stt::whisper::whisper_model_filename(&model_name);
+
+    let models_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("models");
+
+    let path = models_dir.join(&filename);
+
+    if path.exists() {
+        let size_bytes = std::fs::metadata(&path)
+            .map(|m| m.len())
+            .unwrap_or(0);
+        Ok(WhisperFileStatus {
+            exists: true,
+            size_mb: size_bytes / (1024 * 1024),
+            model_name,
+        })
+    } else {
+        Ok(WhisperFileStatus {
+            exists: false,
+            size_mb: 0,
+            model_name,
+        })
+    }
+}
+
+/// Delete a Whisper model file and unload from AppState.
+#[tauri::command]
+pub async fn delete_whisper_model(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    model: String,
+) -> Result<(), String> {
+    // Unload from AppState
+    if let Ok(mut g) = state.whisper.lock() {
+        *g = None;
+    }
+
+    let filename = crate::stt::whisper::whisper_model_filename(&model);
+    let models_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("models");
+
+    let path = models_dir.join(&filename);
+    if path.exists() {
+        std::fs::remove_file(&path)
+            .map_err(|e| format!("Failed to delete Whisper model: {e}"))?;
+    }
+
+    log::info!("Whisper model ({}) deleted", model);
     Ok(())
 }
 
@@ -406,7 +505,13 @@ pub async fn reload_models(
         .unwrap_or(false);
 
     if !whisper_loaded {
-        let candidates = crate::whisper_model_candidates(&app_handle);
+        // Read whisper_model setting from DB to determine which model to load
+        let model_setting = {
+            let db = state.db.lock().map_err(|e| format!("DB lock failed: {e}"))?;
+            crate::db::queries::get_setting(&db, "whisper_model")
+                .unwrap_or_else(|_| crate::stt::whisper::DEFAULT_WHISPER_MODEL.to_string())
+        };
+        let candidates = crate::whisper_model_candidates(&app_handle, &model_setting);
         let whisper_mutex = state.whisper.clone();
 
         tokio::task::spawn_blocking(move || {

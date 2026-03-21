@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
-import type { OllamaStatus, ConnectionResult, DownloadProgress, LlmFileStatus } from "@/types/commands";
+import type { OllamaStatus, ConnectionResult, DownloadProgress, LlmFileStatus, WhisperFileStatus } from "@/types/commands";
 import { getAllSettings, setSetting } from "@/lib/commands/settings";
 import {
   checkOllama,
   testByokConnection,
   checkModelsStatus,
   checkLlmFileExists,
+  checkWhisperFileExists,
   downloadModel,
+  downloadWhisperModel,
   deleteLlmModel,
+  deleteWhisperModel,
   cancelModelDownload,
   reloadModels,
 } from "@/lib/commands/models";
@@ -26,7 +29,7 @@ interface ModelsState {
 }
 
 const DEFAULTS: ModelsState = {
-  whisperModel: "tiny.en",
+  whisperModel: "base.en",
   llmMode: "local",
   ollamaModel: "qwen3:0.6b",
   byokProvider: "openai",
@@ -49,6 +52,12 @@ export function useModels() {
   const [llmDownloading, setLlmDownloading] = useState(false);
   const [llmDownloadProgress, setLlmDownloadProgress] = useState<DownloadProgress | null>(null);
 
+  // Whisper state
+  const [whisperFileStatus, setWhisperFileStatus] = useState<WhisperFileStatus>({ exists: false, size_mb: 0, model_name: "base.en" });
+  const [whisperLoaded, setWhisperLoaded] = useState(false);
+  const [whisperDownloading, setWhisperDownloading] = useState(false);
+  const [whisperDownloadProgress, setWhisperDownloadProgress] = useState<DownloadProgress | null>(null);
+
   const refreshOllama = useCallback(async () => {
     try {
       const status = await checkOllama();
@@ -60,11 +69,12 @@ export function useModels() {
 
   useEffect(() => {
     async function load() {
-      const [settingsResult, ollamaResult, modelsResult, llmFileResult] = await Promise.allSettled([
+      const [settingsResult, ollamaResult, modelsResult, llmFileResult, whisperFileResult] = await Promise.allSettled([
         getAllSettings(),
         checkOllama(),
         checkModelsStatus(),
         checkLlmFileExists(),
+        checkWhisperFileExists(),
       ]);
 
       if (settingsResult.status === "fulfilled") {
@@ -86,10 +96,15 @@ export function useModels() {
 
       if (modelsResult.status === "fulfilled") {
         setLlmLoaded(modelsResult.value.llm_loaded);
+        setWhisperLoaded(modelsResult.value.whisper_loaded);
       }
 
       if (llmFileResult.status === "fulfilled") {
         setLlmFileStatus(llmFileResult.value);
+      }
+
+      if (whisperFileResult.status === "fulfilled") {
+        setWhisperFileStatus(whisperFileResult.value);
       }
 
       setIsLoading(false);
@@ -114,12 +129,6 @@ export function useModels() {
       }
     },
     [],
-  );
-
-  const setWhisperModel = useCallback(
-    (model: WhisperModel) =>
-      updateSetting("whisperModel", model, "whisper_model"),
-    [updateSetting],
   );
 
   const setLlmMode = useCallback(
@@ -220,20 +229,73 @@ export function useModels() {
     }
   }, []);
 
+  // Whisper actions
+  const downloadWhisperModelAction = useCallback(async () => {
+    setWhisperDownloading(true);
+    setWhisperDownloadProgress(null);
+    const unlisten = await listen<DownloadProgress>("whisper_download_progress", (event) => {
+      setWhisperDownloadProgress(event.payload);
+    });
+    try {
+      await downloadWhisperModel();
+      await reloadModels();
+      const [fileResult, statusResult] = await Promise.allSettled([
+        checkWhisperFileExists(),
+        checkModelsStatus(),
+      ]);
+      if (fileResult.status === "fulfilled") setWhisperFileStatus(fileResult.value);
+      if (statusResult.status === "fulfilled") setWhisperLoaded(statusResult.value.whisper_loaded);
+    } catch (e) {
+      console.error("Whisper download failed:", e);
+    } finally {
+      unlisten();
+      setWhisperDownloading(false);
+    }
+  }, []);
+
+  const cancelWhisperDownload = useCallback(async () => {
+    try {
+      await cancelModelDownload();
+    } catch {
+      // ignore
+    }
+    setWhisperDownloading(false);
+    setWhisperDownloadProgress(null);
+  }, []);
+
+  const deleteWhisperModelAction = useCallback(async () => {
+    try {
+      await deleteWhisperModel(settingsRef.current.whisperModel);
+      setWhisperFileStatus({ exists: false, size_mb: 0, model_name: settingsRef.current.whisperModel });
+      setWhisperLoaded(false);
+    } catch (e) {
+      console.error("Whisper delete failed:", e);
+    }
+  }, []);
+
+  const loadWhisperModel = useCallback(async () => {
+    try {
+      await reloadModels();
+      const status = await checkModelsStatus();
+      setWhisperLoaded(status.whisper_loaded);
+    } catch (e) {
+      console.error("Whisper load failed:", e);
+    }
+  }, []);
+
   return {
     ...settings,
     ollamaStatus,
     connectionResult,
     isLoading,
     isTesting,
-    setWhisperModel,
     setLlmMode,
     setOllamaModel,
     setByokProvider,
     setByokApiKey,
     testConnection,
     refreshOllama,
-    // Local model
+    // Local LLM model
     llmFileStatus,
     llmLoaded,
     llmDownloading,
@@ -242,5 +304,14 @@ export function useModels() {
     cancelLocalModelDownload,
     deleteLocalModel,
     loadLocalModel,
+    // Whisper model
+    whisperFileStatus,
+    whisperLoaded,
+    whisperDownloading,
+    whisperDownloadProgress,
+    downloadWhisperModelAction,
+    cancelWhisperDownload,
+    deleteWhisperModelAction,
+    loadWhisperModel,
   };
 }

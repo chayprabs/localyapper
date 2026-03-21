@@ -87,7 +87,9 @@
       "Bash(taskkill //F //PID 26760)",
       "Bash(curl -s https://crates.io/api/v1/crates/mistralrs)",
       "Bash(curl -s https://crates.io/api/v1/crates/candle-core)",
-      "Bash(taskkill //F //IM cargo.exe)"
+      "Bash(taskkill //F //IM cargo.exe)",
+      "Bash(find /c/Users/chait/Project/localyapper/src-tauri/resources -type f -name *whisper* -o -name *tiny*)",
+      "Bash(find /c/Users/chait/.cargo/registry/src -path */whisper-rs-0.16*/src/lib.rs -o -path */whisper-rs-0.16*/src/*.rs)"
     ]
   }
 }

@@ -92,7 +92,7 @@ Audio capture (cpal, 16 kHz mono)
     ↓
 Voice activity detection (energy filter + 0.5 s pre-roll)
     ↓
-Speech-to-text (Whisper tiny.en, local)
+Speech-to-text (Whisper base.en, local)
     ↓
 Correction engine (personal dictionary lookup)
     ↓

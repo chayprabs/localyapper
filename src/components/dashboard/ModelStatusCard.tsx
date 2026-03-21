@@ -53,7 +53,7 @@ export function ModelStatusCard({ status, llmMode, llmLabel, isLoading }: ModelS
           )}
         </div>
         {!isLoading && (
-          <span className="text-[12px] font-medium text-black/50">Whisper tiny.en</span>
+          <span className="text-[12px] font-medium text-black/50">Whisper base.en</span>
         )}
       </div>
       {/* LLM status */}

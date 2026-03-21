@@ -7,8 +7,18 @@ use crate::error::LocalYapperError;
 /// Minimum audio length in samples (0.5s at 16kHz) below which transcription is skipped.
 const MIN_AUDIO_SAMPLES: usize = 8_000;
 
-/// Model filename expected in the resources directory.
-pub const WHISPER_MODEL_FILENAME: &str = "ggml-tiny.en.bin";
+/// Default Whisper model variant for new installs.
+pub const DEFAULT_WHISPER_MODEL: &str = "base.en";
+
+/// Derive the model filename from a model variant string (e.g. "base.en" → "ggml-base.en.bin").
+pub fn whisper_model_filename(model: &str) -> String {
+    format!("ggml-{model}.bin")
+}
+
+/// Derive the HuggingFace download URL for a Whisper model variant.
+pub fn whisper_download_url(model: &str) -> String {
+    format!("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{model}.bin")
+}
 
 /// Whisper speech-to-text engine wrapping whisper-rs.
 ///
@@ -42,7 +52,7 @@ impl WhisperEngine {
             })?;
 
         let n_threads = std::thread::available_parallelism()
-            .map(|p| (p.get() / 2).max(1) as i32)
+            .map(|p| (p.get().saturating_sub(2)).max(1) as i32)
             .unwrap_or(2);
 
         log::info!(
@@ -150,6 +160,9 @@ mod tests {
 
     #[test]
     fn model_filename_is_correct() {
-        assert_eq!(WHISPER_MODEL_FILENAME, "ggml-tiny.en.bin");
+        assert_eq!(whisper_model_filename("tiny.en"), "ggml-tiny.en.bin");
+        assert_eq!(whisper_model_filename("base.en"), "ggml-base.en.bin");
+        assert_eq!(whisper_model_filename("small.en"), "ggml-small.en.bin");
+        assert_eq!(DEFAULT_WHISPER_MODEL, "base.en");
     }
 }

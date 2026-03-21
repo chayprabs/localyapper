@@ -1,9 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { DownloadProgress } from "@/types/commands";
 
+const WHISPER_SIZE_MB = 148;
+const TOTAL_SIZE_MB = 545; // 148 Whisper + 397 LLM
+
 export function DownloadStep({
-  downloadProgress,
   downloadError,
   onProgress,
   onError,
@@ -18,6 +20,8 @@ export function DownloadStep({
   onCancel: () => void;
 }) {
   const startedRef = useRef(false);
+  const [combinedMb, setCombinedMb] = useState(0);
+  const [speedMbps, setSpeedMbps] = useState(0);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -30,11 +34,19 @@ export function DownloadStep({
       // Register listeners FIRST and wait for them to be ready
       unlistenWhisperFn = await listen<DownloadProgress>(
         "whisper_download_progress",
-        (event) => onProgress(event.payload),
+        (event) => {
+          setCombinedMb(event.payload.downloaded_mb);
+          setSpeedMbps(event.payload.speed_mbps);
+          onProgress(event.payload);
+        },
       );
       unlistenLlmFn = await listen<DownloadProgress>(
         "model_download_progress",
-        (event) => onProgress(event.payload),
+        (event) => {
+          setCombinedMb(WHISPER_SIZE_MB + event.payload.downloaded_mb);
+          setSpeedMbps(event.payload.speed_mbps);
+          onProgress(event.payload);
+        },
       );
 
       // NOW start the download
@@ -57,10 +69,7 @@ export function DownloadStep({
     };
   }, [onProgress, onError, onStartDownload]);
 
-  const percent = downloadProgress?.percent ?? 0;
-  const downloadedMb = downloadProgress?.downloaded_mb ?? 0;
-  const totalMb = downloadProgress?.total_mb ?? 400;
-  const speedMbps = downloadProgress?.speed_mbps ?? 0;
+  const percent = TOTAL_SIZE_MB > 0 ? (combinedMb / TOTAL_SIZE_MB) * 100 : 0;
 
   return (
     <div className="flex flex-col items-center text-center">
@@ -77,7 +86,7 @@ export function DownloadStep({
       <p className="text-[13px] text-black/50 mb-6">
         {downloadError
           ? "Download failed"
-          : `${downloadedMb.toFixed(0)} MB / ${totalMb > 0 ? totalMb.toFixed(0) : "?"} MB`}
+          : `${combinedMb.toFixed(0)} MB / ${TOTAL_SIZE_MB > 0 ? TOTAL_SIZE_MB.toFixed(0) : "?"} MB`}
       </p>
 
       {/* Progress bar */}
