@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -215,13 +215,24 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
     println!("OVERLAY: Processing state");
     emit_pipeline_event(&app, "processing", None, None, None, None);
 
-    // 3. Run pipeline (VAD -> whisper -> correction -> LLM)
+    // 3. Run pipeline (VAD -> whisper -> correction -> LLM) with 30s safety timeout
     log::info!("Running pipeline (VAD -> whisper -> correction -> LLM)...");
-    let result = match execute_pipeline(raw_audio, app_state.inner()).await {
-        Ok(r) => r,
-        Err(e) => {
+    let result = match tokio::time::timeout(
+        Duration::from_secs(30),
+        execute_pipeline(raw_audio, app_state.inner()),
+    )
+    .await
+    {
+        Ok(Ok(r)) => r,
+        Ok(Err(e)) => {
             log::error!("Pipeline failed: {e}");
             emit_pipeline_event(&app, "error", None, None, None, Some(&e));
+            hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
+            return;
+        }
+        Err(_timeout) => {
+            log::error!("Pipeline timed out after 30s");
+            emit_pipeline_event(&app, "error", None, None, None, Some("Pipeline timed out (30s)"));
             hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
             return;
         }

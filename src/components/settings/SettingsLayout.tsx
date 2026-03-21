@@ -20,7 +20,7 @@ export function SettingsLayout() {
   const PageComponent = pages[activePage];
 
   return (
-    <div className="flex h-screen bg-[#eeeeee]">
+    <div className="flex h-full bg-[#eeeeee]">
       <Sidebar />
       <main className="flex-1 overflow-y-auto bg-[#f9f9f9]">
         <PageComponent />

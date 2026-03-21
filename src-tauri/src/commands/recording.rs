@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use crate::audio::vad;
 use crate::context::detector;
@@ -39,13 +40,14 @@ pub(crate) async fn execute_pipeline(
     let trimmed_audio = vad_result.trimmed_audio;
 
     println!("STT: Transcribing...");
+    let stt_start = Instant::now();
     let raw_text = tokio::task::spawn_blocking(move || {
         whisper.transcribe(&trimmed_audio)
     })
     .await
     .map_err(|e| format!("Transcription task failed: {e}"))?
     .map_err(|e| e.to_string())?;
-    println!("STT: Transcribing... result: [{}]", raw_text);
+    println!("STT: Done in {}ms, result: [{}]", stt_start.elapsed().as_millis(), raw_text);
 
     let word_count = if raw_text.is_empty() {
         0
@@ -86,19 +88,30 @@ pub(crate) async fn execute_pipeline(
             let system_prompt_full = prompt::build_system_prompt(&system_prompt, &app_name);
 
             println!("LLM: Running cleanup...");
-            match llm.generate(&system_prompt_full, &corrected_text).await {
-                Ok(llm_output) if !llm_output.is_empty() => {
-                    println!("LLM: Cleanup result: [{}]", llm_output);
+            let llm_start = Instant::now();
+            match tokio::time::timeout(
+                Duration::from_secs(20),
+                llm.generate(&system_prompt_full, &corrected_text),
+            )
+            .await
+            {
+                Ok(Ok(llm_output)) if !llm_output.is_empty() => {
+                    println!("LLM: Done in {}ms, result: [{}]", llm_start.elapsed().as_millis(), llm_output);
                     log::info!("LLM cleanup applied ({} -> {} chars)", corrected_text.len(), llm_output.len());
                     llm_output
                 }
-                Ok(_) => {
-                    println!("LLM: Empty response, using corrected text");
+                Ok(Ok(_)) => {
+                    println!("LLM: Empty response in {}ms, using corrected text", llm_start.elapsed().as_millis());
                     corrected_text
                 }
-                Err(e) => {
-                    println!("LLM: Failed ({}), using corrected text", e);
+                Ok(Err(e)) => {
+                    println!("LLM: Failed in {}ms ({}), using corrected text", llm_start.elapsed().as_millis(), e);
                     log::warn!("LLM generation failed, using corrected text: {e}");
+                    corrected_text
+                }
+                Err(_timeout) => {
+                    println!("LLM: Timed out after 20s, using corrected text");
+                    log::warn!("LLM generation timed out after 20s, using corrected text");
                     corrected_text
                 }
             }

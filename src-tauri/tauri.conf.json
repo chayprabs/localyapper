@@ -24,6 +24,7 @@
         "height": 650,
         "resizable": true,
         "center": true,
+        "decorations": false,
         "url": "/"
       },
       {

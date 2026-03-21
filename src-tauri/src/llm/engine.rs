@@ -71,7 +71,7 @@ impl LlmEngine {
             .add_message(TextMessageRole::User, user_text)
             .enable_thinking(false);
 
-        let request = RequestBuilder::from(messages).set_sampler_max_len(1024);
+        let request = RequestBuilder::from(messages).set_sampler_max_len(400);
 
         let response = self
             .model

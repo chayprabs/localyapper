@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useAtom } from "jotai";
 import { Overlay } from "@/components/overlay/Overlay";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
+import { TitleBar } from "@/components/settings/TitleBar";
 import { Wizard } from "@/components/wizard/Wizard";
 import { setupCompleteAtom } from "@/stores/wizardStore";
 import { getSetting } from "@/lib/commands/settings";
@@ -23,21 +24,24 @@ function MainWindow() {
     }
   }, [setupComplete]);
 
-  if (setupComplete === null) {
-    return (
-      <div className="h-screen w-screen bg-[#f9f9f9] flex items-center justify-center">
-        <span className="material-symbols-outlined text-[32px] text-black/[0.30] animate-spin">
-          progress_activity
-        </span>
+  return (
+    <div className="flex flex-col h-screen w-screen">
+      <TitleBar />
+      <div className="flex-1 min-h-0">
+        {setupComplete === null ? (
+          <div className="h-full bg-[#f9f9f9] flex items-center justify-center">
+            <span className="material-symbols-outlined text-[32px] text-black/[0.30] animate-spin">
+              progress_activity
+            </span>
+          </div>
+        ) : !setupComplete ? (
+          <Wizard />
+        ) : (
+          <SettingsLayout />
+        )}
       </div>
-    );
-  }
-
-  if (!setupComplete) {
-    return <Wizard />;
-  }
-
-  return <SettingsLayout />;
+    </div>
+  );
 }
 
 export function App() {
