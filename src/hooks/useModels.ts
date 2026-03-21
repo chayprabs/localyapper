@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { OllamaStatus, ConnectionResult } from "@/types/commands";
+import type { OllamaStatus, ConnectionResult, ModelsStatus } from "@/types/commands";
 import { getAllSettings, setSetting } from "@/lib/commands/settings";
-import { checkOllama, testByokConnection } from "@/lib/commands/models";
+import { checkOllama, checkModelsStatus, testByokConnection } from "@/lib/commands/models";
 
 type LlmMode = "local" | "ollama" | "byok";
 type WhisperModel = "tiny.en" | "base.en" | "small.en" | "medium.en";
@@ -26,6 +26,7 @@ const DEFAULTS: ModelsState = {
 export function useModels() {
   const [settings, setSettings] = useState<ModelsState>(DEFAULTS);
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null);
+  const [modelsStatus, setModelsStatus] = useState<ModelsStatus | null>(null);
   const [connectionResult, setConnectionResult] =
     useState<ConnectionResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,9 +45,10 @@ export function useModels() {
 
   useEffect(() => {
     async function load() {
-      const [settingsResult, ollamaResult] = await Promise.allSettled([
+      const [settingsResult, ollamaResult, modelsResult] = await Promise.allSettled([
         getAllSettings(),
         checkOllama(),
+        checkModelsStatus(),
       ]);
 
       if (settingsResult.status === "fulfilled") {
