@@ -37,8 +37,9 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
     let record_hotkey = {
         let state = app.state::<AppState>();
         let conn = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
-        queries::get_setting(&conn, "hotkey_record").unwrap_or_else(|_| "Alt+Space".to_string())
+        queries::get_setting(&conn, "hotkey_record").unwrap_or_else(|_| "Ctrl+Shift+Space".to_string())
     };
+
 
     let paste_last_hotkey = {
         let state = app.state::<AppState>();
@@ -56,7 +57,7 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
     // Register the record hotkey (hold-to-talk + double-tap hands-free)
     let state_clone = hotkey_state.clone();
     let app_handle = app.clone();
-    app.global_shortcut()
+    match app.global_shortcut()
         .on_shortcut(record_hotkey.as_str(), move |_app, _shortcut, event| {
             let state = state_clone.clone();
             let handle = app_handle.clone();
@@ -72,14 +73,14 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
                     });
                 }
             }
-        })
-        .map_err(|e| format!("Failed to register record hotkey '{record_hotkey}': {e}"))?;
-
-    log::info!("Record hotkey registered: {record_hotkey}");
+        }) {
+        Ok(()) => log::info!("Record hotkey registered: {record_hotkey}"),
+        Err(e) => log::error!("Failed to register record hotkey '{record_hotkey}': {e}"),
+    }
 
     // Register paste-last hotkey
     let app_handle = app.clone();
-    app.global_shortcut()
+    match app.global_shortcut()
         .on_shortcut(paste_last_hotkey.as_str(), move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
                 let handle = app_handle.clone();
@@ -87,14 +88,14 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
                     handle_paste_last(handle).await;
                 });
             }
-        })
-        .map_err(|e| format!("Failed to register paste-last hotkey '{paste_last_hotkey}': {e}"))?;
-
-    log::info!("Paste-last hotkey registered: {paste_last_hotkey}");
+        }) {
+        Ok(()) => log::info!("Paste-last hotkey registered: {paste_last_hotkey}"),
+        Err(e) => log::error!("Failed to register paste-last hotkey '{paste_last_hotkey}': {e}"),
+    }
 
     // Register open-app hotkey
     let app_handle = app.clone();
-    app.global_shortcut()
+    match app.global_shortcut()
         .on_shortcut(open_app_hotkey.as_str(), move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
                 if let Some(window) = app_handle.get_webview_window("main") {
@@ -102,10 +103,10 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
                     let _ = window.set_focus();
                 }
             }
-        })
-        .map_err(|e| format!("Failed to register open-app hotkey '{open_app_hotkey}': {e}"))?;
-
-    log::info!("Open-app hotkey registered: {open_app_hotkey}");
+        }) {
+        Ok(()) => log::info!("Open-app hotkey registered: {open_app_hotkey}"),
+        Err(e) => log::error!("Failed to register open-app hotkey '{open_app_hotkey}': {e}"),
+    }
 
     // NOTE: Escape is registered dynamically when recording starts to avoid
     // capturing all Escape keypresses system-wide.
@@ -127,6 +128,11 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
 
     match current_mode {
         MODE_IDLE => {
+            // Atomically claim the transition from IDLE — only one press wins
+            if state.mode.compare_exchange(MODE_IDLE, MODE_HOLD_RECORDING, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+                return; // Another press already transitioned
+            }
+
             // Check for double-tap
             let is_double_tap = {
                 let mut last_press = state.last_press_time.lock().await;
@@ -142,6 +148,7 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
             if let Err(e) = app_state.recorder.start() {
                 log::error!("Failed to start recording: {e}");
                 emit_pipeline_event(&app, "error", None, None, None, Some(&e.to_string()));
+                state.mode.store(MODE_IDLE, Ordering::SeqCst);
                 return;
             }
 
@@ -149,7 +156,6 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
                 state.mode.store(MODE_HANDS_FREE, Ordering::SeqCst);
                 log::info!("Hands-free recording started (double-tap)");
             } else {
-                state.mode.store(MODE_HOLD_RECORDING, Ordering::SeqCst);
                 log::info!("Hold-to-talk recording started");
             }
 
@@ -159,8 +165,10 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
             register_cancel_hotkey(&app, state.clone());
         }
         MODE_HANDS_FREE => {
-            // Press in hands-free mode = stop and process
-            state.mode.store(MODE_PROCESSING, Ordering::SeqCst);
+            // Atomically transition from hands-free to processing
+            if state.mode.compare_exchange(MODE_HANDS_FREE, MODE_PROCESSING, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+                return;
+            }
             unregister_cancel_hotkey(&app);
             run_pipeline_and_inject(app, state).await;
         }
@@ -172,10 +180,8 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
 
 /// Handle record hotkey released — stop hold-to-talk recording.
 async fn handle_record_released(app: AppHandle, state: Arc<HotkeyState>) {
-    let current_mode = state.mode.load(Ordering::SeqCst);
-
-    if current_mode == MODE_HOLD_RECORDING {
-        state.mode.store(MODE_PROCESSING, Ordering::SeqCst);
+    // Atomically transition from hold-recording to processing — only one release wins
+    if state.mode.compare_exchange(MODE_HOLD_RECORDING, MODE_PROCESSING, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
         unregister_cancel_hotkey(&app);
         run_pipeline_and_inject(app, state).await;
     }
@@ -184,6 +190,7 @@ async fn handle_record_released(app: AppHandle, state: Arc<HotkeyState>) {
 
 /// Run the full pipeline: stop recording -> VAD -> whisper -> correction -> LLM -> inject.
 async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>) {
+    log::info!("run_pipeline_and_inject: starting");
     let app_state = app.state::<AppState>();
 
     // 1. Stop recording, get raw audio
@@ -197,10 +204,13 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
         }
     };
 
+    log::info!("Recording stopped. {} samples captured", raw_audio.len());
+
     // 2. Emit processing state
     emit_pipeline_event(&app, "processing", None, None, None, None);
 
     // 3. Run pipeline (VAD -> whisper -> correction -> LLM)
+    log::info!("Running pipeline (VAD -> whisper -> correction -> LLM)...");
     let result = match execute_pipeline(raw_audio, app_state.inner()).await {
         Ok(r) => r,
         Err(e) => {
@@ -210,6 +220,8 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
             return;
         }
     };
+
+    log::info!("Pipeline complete: {} chars, {} words", result.final_text.len(), result.word_count);
 
     // 4. Check if there's any text to inject
     if result.final_text.is_empty() {
@@ -347,7 +359,7 @@ fn emit_pipeline_event(
     word_count: Option<i64>,
     error: Option<&str>,
 ) {
-    let _ = app.emit(
+    if let Err(e) = app.emit(
         "pipeline-state",
         PipelineEvent {
             state: state.to_string(),
@@ -356,5 +368,7 @@ fn emit_pipeline_event(
             word_count,
             error: error.map(String::from),
         },
-    );
+    ) {
+        log::error!("Failed to emit pipeline-state '{state}': {e}");
+    }
 }

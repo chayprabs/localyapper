@@ -25,6 +25,7 @@ function EmptyState() {
       <p className="text-[14px] font-medium text-black/85 mb-1">No dictations yet</p>
       <p className="text-[12px] text-black/[0.26] flex items-center gap-1.5">
         Hold <KeyBadge>{isMac ? "⌥" : "Ctrl"}</KeyBadge>{" "}
+        {!isMac && <><KeyBadge>Shift</KeyBadge>{" "}</>}
         <KeyBadge>Space</KeyBadge> to start your first dictation.
       </p>
     </div>

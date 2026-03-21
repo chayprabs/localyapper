@@ -43,11 +43,12 @@ export function useOverlayState() {
 
   const showOverlay = useCallback(async () => {
     try {
+      console.log("[overlay] showOverlay called");
       const win = getCurrentWindow();
       await win.show();
       await win.setFocus();
     } catch (e) {
-      console.error("Failed to show overlay window:", e);
+      console.error("[overlay] Failed to show overlay window:", e);
     }
   }, []);
 
@@ -117,8 +118,10 @@ export function useOverlayState() {
   );
 
   useEffect(() => {
+    console.log("[overlay] Pipeline state listener attached");
     const unlisten = listen<PipelineEvent>("pipeline-state", (event) => {
       const { state, text, duration_ms, word_count, error } = event.payload;
+      console.log("[overlay] Received pipeline-state:", state, { text, duration_ms, word_count, error });
       const gen = ++generationRef.current;
       clearAllTimers();
 

@@ -15,8 +15,8 @@ const HOTKEY_KEYS: &[&str] = &[
 
 /// Default hotkey values.
 const HOTKEY_DEFAULTS: &[(&str, &str)] = &[
-    ("hotkey_record", "Alt+Space"),
-    ("hotkey_hands_free", "Alt+Alt+Space"),
+    ("hotkey_record", "Ctrl+Shift+Space"),
+    ("hotkey_hands_free", "Ctrl+Shift+Space"),
     ("hotkey_cancel", "Escape"),
     ("hotkey_paste_last", "Alt+Shift+V"),
     ("hotkey_open_app", "Alt+L"),

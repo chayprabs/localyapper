@@ -1,13 +1,12 @@
-import type { OllamaStatus } from "@/types/commands";
+import type { ModelsStatus } from "@/types/commands";
 
 interface ModelStatusCardProps {
-  status: OllamaStatus | null;
+  status: ModelsStatus | null;
   isLoading: boolean;
 }
 
 export function ModelStatusCard({ status, isLoading }: ModelStatusCardProps) {
-  const running = status?.running ?? false;
-  const modelName = status?.models[0] ?? "qwen2.5:0.5b";
+  const whisperReady = status?.whisper_loaded ?? false;
 
   return (
     <div className="bg-white p-5 rounded-xl border border-black/[0.07] shadow-sm">
@@ -20,21 +19,21 @@ export function ModelStatusCard({ status, isLoading }: ModelStatusCardProps) {
             <span className="text-[14px] font-medium text-black/50">
               Checking...
             </span>
-          ) : running ? (
+          ) : whisperReady ? (
             <>
               <span className="w-2 h-2 rounded-full bg-[#006b19]" />
-              <span className="text-[14px] font-semibold text-[#006b19]">Running</span>
+              <span className="text-[14px] font-semibold text-[#006b19]">Ready</span>
             </>
           ) : (
             <>
               <span className="w-2 h-2 rounded-full bg-[#ba1a1a]" />
-              <span className="text-[14px] font-semibold text-[#ba1a1a]">Offline</span>
+              <span className="text-[14px] font-semibold text-[#ba1a1a]">Not loaded</span>
             </>
           )}
         </div>
         {!isLoading && (
           <span className="text-[12px] font-medium text-black/50">
-            {modelName}
+            Whisper tiny.en
           </span>
         )}
       </div>

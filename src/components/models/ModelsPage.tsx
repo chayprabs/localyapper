@@ -156,17 +156,20 @@ function Row({
 function LocalContent() {
   return (
     <div className="border-t border-black/[0.07]">
-      <Row label="Active Model">
-        <span className="text-[13px] text-black/50">qwen2.5:0.5b</span>
-      </Row>
       <Row label="Service Status" isLast>
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-[#28CD41]" />
-          <span className="text-[13px] font-medium text-[#28CD41]">
-            Running
+          <div className="w-2 h-2 rounded-full bg-black/[0.25]" />
+          <span className="text-[13px] font-medium text-black/50">
+            Unavailable
           </span>
         </div>
       </Row>
+      <div className="px-4 pb-3">
+        <p className="text-[12px] text-black/[0.40] leading-relaxed">
+          Local LLM is disabled due to a build conflict. Use the Ollama or BYOK
+          tab for text cleanup.
+        </p>
+      </div>
     </div>
   );
 }

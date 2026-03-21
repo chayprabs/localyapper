@@ -62,6 +62,7 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
 
     seed_settings(conn)?;
     seed_modes(conn)?;
+    migrate_hotkey_defaults(conn)?;
 
     Ok(())
 }
@@ -69,8 +70,8 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
 /// Inserts default settings (22 rows). Uses INSERT OR IGNORE for idempotency.
 fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     let seeds = [
-        ("hotkey_record", "Alt+Space"),
-        ("hotkey_hands_free", "Alt+Alt+Space"),
+        ("hotkey_record", "Ctrl+Shift+Space"),
+        ("hotkey_hands_free", "Ctrl+Shift+Space"),
         ("hotkey_cancel", "Escape"),
         ("hotkey_paste_last", "Alt+Shift+V"),
         ("hotkey_open_app", "Alt+L"),
@@ -103,6 +104,23 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     }
     tx.commit()?;
 
+    Ok(())
+}
+
+/// Migrate hotkey_record from conflicting defaults (Alt+Space, Ctrl+Space) to Ctrl+Shift+Space.
+/// Safe to run repeatedly — only updates if value matches a known conflicting default.
+fn migrate_hotkey_defaults(conn: &Connection) -> Result<(), LocalYapperError> {
+    let conflicting = ["Alt+Space", "Ctrl+Space", "Alt+Alt+Space"];
+    for old_val in &conflicting {
+        conn.execute(
+            "UPDATE settings SET value = 'Ctrl+Shift+Space', updated_at = datetime('now') WHERE key = 'hotkey_record' AND value = ?1",
+            rusqlite::params![old_val],
+        )?;
+        conn.execute(
+            "UPDATE settings SET value = 'Ctrl+Shift+Space', updated_at = datetime('now') WHERE key = 'hotkey_hands_free' AND value = ?1",
+            rusqlite::params![old_val],
+        )?;
+    }
     Ok(())
 }
 

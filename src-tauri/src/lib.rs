@@ -122,11 +122,16 @@ pub fn run() {
             let conn = db::open_database(&app_data_dir)
                 .expect("Failed to initialize database");
 
-            // Models are loaded on-demand via reload_models command.
-            // Loading at startup can crash in debug builds due to ggml symbol conflicts.
-            let whisper: Option<Arc<WhisperEngine>> = None;
+            // Load Whisper at startup (safe now that llama-cpp-2 is removed).
+            let whisper = load_whisper_model(app);
+            if whisper.is_some() {
+                log::info!("Whisper model loaded at startup");
+            } else {
+                log::warn!("Whisper model not found at startup — STT unavailable until downloaded");
+            }
+            // Local LLM is a stub (llama-cpp-2 removed due to ggml conflict).
             let llm: Option<Arc<LlmEngine>> = None;
-            log::info!("Models will be loaded on-demand via reload_models command");
+            log::info!("Local LLM disabled (stub). Use Ollama or BYOK for text cleanup.");
 
             // Initialize correction engine
             let correction_engine = Arc::new(CorrectionEngine::new());

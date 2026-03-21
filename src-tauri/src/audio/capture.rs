@@ -126,17 +126,28 @@ impl AudioRecorder {
             )
         })?;
 
+        // Use the device's default config (most compatible), then resample to 16kHz mono
+        let default_config = device.default_input_config().map_err(|e| {
+            LocalYapperError::AudioError(format!("Failed to get default input config: {}", e))
+        })?;
+        let native_rate = default_config.sample_rate().0;
+        let native_channels = default_config.channels();
         let config = cpal::StreamConfig {
-            channels: CHANNELS,
-            sample_rate: cpal::SampleRate(SAMPLE_RATE),
+            channels: native_channels,
+            sample_rate: cpal::SampleRate(native_rate),
             buffer_size: cpal::BufferSize::Default,
         };
+        log::info!("Audio: native {}Hz {}ch, target {}Hz 1ch", native_rate, native_channels, SAMPLE_RATE);
 
         let buffer = Arc::clone(&self.buffer);
         let stop_signal = Arc::clone(&self.stop_signal);
         let started_at = Arc::clone(&self.started_at);
 
         let err_stop_signal = Arc::clone(&self.stop_signal);
+
+        // Resampling state: track fractional position for accurate sample-rate conversion
+        let resample_ratio = SAMPLE_RATE as f64 / native_rate as f64;
+        let resample_pos = Arc::new(Mutex::new(0.0_f64));
 
         let stream = device
             .build_input_stream(
@@ -157,12 +168,40 @@ impl AudioRecorder {
                         }
                     }
 
-                    // Append samples to buffer (drop on contention)
+                    // Convert to mono by averaging channels per frame
+                    let ch = native_channels as usize;
+                    let mono: Vec<f32> = data
+                        .chunks_exact(ch)
+                        .map(|frame| frame.iter().sum::<f32>() / ch as f32)
+                        .collect();
+
+                    // Resample from native rate to 16kHz using linear interpolation
+                    let resampled = if native_rate == SAMPLE_RATE {
+                        mono
+                    } else {
+                        let mut out = Vec::new();
+                        let mut pos = resample_pos.lock().unwrap_or_else(|e| e.into_inner());
+                        while ((*pos).floor() as usize) < mono.len().saturating_sub(1) {
+                            let idx = (*pos).floor() as usize;
+                            let frac = (*pos - idx as f64) as f32;
+                            let sample = mono[idx] * (1.0 - frac) + mono[idx + 1] * frac;
+                            out.push(sample);
+                            *pos += 1.0 / resample_ratio;
+                        }
+                        // Save fractional remainder for next callback
+                        *pos -= mono.len() as f64;
+                        if *pos < 0.0 {
+                            *pos = 0.0;
+                        }
+                        out
+                    };
+
+                    // Append resampled samples to buffer (drop on contention)
                     if let Ok(mut buf) = buffer.try_lock() {
                         let remaining = MAX_RECORDING_SAMPLES.saturating_sub(buf.len());
-                        let to_copy = data.len().min(remaining);
+                        let to_copy = resampled.len().min(remaining);
                         if to_copy > 0 {
-                            buf.extend_from_slice(&data[..to_copy]);
+                            buf.extend_from_slice(&resampled[..to_copy]);
                         }
                         if remaining == 0 {
                             stop_signal.store(true, Ordering::SeqCst);

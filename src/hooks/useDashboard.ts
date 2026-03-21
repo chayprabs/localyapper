@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Stats, HistoryEntry, OllamaStatus } from "@/types/commands";
+import type { Stats, HistoryEntry, ModelsStatus } from "@/types/commands";
 import { getStats, getHistory, deleteHistoryEntry } from "@/lib/commands/history";
-import { checkOllama } from "@/lib/commands/models";
+import { checkModelsStatus } from "@/lib/commands/models";
 
 interface DashboardData {
   stats: Stats | null;
   lastDictation: HistoryEntry | null;
-  modelStatus: OllamaStatus | null;
+  modelStatus: ModelsStatus | null;
   isLoading: boolean;
   refresh: () => void;
   deleteLastDictation: (id: string) => Promise<void>;
@@ -15,22 +15,22 @@ interface DashboardData {
 export function useDashboard(): DashboardData {
   const [stats, setStats] = useState<Stats | null>(null);
   const [lastDictation, setLastDictation] = useState<HistoryEntry | null>(null);
-  const [modelStatus, setModelStatus] = useState<OllamaStatus | null>(null);
+  const [modelStatus, setModelStatus] = useState<ModelsStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true);
-    const [statsResult, historyResult, ollamaResult] = await Promise.allSettled([
+    const [statsResult, historyResult, modelsResult] = await Promise.allSettled([
       getStats(),
       getHistory(1, 0),
-      checkOllama(),
+      checkModelsStatus(),
     ]);
 
     if (statsResult.status === "fulfilled") setStats(statsResult.value);
     if (historyResult.status === "fulfilled") {
       setLastDictation(historyResult.value[0] ?? null);
     }
-    if (ollamaResult.status === "fulfilled") setModelStatus(ollamaResult.value);
+    if (modelsResult.status === "fulfilled") setModelStatus(modelsResult.value);
 
     setIsLoading(false);
   }, []);

@@ -24,14 +24,14 @@ const HOTKEY_DEFINITIONS: {
     key: "hotkey_record",
     label: "Record",
     description: "Hold to dictate",
-    defaultValue: "Alt+Space",
+    defaultValue: "Ctrl+Shift+Space",
     readOnly: false,
   },
   {
     key: "hotkey_hands_free",
     label: "Hands-free",
     description: "Double-tap to toggle",
-    defaultValue: "Alt+Space",
+    defaultValue: "Ctrl+Shift+Space",
     readOnly: true,
   },
   {

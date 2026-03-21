@@ -44,7 +44,7 @@ export function useWizard(onComplete: () => void) {
   const [byokTesting, setByokTesting] = useState(false);
 
   // Hotkey state
-  const [hotkey, setHotkey] = useState("Alt+Space");
+  const [hotkey, setHotkey] = useState("Ctrl+Shift+Space");
 
   const modelChoiceRef = useRef(modelChoice);
   modelChoiceRef.current = modelChoice;

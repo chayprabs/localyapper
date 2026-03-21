@@ -81,7 +81,10 @@
       "Bash(cargo run:*)",
       "Bash(tasklist)",
       "Bash(find /c/Users/chait/Project/localyapper/dist -name *.html)",
-      "Bash(find /c/Users/chait/Project/localyapper -name *.html -type f)"
+      "Bash(find /c/Users/chait/Project/localyapper -name *.html -type f)",
+      "Bash(ls -la /c/Users/chait/Project/localyapper/src-tauri/target/debug/localyapper*)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 26760)"
     ]
   }
 }
