@@ -3,12 +3,16 @@ use std::sync::atomic::Ordering;
 use futures_util::StreamExt;
 use tauri::{Emitter, Manager};
 
-use crate::models::{ConnectionResult, DownloadProgress, ModelsStatus, OllamaStatus};
+use crate::models::{ConnectionResult, DownloadProgress, LlmFileStatus, ModelsStatus, OllamaStatus};
 use crate::state::AppState;
 
-/// HuggingFace URL for the bundled LLM model.
+/// HuggingFace URL for the Qwen3 0.6B GGUF model.
 const MODEL_DOWNLOAD_URL: &str =
-    "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf";
+    "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf";
+
+/// HuggingFace URL for the Qwen3 0.6B tokenizer.
+const TOKENIZER_DOWNLOAD_URL: &str =
+    "https://huggingface.co/Qwen/Qwen3-0.6B/resolve/main/tokenizer.json";
 
 /// HuggingFace URL for the Whisper tiny.en model.
 const WHISPER_DOWNLOAD_URL: &str =
@@ -49,16 +53,16 @@ pub async fn check_ollama() -> Result<OllamaStatus, String> {
     }
 }
 
-/// Begin downloading the bundled LLM model to app data dir.
+/// Begin downloading the Qwen3 0.6B GGUF model + tokenizer to app data dir.
 ///
 /// Emits `model_download_progress` events with `DownloadProgress` payload.
 /// Checks `download_cancel` AtomicBool between chunks to support cancellation.
+/// Skips GGUF download if the file already exists.
 #[tauri::command]
 pub async fn download_model(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    // Reset cancel flag
     state.download_cancel.store(false, Ordering::SeqCst);
 
     let models_dir = app_handle
@@ -70,74 +74,117 @@ pub async fn download_model(
     std::fs::create_dir_all(&models_dir).map_err(|e| format!("Failed to create models dir: {e}"))?;
 
     let dest_path = models_dir.join(crate::llm::engine::LLM_MODEL_FILENAME);
-    let temp_path = models_dir.join(format!("{}.download", crate::llm::engine::LLM_MODEL_FILENAME));
 
-    let client = reqwest::Client::new();
-    let resp = client
-        .get(MODEL_DOWNLOAD_URL)
-        .send()
-        .await
-        .map_err(|e| format!("Download request failed: {e}"))?;
+    // Skip GGUF if already downloaded
+    if dest_path.exists() {
+        log::info!("LLM model already exists at {}", dest_path.display());
+    } else {
+        let temp_path = models_dir.join(format!("{}.download", crate::llm::engine::LLM_MODEL_FILENAME));
 
-    if !resp.status().is_success() {
-        return Err(format!("Download failed with status: {}", resp.status()));
-    }
+        let client = reqwest::Client::new();
 
-    let total_bytes = resp.content_length().unwrap_or(0);
-    let total_mb = total_bytes / (1024 * 1024);
+        // Check for partial download to support resume
+        let existing_bytes = if temp_path.exists() {
+            std::fs::metadata(&temp_path).map(|m| m.len()).unwrap_or(0)
+        } else {
+            0
+        };
 
-    let mut stream = resp.bytes_stream();
-    let mut file = std::fs::File::create(&temp_path)
-        .map_err(|e| format!("Failed to create temp file: {e}"))?;
-
-    let mut downloaded: u64 = 0;
-    let start = std::time::Instant::now();
-    let cancel_flag = state.download_cancel.clone();
-
-    use std::io::Write;
-    while let Some(chunk) = stream.next().await {
-        // Check cancellation
-        if cancel_flag.load(Ordering::SeqCst) {
-            drop(file);
-            let _ = std::fs::remove_file(&temp_path);
-            return Err("Download cancelled".to_string());
+        let mut req = client.get(MODEL_DOWNLOAD_URL);
+        if existing_bytes > 0 {
+            req = req.header("Range", format!("bytes={existing_bytes}-"));
+            log::info!("Resuming download from {} bytes", existing_bytes);
         }
 
-        let chunk = chunk.map_err(|e| format!("Download stream error: {e}"))?;
-        file.write_all(&chunk)
-            .map_err(|e| format!("Failed to write chunk: {e}"))?;
+        let resp = req.send().await
+            .map_err(|e| format!("Download request failed: {e}"))?;
 
-        downloaded += chunk.len() as u64;
-        let elapsed = start.elapsed().as_secs_f64();
-        let speed_mbps = if elapsed > 0.0 {
-            (downloaded as f64 / (1024.0 * 1024.0)) / elapsed
+        let status = resp.status();
+        if !status.is_success() && status != reqwest::StatusCode::PARTIAL_CONTENT {
+            return Err(format!("Download failed with status: {status}"));
+        }
+
+        let is_resume = status == reqwest::StatusCode::PARTIAL_CONTENT;
+        let total_bytes = if is_resume {
+            resp.content_length().unwrap_or(0) + existing_bytes
         } else {
-            0.0
+            resp.content_length().unwrap_or(0)
         };
-        let percent = if total_bytes > 0 {
-            (downloaded as f64 / total_bytes as f64) * 100.0
+        let total_mb = total_bytes / (1024 * 1024);
+
+        let mut stream = resp.bytes_stream();
+
+        use std::io::Write;
+        let mut file = if existing_bytes > 0 && is_resume {
+            std::fs::OpenOptions::new().append(true).open(&temp_path)
+                .map_err(|e| format!("Failed to open temp file for resume: {e}"))?
         } else {
-            0.0
+            std::fs::File::create(&temp_path)
+                .map_err(|e| format!("Failed to create temp file: {e}"))?
         };
 
-        let _ = app_handle.emit(
-            "model_download_progress",
-            DownloadProgress {
-                percent,
-                downloaded_mb: downloaded / (1024 * 1024),
-                total_mb,
-                speed_mbps,
-            },
-        );
+        let mut downloaded: u64 = if is_resume { existing_bytes } else { 0 };
+        let start = std::time::Instant::now();
+        let cancel_flag = state.download_cancel.clone();
+
+        while let Some(chunk) = stream.next().await {
+            if cancel_flag.load(Ordering::SeqCst) {
+                drop(file);
+                let _ = std::fs::remove_file(&temp_path);
+                return Err("Download cancelled".to_string());
+            }
+
+            let chunk = chunk.map_err(|e| format!("Download stream error: {e}"))?;
+            file.write_all(&chunk)
+                .map_err(|e| format!("Failed to write chunk: {e}"))?;
+
+            downloaded += chunk.len() as u64;
+            let elapsed = start.elapsed().as_secs_f64();
+            let speed_mbps = if elapsed > 0.0 {
+                (downloaded as f64 / (1024.0 * 1024.0)) / elapsed
+            } else {
+                0.0
+            };
+            let percent = if total_bytes > 0 {
+                (downloaded as f64 / total_bytes as f64) * 100.0
+            } else {
+                0.0
+            };
+
+            let _ = app_handle.emit(
+                "model_download_progress",
+                DownloadProgress {
+                    percent,
+                    downloaded_mb: downloaded / (1024 * 1024),
+                    total_mb,
+                    speed_mbps,
+                },
+            );
+        }
+
+        drop(file);
+        std::fs::rename(&temp_path, &dest_path)
+            .map_err(|e| format!("Failed to rename downloaded model: {e}"))?;
+
+        log::info!("LLM model downloaded to {}", dest_path.display());
     }
 
-    drop(file);
+    // Download tokenizer alongside the GGUF (small file, no progress needed)
+    let tokenizer_path = models_dir.join(crate::llm::engine::LLM_TOKENIZER_FILENAME);
+    if !tokenizer_path.exists() {
+        log::info!("Downloading tokenizer...");
+        let client = reqwest::Client::new();
+        let resp = client.get(TOKENIZER_DOWNLOAD_URL).send().await
+            .map_err(|e| format!("Tokenizer download failed: {e}"))?;
+        if !resp.status().is_success() {
+            return Err(format!("Tokenizer download failed with status: {}", resp.status()));
+        }
+        let bytes = resp.bytes().await.map_err(|e| format!("Tokenizer read failed: {e}"))?;
+        std::fs::write(&tokenizer_path, &bytes)
+            .map_err(|e| format!("Failed to write tokenizer: {e}"))?;
+        log::info!("Tokenizer downloaded to {}", tokenizer_path.display());
+    }
 
-    // Rename temp file to final destination
-    std::fs::rename(&temp_path, &dest_path)
-        .map_err(|e| format!("Failed to rename downloaded model: {e}"))?;
-
-    log::info!("LLM model downloaded to {}", dest_path.display());
     Ok(())
 }
 
@@ -384,35 +431,37 @@ pub async fn reload_models(
         .map_err(|e| format!("Whisper load task failed: {e}"))?;
     }
 
-    // Reload LLM if not already loaded
+    // Reload LLM if not already loaded (async — mistral.rs model loading is async)
     let llm_loaded = state.llm.lock()
         .map(|g| g.is_some())
         .unwrap_or(false);
 
     if !llm_loaded {
-        let candidates = crate::llm_model_candidates(&app_handle);
-        let llm_mutex = state.llm.clone();
+        let models_dir = app_handle
+            .path()
+            .app_data_dir()
+            .map_err(|e: tauri::Error| e.to_string())?
+            .join("models");
 
-        tokio::task::spawn_blocking(move || {
-            for candidate in &candidates {
-                if candidate.exists() {
-                    match crate::llm::engine::LlmEngine::new(candidate) {
-                        Ok(engine) => {
-                            log::info!("Hot-loaded LLM engine from {}", candidate.display());
-                            if let Ok(mut g) = llm_mutex.lock() {
-                                *g = Some(std::sync::Arc::new(engine));
-                            }
-                            break;
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to load LLM from {}: {e}", candidate.display());
-                        }
+        let gguf_path = models_dir.join(crate::llm::engine::LLM_MODEL_FILENAME);
+        let tokenizer_path = models_dir.join(crate::llm::engine::LLM_TOKENIZER_FILENAME);
+
+        if gguf_path.exists() && tokenizer_path.exists() {
+            let llm_mutex = state.llm.clone();
+            match crate::llm::engine::LlmEngine::new(&models_dir).await {
+                Ok(engine) => {
+                    log::info!("Hot-loaded LLM engine from {}", models_dir.display());
+                    if let Ok(mut g) = llm_mutex.lock() {
+                        *g = Some(std::sync::Arc::new(engine));
                     }
                 }
+                Err(e) => {
+                    log::warn!("Failed to load LLM from {}: {e}", models_dir.display());
+                }
             }
-        })
-        .await
-        .map_err(|e| format!("LLM load task failed: {e}"))?;
+        } else {
+            log::info!("LLM model files not found in {}, skipping", models_dir.display());
+        }
     }
 
     Ok(())
@@ -434,4 +483,66 @@ pub async fn check_models_status(
         whisper_loaded,
         llm_loaded,
     })
+}
+
+/// Check if the LLM GGUF file exists on disk.
+#[tauri::command]
+pub async fn check_llm_file_exists(
+    app_handle: tauri::AppHandle,
+) -> Result<LlmFileStatus, String> {
+    let models_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("models");
+
+    let gguf_path = models_dir.join(crate::llm::engine::LLM_MODEL_FILENAME);
+
+    if gguf_path.exists() {
+        let size_bytes = std::fs::metadata(&gguf_path)
+            .map(|m| m.len())
+            .unwrap_or(0);
+        Ok(LlmFileStatus {
+            exists: true,
+            size_mb: size_bytes / (1024 * 1024),
+        })
+    } else {
+        Ok(LlmFileStatus {
+            exists: false,
+            size_mb: 0,
+        })
+    }
+}
+
+/// Delete the LLM model files (GGUF + tokenizer) and unload from AppState.
+#[tauri::command]
+pub async fn delete_llm_model(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    // Unload from AppState first
+    if let Ok(mut g) = state.llm.lock() {
+        *g = None;
+    }
+
+    let models_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("models");
+
+    let gguf_path = models_dir.join(crate::llm::engine::LLM_MODEL_FILENAME);
+    let tokenizer_path = models_dir.join(crate::llm::engine::LLM_TOKENIZER_FILENAME);
+
+    if gguf_path.exists() {
+        std::fs::remove_file(&gguf_path)
+            .map_err(|e| format!("Failed to delete model: {e}"))?;
+    }
+    if tokenizer_path.exists() {
+        std::fs::remove_file(&tokenizer_path)
+            .map_err(|e| format!("Failed to delete tokenizer: {e}"))?;
+    }
+
+    log::info!("LLM model files deleted");
+    Ok(())
 }

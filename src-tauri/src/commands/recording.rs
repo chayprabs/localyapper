@@ -8,7 +8,6 @@ use crate::llm::engine::LlmEngine;
 use crate::llm::prompt;
 use crate::models::PipelineResult;
 use crate::state::AppState;
-use crate::stt::whisper::WhisperEngine;
 
 /// Run the full voice pipeline: VAD -> Whisper -> Correction -> LLM.
 /// Does NOT inject or save to history — caller decides.
@@ -20,6 +19,7 @@ pub(crate) async fn execute_pipeline(
     let vad_result = vad::apply_vad(&raw_audio, &vad_config);
 
     if !vad_result.has_speech {
+        println!("STT: No speech detected in audio");
         return Ok(PipelineResult {
             raw_text: String::new(),
             final_text: String::new(),
@@ -28,7 +28,7 @@ pub(crate) async fn execute_pipeline(
         });
     }
 
-    let whisper: Arc<WhisperEngine> = state
+    let whisper = state
         .whisper
         .lock()
         .map_err(|e| format!("Whisper lock error: {e}"))?
@@ -38,12 +38,14 @@ pub(crate) async fn execute_pipeline(
 
     let trimmed_audio = vad_result.trimmed_audio;
 
+    println!("STT: Transcribing...");
     let raw_text = tokio::task::spawn_blocking(move || {
         whisper.transcribe(&trimmed_audio)
     })
     .await
     .map_err(|e| format!("Transcription task failed: {e}"))?
     .map_err(|e| e.to_string())?;
+    println!("STT: Transcribing... result: [{}]", raw_text);
 
     let word_count = if raw_text.is_empty() {
         0
@@ -53,6 +55,7 @@ pub(crate) async fn execute_pipeline(
 
     let corrected_text = state.correction_engine.apply(&raw_text)
         .unwrap_or_else(|_| raw_text.clone());
+    println!("CORRECTION: Applied corrections, result: [{}]", corrected_text);
 
     // LLM cleanup step — skipped if no model or mode says skip_llm
     let final_text = {
@@ -80,29 +83,31 @@ pub(crate) async fn execute_pipeline(
             };
 
             let app_name = detector::get_focused_window_name();
-            let llm_prompt = prompt::build_prompt(&system_prompt, &corrected_text, &app_name);
-            let max_tokens = (corrected_text.len() as u32 * 2).clamp(128, 512);
+            let system_prompt_full = prompt::build_system_prompt(&system_prompt, &app_name);
 
-            match tokio::task::spawn_blocking(move || {
-                llm.generate(&llm_prompt, max_tokens)
-            })
-            .await
-            {
-                Ok(Ok(llm_output)) if !llm_output.is_empty() => {
+            println!("LLM: Running cleanup...");
+            match llm.generate(&system_prompt_full, &corrected_text).await {
+                Ok(llm_output) if !llm_output.is_empty() => {
+                    println!("LLM: Cleanup result: [{}]", llm_output);
                     log::info!("LLM cleanup applied ({} -> {} chars)", corrected_text.len(), llm_output.len());
                     llm_output
                 }
-                Ok(Err(e)) => {
-                    log::warn!("LLM generation failed, using corrected text: {e}");
+                Ok(_) => {
+                    println!("LLM: Empty response, using corrected text");
                     corrected_text
                 }
                 Err(e) => {
-                    log::warn!("LLM task panicked, using corrected text: {e}");
+                    println!("LLM: Failed ({}), using corrected text", e);
+                    log::warn!("LLM generation failed, using corrected text: {e}");
                     corrected_text
                 }
-                _ => corrected_text,
             }
         } else {
+            if !llm_available {
+                println!("LLM: Skipped (model not loaded), using corrected text");
+            } else {
+                println!("LLM: Skipped (mode skip_llm=true), using corrected text");
+            }
             corrected_text
         }
     };

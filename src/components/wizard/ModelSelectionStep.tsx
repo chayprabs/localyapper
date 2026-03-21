@@ -10,8 +10,8 @@ const MODEL_OPTIONS: {
   {
     value: "qwen",
     icon: "download",
-    title: "Download Qwen 2.5 (Recommended)",
-    description: "~400MB local model for smart text formatting",
+    title: "Download Qwen3 0.6B (Recommended)",
+    description: "~397MB local model for smart text formatting",
   },
   {
     value: "ollama",

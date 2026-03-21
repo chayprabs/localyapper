@@ -46,7 +46,7 @@ export function useOverlayState() {
       console.log("[overlay] showOverlay called");
       const win = getCurrentWindow();
       await win.show();
-      await win.setFocus();
+      // Do NOT call setFocus() — the overlay must not steal focus from the target app
     } catch (e) {
       console.error("[overlay] Failed to show overlay window:", e);
     }

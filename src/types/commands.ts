@@ -98,4 +98,9 @@ export interface ModelsStatus {
   llm_loaded: boolean;
 }
 
+export interface LlmFileStatus {
+  exists: boolean;
+  size_mb: number;
+}
+
 export type AllSettings = Record<string, string>;

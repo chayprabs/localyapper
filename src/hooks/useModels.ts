@@ -1,7 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { OllamaStatus, ConnectionResult } from "@/types/commands";
+import { listen } from "@tauri-apps/api/event";
+import type { OllamaStatus, ConnectionResult, DownloadProgress, LlmFileStatus } from "@/types/commands";
 import { getAllSettings, setSetting } from "@/lib/commands/settings";
-import { checkOllama, testByokConnection } from "@/lib/commands/models";
+import {
+  checkOllama,
+  testByokConnection,
+  checkModelsStatus,
+  checkLlmFileExists,
+  downloadModel,
+  deleteLlmModel,
+  cancelModelDownload,
+  reloadModels,
+} from "@/lib/commands/models";
 
 type LlmMode = "local" | "ollama" | "byok";
 type WhisperModel = "tiny.en" | "base.en" | "small.en" | "medium.en";
@@ -18,7 +28,7 @@ interface ModelsState {
 const DEFAULTS: ModelsState = {
   whisperModel: "tiny.en",
   llmMode: "local",
-  ollamaModel: "qwen2.5:0.5b",
+  ollamaModel: "qwen3:0.6b",
   byokProvider: "openai",
   byokApiKey: "",
 };
@@ -33,6 +43,12 @@ export function useModels() {
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
+  // Local LLM state
+  const [llmFileStatus, setLlmFileStatus] = useState<LlmFileStatus>({ exists: false, size_mb: 0 });
+  const [llmLoaded, setLlmLoaded] = useState(false);
+  const [llmDownloading, setLlmDownloading] = useState(false);
+  const [llmDownloadProgress, setLlmDownloadProgress] = useState<DownloadProgress | null>(null);
+
   const refreshOllama = useCallback(async () => {
     try {
       const status = await checkOllama();
@@ -44,9 +60,11 @@ export function useModels() {
 
   useEffect(() => {
     async function load() {
-      const [settingsResult, ollamaResult] = await Promise.allSettled([
+      const [settingsResult, ollamaResult, modelsResult, llmFileResult] = await Promise.allSettled([
         getAllSettings(),
         checkOllama(),
+        checkModelsStatus(),
+        checkLlmFileExists(),
       ]);
 
       if (settingsResult.status === "fulfilled") {
@@ -64,6 +82,14 @@ export function useModels() {
 
       if (ollamaResult.status === "fulfilled") {
         setOllamaStatus(ollamaResult.value);
+      }
+
+      if (modelsResult.status === "fulfilled") {
+        setLlmLoaded(modelsResult.value.llm_loaded);
+      }
+
+      if (llmFileResult.status === "fulfilled") {
+        setLlmFileStatus(llmFileResult.value);
       }
 
       setIsLoading(false);
@@ -145,6 +171,55 @@ export function useModels() {
     }
   }, []);
 
+  const downloadLocalModel = useCallback(async () => {
+    setLlmDownloading(true);
+    setLlmDownloadProgress(null);
+    const unlisten = await listen<DownloadProgress>("model_download_progress", (event) => {
+      setLlmDownloadProgress(event.payload);
+    });
+    try {
+      await downloadModel();
+      await reloadModels();
+      setLlmFileStatus({ exists: true, size_mb: 397 });
+      setLlmLoaded(true);
+    } catch (e) {
+      console.error("Model download failed:", e);
+    } finally {
+      unlisten();
+      setLlmDownloading(false);
+    }
+  }, []);
+
+  const cancelLocalModelDownload = useCallback(async () => {
+    try {
+      await cancelModelDownload();
+    } catch {
+      // ignore
+    }
+    setLlmDownloading(false);
+    setLlmDownloadProgress(null);
+  }, []);
+
+  const deleteLocalModel = useCallback(async () => {
+    try {
+      await deleteLlmModel();
+      setLlmFileStatus({ exists: false, size_mb: 0 });
+      setLlmLoaded(false);
+    } catch (e) {
+      console.error("Model delete failed:", e);
+    }
+  }, []);
+
+  const loadLocalModel = useCallback(async () => {
+    try {
+      await reloadModels();
+      const status = await checkModelsStatus();
+      setLlmLoaded(status.llm_loaded);
+    } catch (e) {
+      console.error("Model load failed:", e);
+    }
+  }, []);
+
   return {
     ...settings,
     ollamaStatus,
@@ -158,5 +233,14 @@ export function useModels() {
     setByokApiKey,
     testConnection,
     refreshOllama,
+    // Local model
+    llmFileStatus,
+    llmLoaded,
+    llmDownloading,
+    llmDownloadProgress,
+    downloadLocalModel,
+    cancelLocalModelDownload,
+    deleteLocalModel,
+    loadLocalModel,
   };
 }

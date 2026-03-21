@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Stats, HistoryEntry, ModelsStatus } from "@/types/commands";
 import { getStats, getHistory, deleteHistoryEntry } from "@/lib/commands/history";
-import { checkModelsStatus } from "@/lib/commands/models";
+import { checkModelsStatus, checkOllama } from "@/lib/commands/models";
+import { getAllSettings } from "@/lib/commands/settings";
 
 interface DashboardData {
   stats: Stats | null;
   lastDictation: HistoryEntry | null;
   modelStatus: ModelsStatus | null;
+  llmMode: string;
+  llmLabel: string;
   isLoading: boolean;
   refresh: () => void;
   deleteLastDictation: (id: string) => Promise<void>;
@@ -16,14 +19,17 @@ export function useDashboard(): DashboardData {
   const [stats, setStats] = useState<Stats | null>(null);
   const [lastDictation, setLastDictation] = useState<HistoryEntry | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelsStatus | null>(null);
+  const [llmMode, setLlmMode] = useState("local");
+  const [llmLabel, setLlmLabel] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true);
-    const [statsResult, historyResult, modelsResult] = await Promise.allSettled([
+    const [statsResult, historyResult, modelsResult, settingsResult] = await Promise.allSettled([
       getStats(),
       getHistory(1, 0),
       checkModelsStatus(),
+      getAllSettings(),
     ]);
 
     if (statsResult.status === "fulfilled") setStats(statsResult.value);
@@ -31,6 +37,24 @@ export function useDashboard(): DashboardData {
       setLastDictation(historyResult.value[0] ?? null);
     }
     if (modelsResult.status === "fulfilled") setModelStatus(modelsResult.value);
+
+    if (settingsResult.status === "fulfilled") {
+      const s = settingsResult.value;
+      const mode = s["llm_mode"] ?? "local";
+      setLlmMode(mode);
+
+      if (mode === "ollama") {
+        const ollamaModel = s["ollama_model"] ?? "";
+        try {
+          const ollama = await checkOllama();
+          if (ollama.running) {
+            setLlmLabel(ollamaModel || (ollama.models[0] ?? ""));
+          }
+        } catch { /* ignore */ }
+      } else if (mode === "byok") {
+        setLlmLabel(s["byok_provider"] ?? "");
+      }
+    }
 
     setIsLoading(false);
   }, []);
@@ -47,5 +71,5 @@ export function useDashboard(): DashboardData {
     [fetchAll],
   );
 
-  return { stats, lastDictation, modelStatus, isLoading, refresh: fetchAll, deleteLastDictation };
+  return { stats, lastDictation, modelStatus, llmMode, llmLabel, isLoading, refresh: fetchAll, deleteLastDictation };
 }

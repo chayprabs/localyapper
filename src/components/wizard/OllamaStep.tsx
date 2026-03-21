@@ -108,7 +108,7 @@ export function OllamaStep({
               <span className="text-[13px] text-black/85">
                 Pull a model:{" "}
                 <code className="text-[12px] bg-black/[0.04] px-1.5 py-0.5 rounded font-mono">
-                  ollama pull qwen2.5:0.5b
+                  ollama pull qwen3:0.6b
                 </code>
               </span>
             </div>

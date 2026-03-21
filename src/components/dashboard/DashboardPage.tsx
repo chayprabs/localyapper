@@ -5,7 +5,7 @@ import { ModelStatusCard } from "./ModelStatusCard";
 import { LastDictationCard } from "./LastDictationCard";
 
 export function DashboardPage() {
-  const { stats, lastDictation, modelStatus, isLoading, deleteLastDictation } = useDashboard();
+  const { stats, lastDictation, modelStatus, llmMode, llmLabel, isLoading, deleteLastDictation } = useDashboard();
 
   const isEmpty = !stats || stats.total_sessions === 0;
 
@@ -50,7 +50,7 @@ export function DashboardPage() {
           label="TOTAL SESSIONS"
           value={isEmpty ? null : formatNumber(stats.total_sessions)}
         />
-        <ModelStatusCard status={modelStatus} isLoading={isLoading} />
+        <ModelStatusCard status={modelStatus} llmMode={llmMode} llmLabel={llmLabel} isLoading={isLoading} />
       </section>
 
       {/* Last Dictation */}

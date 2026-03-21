@@ -144,5 +144,12 @@ pub struct ModelsStatus {
     pub llm_loaded: bool,
 }
 
+/// LLM model file status (exists on disk + size).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LlmFileStatus {
+    pub exists: bool,
+    pub size_mb: u64,
+}
+
 /// All settings as a key-value map.
 pub type AllSettings = HashMap<String, String>;

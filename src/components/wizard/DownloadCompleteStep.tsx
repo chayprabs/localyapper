@@ -16,10 +16,10 @@ export function DownloadCompleteStep({
         Download Complete
       </h2>
       <p className="text-[13px] text-black/50 mb-2">
-        Qwen 2.5 is ready to use.
+        Qwen3 0.6B is ready to use.
       </p>
       <p className="text-[12px] text-black/[0.30] mb-8">
-        qwen2.5-0.5b-q4.gguf (~400MB)
+        qwen3-0.6b-q4_k_m.gguf (~397MB)
       </p>
 
       <button

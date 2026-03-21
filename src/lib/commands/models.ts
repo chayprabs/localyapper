@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { OllamaStatus, ConnectionResult, ModelsStatus } from "@/types/commands";
+import type { OllamaStatus, ConnectionResult, ModelsStatus, LlmFileStatus } from "@/types/commands";
 
 export async function checkOllama(): Promise<OllamaStatus> {
   return invoke<OllamaStatus>("check_ollama");
@@ -37,4 +37,12 @@ export async function reloadModels(): Promise<void> {
 
 export async function checkModelsStatus(): Promise<ModelsStatus> {
   return invoke<ModelsStatus>("check_models_status");
+}
+
+export async function checkLlmFileExists(): Promise<LlmFileStatus> {
+  return invoke<LlmFileStatus>("check_llm_file_exists");
+}
+
+export async function deleteLlmModel(): Promise<void> {
+  return invoke<void>("delete_llm_model");
 }

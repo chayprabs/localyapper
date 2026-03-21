@@ -84,7 +84,10 @@
       "Bash(find /c/Users/chait/Project/localyapper -name *.html -type f)",
       "Bash(ls -la /c/Users/chait/Project/localyapper/src-tauri/target/debug/localyapper*)",
       "Bash(netstat -ano)",
-      "Bash(taskkill //F //PID 26760)"
+      "Bash(taskkill //F //PID 26760)",
+      "Bash(curl -s https://crates.io/api/v1/crates/mistralrs)",
+      "Bash(curl -s https://crates.io/api/v1/crates/candle-core)",
+      "Bash(taskkill //F //IM cargo.exe)"
     ]
   }
 }

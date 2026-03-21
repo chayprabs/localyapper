@@ -16,7 +16,7 @@ mod tray;
 
 use audio::capture::AudioRecorder;
 use correction::engine::CorrectionEngine;
-use llm::engine::{LlmEngine, LLM_MODEL_FILENAME};
+use llm::engine::LlmEngine;
 use state::AppState;
 use stt::whisper::{WhisperEngine, WHISPER_MODEL_FILENAME};
 use std::sync::atomic::AtomicBool;
@@ -34,16 +34,6 @@ pub(crate) fn whisper_model_candidates(app: &tauri::AppHandle) -> Vec<std::path:
     .collect()
 }
 
-/// Candidate paths where the LLM model might be found.
-pub(crate) fn llm_model_candidates(app: &tauri::AppHandle) -> Vec<std::path::PathBuf> {
-    [
-        app.path().app_data_dir().ok().map(|p| p.join("models").join(LLM_MODEL_FILENAME)),
-        app.path().resource_dir().ok().map(|p| p.join("resources").join(LLM_MODEL_FILENAME)),
-    ]
-    .into_iter()
-    .flatten()
-    .collect()
-}
 
 /// Attempt to load the Whisper model by scanning candidate paths.
 /// Returns `None` with a warning log if the model file is not found or fails to load.
@@ -72,32 +62,6 @@ fn load_whisper_model(app: &tauri::App) -> Option<Arc<WhisperEngine>> {
     None
 }
 
-/// Attempt to load the LLM model by scanning candidate paths.
-/// Returns `None` with a warning log if the model file is not found or fails to load.
-fn load_llm_model(app: &tauri::App) -> Option<Arc<LlmEngine>> {
-    let candidates = llm_model_candidates(app.handle());
-
-    for candidate in &candidates {
-        if candidate.exists() {
-            log::info!("Found LLM model at {}", candidate.display());
-            match LlmEngine::new(candidate) {
-                Ok(engine) => {
-                    log::info!("LLM engine loaded successfully");
-                    return Some(Arc::new(engine));
-                }
-                Err(e) => {
-                    log::warn!("Failed to load LLM model from {}: {}", candidate.display(), e);
-                }
-            }
-        }
-    }
-
-    log::warn!(
-        "LLM model ({}) not found. LLM cleanup will be skipped until the model is downloaded.",
-        LLM_MODEL_FILENAME
-    );
-    None
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -129,9 +93,9 @@ pub fn run() {
             } else {
                 log::warn!("Whisper model not found at startup — STT unavailable until downloaded");
             }
-            // Local LLM is a stub (llama-cpp-2 removed due to ggml conflict).
+            // LLM loaded lazily via reload_models() — not at startup.
             let llm: Option<Arc<LlmEngine>> = None;
-            log::info!("Local LLM disabled (stub). Use Ollama or BYOK for text cleanup.");
+            log::info!("LLM will be loaded lazily (via reload_models or first dictation).");
 
             // Initialize correction engine
             let correction_engine = Arc::new(CorrectionEngine::new());
@@ -191,6 +155,8 @@ pub fn run() {
             commands::models::test_byok_connection,
             commands::models::reload_models,
             commands::models::check_models_status,
+            commands::models::check_llm_file_exists,
+            commands::models::delete_llm_model,
             // Modes (6)
             commands::modes::get_modes,
             commands::modes::create_mode,

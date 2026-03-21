@@ -153,23 +153,111 @@ function Row({
 /* ------------------------------------------------------------------ */
 /*  Local tab content                                                  */
 /* ------------------------------------------------------------------ */
-function LocalContent() {
+function LocalContent({
+  fileExists,
+  sizeMb,
+  loaded,
+  downloading,
+  downloadProgress,
+  onDownload,
+  onCancelDownload,
+  onDelete,
+  onLoad,
+}: {
+  fileExists: boolean;
+  sizeMb: number;
+  loaded: boolean;
+  downloading: boolean;
+  downloadProgress: { percent: number; downloaded_mb: number; total_mb: number; speed_mbps: number } | null;
+  onDownload: () => void;
+  onCancelDownload: () => void;
+  onDelete: () => void;
+  onLoad: () => void;
+}) {
   return (
     <div className="border-t border-black/[0.07]">
-      <Row label="Service Status" isLast>
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-black/[0.25]" />
-          <span className="text-[13px] font-medium text-black/50">
-            Unavailable
-          </span>
-        </div>
+      <Row label="Model">
+        <span className="text-[13px] text-black/50">Qwen3 0.6B (397 MB)</span>
       </Row>
-      <div className="px-4 pb-3">
-        <p className="text-[12px] text-black/[0.40] leading-relaxed">
-          Local LLM is disabled due to a build conflict. Use the Ollama or BYOK
-          tab for text cleanup.
-        </p>
-      </div>
+
+      {/* Download status / progress */}
+      {downloading ? (
+        <div className="px-4 pb-3 pt-1">
+          <div className="w-full h-1.5 rounded-full bg-black/[0.06] mb-1.5">
+            <div
+              className="h-full rounded-full bg-[#0058bc] transition-all duration-300"
+              style={{ width: `${Math.min(downloadProgress?.percent ?? 0, 100)}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-[11px] text-black/[0.40] mb-2">
+            <span>{(downloadProgress?.percent ?? 0).toFixed(0)}% — {downloadProgress?.downloaded_mb ?? 0} / {downloadProgress?.total_mb ?? 397} MB</span>
+            <span>{(downloadProgress?.speed_mbps ?? 0) > 0 ? `${(downloadProgress?.speed_mbps ?? 0).toFixed(1)} MB/s` : "Starting..."}</span>
+          </div>
+          <button
+            onClick={onCancelDownload}
+            className="text-[12px] text-[#ba1a1a] hover:underline"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <Row label="File Status">
+          {fileExists ? (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-[#28CD41]" />
+                <span className="text-[13px] font-medium text-[#28CD41]">
+                  Downloaded ({sizeMb} MB)
+                </span>
+              </div>
+              <button
+                onClick={onDelete}
+                className="text-[12px] text-[#ba1a1a] hover:underline"
+              >
+                Delete
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-[#FF9500]" />
+                <span className="text-[13px] font-medium text-black/50">Not downloaded</span>
+              </div>
+              <button
+                onClick={onDownload}
+                className="h-6 px-3 bg-[#0058bc] text-white text-[12px] font-medium rounded-md hover:bg-[#004ea8] transition-colors"
+              >
+                Download
+              </button>
+            </div>
+          )}
+        </Row>
+      )}
+
+      {/* Load status (only if downloaded) */}
+      {fileExists && !downloading && (
+        <Row label="Engine Status" isLast>
+          {loaded ? (
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-[#28CD41]" />
+              <span className="text-[13px] font-medium text-[#28CD41]">Loaded</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-black/[0.25]" />
+                <span className="text-[13px] font-medium text-black/50">Not loaded</span>
+              </div>
+              <button
+                onClick={onLoad}
+                className="h-6 px-3 bg-[#0058bc] text-white text-[12px] font-medium rounded-md hover:bg-[#004ea8] transition-colors"
+              >
+                Load Model
+              </button>
+            </div>
+          )}
+        </Row>
+      )}
     </div>
   );
 }
@@ -295,6 +383,14 @@ export function ModelsPage() {
     setByokProvider,
     setByokApiKey,
     testConnection,
+    llmFileStatus,
+    llmLoaded,
+    llmDownloading,
+    llmDownloadProgress,
+    downloadLocalModel,
+    cancelLocalModelDownload,
+    deleteLocalModel,
+    loadLocalModel,
   } = useModels();
 
   if (isLoading) {
@@ -349,7 +445,19 @@ export function ModelsPage() {
         <div className={`bg-white rounded-[10px] border border-black/[0.07] shadow-sm overflow-hidden${llmMode === "byok" ? " mb-3" : ""}`}>
           <SegmentedControl value={llmMode} onChange={(v) => setLlmMode(v as "local" | "ollama" | "byok")} />
 
-          {llmMode === "local" && <LocalContent />}
+          {llmMode === "local" && (
+            <LocalContent
+              fileExists={llmFileStatus.exists}
+              sizeMb={llmFileStatus.size_mb}
+              loaded={llmLoaded}
+              downloading={llmDownloading}
+              downloadProgress={llmDownloadProgress}
+              onDownload={downloadLocalModel}
+              onCancelDownload={cancelLocalModelDownload}
+              onDelete={deleteLocalModel}
+              onLoad={loadLocalModel}
+            />
+          )}
           {llmMode === "ollama" && (
             <OllamaContent
               ollamaStatus={ollamaStatus}

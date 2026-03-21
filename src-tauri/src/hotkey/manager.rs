@@ -128,6 +128,7 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
 
     match current_mode {
         MODE_IDLE => {
+            println!("HOTKEY: Press detected");
             // Atomically claim the transition from IDLE — only one press wins
             if state.mode.compare_exchange(MODE_IDLE, MODE_HOLD_RECORDING, Ordering::SeqCst, Ordering::SeqCst).is_err() {
                 return; // Another press already transitioned
@@ -151,6 +152,7 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
                 state.mode.store(MODE_IDLE, Ordering::SeqCst);
                 return;
             }
+            println!("AUDIO: Capture started");
 
             if is_double_tap {
                 state.mode.store(MODE_HANDS_FREE, Ordering::SeqCst);
@@ -159,6 +161,7 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
                 log::info!("Hold-to-talk recording started");
             }
 
+            println!("OVERLAY: Showing listening state");
             emit_pipeline_event(&app, "listening", None, None, None, None);
 
             // Register Escape as cancel while recording
@@ -182,6 +185,7 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
 async fn handle_record_released(app: AppHandle, state: Arc<HotkeyState>) {
     // Atomically transition from hold-recording to processing — only one release wins
     if state.mode.compare_exchange(MODE_HOLD_RECORDING, MODE_PROCESSING, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+        println!("HOTKEY: Release detected");
         unregister_cancel_hotkey(&app);
         run_pipeline_and_inject(app, state).await;
     }
@@ -204,9 +208,11 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
         }
     };
 
+    println!("AUDIO: Capture stopped, buffer size: {} samples", raw_audio.len());
     log::info!("Recording stopped. {} samples captured", raw_audio.len());
 
     // 2. Emit processing state
+    println!("OVERLAY: Processing state");
     emit_pipeline_event(&app, "processing", None, None, None, None);
 
     // 3. Run pipeline (VAD -> whisper -> correction -> LLM)
@@ -251,6 +257,7 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
     save_history_and_learn(app_state.inner(), &result, &app_name);
 
     // 8. Inject text into focused app
+    println!("INJECT: Injecting text into {}", app_name);
     let text_for_inject = result.final_text.clone();
     match tokio::task::spawn_blocking(move || {
         crate::injection::injector::inject(&text_for_inject, false)
