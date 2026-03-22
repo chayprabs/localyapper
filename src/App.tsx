@@ -28,7 +28,7 @@ function MainWindow() {
   // Load models in the background once setup is complete
   useEffect(() => {
     if (setupComplete) {
-      reloadModels().catch(() => {});
+      reloadModels().catch((e) => console.error("Auto-reload models failed:", e));
     }
   }, [setupComplete]);
 

@@ -58,22 +58,31 @@ fn load_whisper_model(app: &tauri::App, conn: &rusqlite::Connection) -> Option<A
         .unwrap_or_else(|_| stt::whisper::DEFAULT_WHISPER_MODEL.to_string());
 
     let candidates = whisper_model_candidates(app.handle(), &model_setting);
+    println!("WHISPER: Startup load — model setting='{}', candidates: {:?}",
+        model_setting, candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>());
 
     for candidate in &candidates {
         if candidate.exists() {
+            let size = std::fs::metadata(candidate).map(|m| m.len()).unwrap_or(0);
+            println!("WHISPER: Found model at {} ({} bytes), loading...", candidate.display(), size);
             log::info!("Found Whisper model at {}", candidate.display());
             match WhisperEngine::new(candidate) {
                 Ok(engine) => {
+                    println!("WHISPER: Engine loaded successfully");
                     log::info!("Whisper engine loaded successfully");
                     return Some(Arc::new(engine));
                 }
                 Err(e) => {
+                    println!("WHISPER: Load FAILED from {}: {}", candidate.display(), e);
                     log::warn!("Failed to load Whisper model from {}: {}", candidate.display(), e);
                 }
             }
+        } else {
+            println!("WHISPER: File not found at {}", candidate.display());
         }
     }
 
+    println!("WHISPER: No model loaded — STT unavailable until downloaded");
     log::warn!(
         "Whisper model ({}) not found. STT will be unavailable until the model is downloaded.",
         stt::whisper::whisper_model_filename(&model_setting)

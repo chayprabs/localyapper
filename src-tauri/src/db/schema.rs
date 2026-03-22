@@ -63,6 +63,7 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
     seed_settings(conn)?;
     seed_modes(conn)?;
     migrate_hotkey_defaults(conn)?;
+    migrate_whisper_model_default(conn)?;
 
     Ok(())
 }
@@ -104,6 +105,16 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     }
     tx.commit()?;
 
+    Ok(())
+}
+
+/// Migrate whisper_model from old default "tiny.en" to "base.en".
+/// Safe to run repeatedly — only updates if value is still "tiny.en".
+fn migrate_whisper_model_default(conn: &Connection) -> Result<(), LocalYapperError> {
+    conn.execute(
+        "UPDATE settings SET value = 'base.en', updated_at = datetime('now') WHERE key = 'whisper_model' AND value = 'tiny.en'",
+        [],
+    )?;
     Ok(())
 }
 

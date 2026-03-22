@@ -494,52 +494,73 @@ pub async fn delete_whisper_model(
 ///
 /// Model loading is done on a blocking thread since whisper-rs and llama-cpp
 /// perform heavy C FFI operations that need a full OS thread stack.
+/// Returns errors for any model that fails to load (both models still get a chance).
 #[tauri::command]
 pub async fn reload_models(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
+    let mut errors: Vec<String> = Vec::new();
+
     // Reload Whisper if not already loaded
     let whisper_loaded = state.whisper.lock()
         .map(|g| g.is_some())
         .unwrap_or(false);
 
+    println!("RELOAD: Whisper currently loaded: {whisper_loaded}");
+
     if !whisper_loaded {
-        // Read whisper_model setting from DB to determine which model to load
         let model_setting = {
             let db = state.db.lock().map_err(|e| format!("DB lock failed: {e}"))?;
             crate::db::queries::get_setting(&db, "whisper_model")
                 .unwrap_or_else(|_| crate::stt::whisper::DEFAULT_WHISPER_MODEL.to_string())
         };
         let candidates = crate::whisper_model_candidates(&app_handle, &model_setting);
+        println!("RELOAD: Whisper model setting='{}', candidates: {:?}", model_setting,
+            candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>());
+
         let whisper_mutex = state.whisper.clone();
 
-        tokio::task::spawn_blocking(move || {
+        let whisper_result = tokio::task::spawn_blocking(move || {
             for candidate in &candidates {
                 if candidate.exists() {
+                    let size = std::fs::metadata(candidate).map(|m| m.len()).unwrap_or(0);
+                    println!("RELOAD: Trying Whisper at {} ({} bytes)", candidate.display(), size);
                     match crate::stt::whisper::WhisperEngine::new(candidate) {
                         Ok(engine) => {
+                            println!("RELOAD: Whisper loaded successfully from {}", candidate.display());
                             log::info!("Hot-loaded Whisper engine from {}", candidate.display());
                             if let Ok(mut g) = whisper_mutex.lock() {
                                 *g = Some(std::sync::Arc::new(engine));
                             }
-                            break;
+                            return Ok(());
                         }
                         Err(e) => {
+                            println!("RELOAD: Whisper load FAILED from {}: {e}", candidate.display());
                             log::warn!("Failed to load Whisper from {}: {e}", candidate.display());
+                            return Err(format!("Failed to load Whisper from {}: {e}", candidate.display()));
                         }
                     }
+                } else {
+                    println!("RELOAD: File not found at {}", candidate.display());
                 }
             }
+            Err("No Whisper model file found at any candidate path".to_string())
         })
         .await
-        .map_err(|e| format!("Whisper load task failed: {e}"))?;
+        .map_err(|e| format!("Whisper load task panicked: {e}"))?;
+
+        if let Err(e) = whisper_result {
+            errors.push(e);
+        }
     }
 
     // Reload LLM if not already loaded (async — mistral.rs model loading is async)
     let llm_loaded = state.llm.lock()
         .map(|g| g.is_some())
         .unwrap_or(false);
+
+    println!("RELOAD: LLM currently loaded: {llm_loaded}");
 
     if !llm_loaded {
         let models_dir = app_handle
@@ -552,23 +573,31 @@ pub async fn reload_models(
         let tokenizer_path = models_dir.join(crate::llm::engine::LLM_TOKENIZER_FILENAME);
 
         if gguf_path.exists() && tokenizer_path.exists() {
+            println!("RELOAD: Loading LLM from {}", models_dir.display());
             let llm_mutex = state.llm.clone();
             match crate::llm::engine::LlmEngine::new(&models_dir).await {
                 Ok(engine) => {
+                    println!("RELOAD: LLM loaded successfully");
                     log::info!("Hot-loaded LLM engine from {}", models_dir.display());
                     if let Ok(mut g) = llm_mutex.lock() {
                         *g = Some(std::sync::Arc::new(engine));
                     }
                 }
                 Err(e) => {
+                    println!("RELOAD: LLM load FAILED: {e}");
                     log::warn!("Failed to load LLM from {}: {e}", models_dir.display());
+                    errors.push(format!("Failed to load LLM: {e}"));
                 }
             }
         } else {
+            println!("RELOAD: LLM files not found in {}", models_dir.display());
             log::info!("LLM model files not found in {}, skipping", models_dir.display());
         }
     }
 
+    if !errors.is_empty() {
+        return Err(errors.join("; "));
+    }
     Ok(())
 }
 

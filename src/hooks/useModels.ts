@@ -51,12 +51,16 @@ export function useModels() {
   const [llmLoaded, setLlmLoaded] = useState(false);
   const [llmDownloading, setLlmDownloading] = useState(false);
   const [llmDownloadProgress, setLlmDownloadProgress] = useState<DownloadProgress | null>(null);
+  const [llmLoading, setLlmLoading] = useState(false);
+  const [llmError, setLlmError] = useState<string | null>(null);
 
   // Whisper state
   const [whisperFileStatus, setWhisperFileStatus] = useState<WhisperFileStatus>({ exists: false, size_mb: 0, model_name: "base.en" });
   const [whisperLoaded, setWhisperLoaded] = useState(false);
   const [whisperDownloading, setWhisperDownloading] = useState(false);
   const [whisperDownloadProgress, setWhisperDownloadProgress] = useState<DownloadProgress | null>(null);
+  const [whisperLoading, setWhisperLoading] = useState(false);
+  const [whisperError, setWhisperError] = useState<string | null>(null);
 
   const refreshOllama = useCallback(async () => {
     try {
@@ -183,6 +187,7 @@ export function useModels() {
   const downloadLocalModel = useCallback(async () => {
     setLlmDownloading(true);
     setLlmDownloadProgress(null);
+    setLlmError(null);
     const unlisten = await listen<DownloadProgress>("model_download_progress", (event) => {
       setLlmDownloadProgress(event.payload);
     });
@@ -192,6 +197,8 @@ export function useModels() {
       setLlmFileStatus({ exists: true, size_mb: 397 });
       setLlmLoaded(true);
     } catch (e) {
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Download failed";
+      setLlmError(msg);
       console.error("Model download failed:", e);
     } finally {
       unlisten();
@@ -210,6 +217,7 @@ export function useModels() {
   }, []);
 
   const deleteLocalModel = useCallback(async () => {
+    setLlmError(null);
     try {
       await deleteLlmModel();
       setLlmFileStatus({ exists: false, size_mb: 0 });
@@ -220,12 +228,21 @@ export function useModels() {
   }, []);
 
   const loadLocalModel = useCallback(async () => {
+    setLlmLoading(true);
+    setLlmError(null);
     try {
       await reloadModels();
       const status = await checkModelsStatus();
       setLlmLoaded(status.llm_loaded);
+      if (!status.llm_loaded) {
+        setLlmError("Model file may be corrupted. Try deleting and re-downloading.");
+      }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Load failed";
+      setLlmError(msg);
       console.error("Model load failed:", e);
+    } finally {
+      setLlmLoading(false);
     }
   }, []);
 
@@ -233,6 +250,7 @@ export function useModels() {
   const downloadWhisperModelAction = useCallback(async () => {
     setWhisperDownloading(true);
     setWhisperDownloadProgress(null);
+    setWhisperError(null);
     const unlisten = await listen<DownloadProgress>("whisper_download_progress", (event) => {
       setWhisperDownloadProgress(event.payload);
     });
@@ -244,8 +262,15 @@ export function useModels() {
         checkModelsStatus(),
       ]);
       if (fileResult.status === "fulfilled") setWhisperFileStatus(fileResult.value);
-      if (statusResult.status === "fulfilled") setWhisperLoaded(statusResult.value.whisper_loaded);
+      if (statusResult.status === "fulfilled") {
+        setWhisperLoaded(statusResult.value.whisper_loaded);
+        if (!statusResult.value.whisper_loaded) {
+          setWhisperError("Download complete but model failed to load. Try clicking Load Model.");
+        }
+      }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Download failed";
+      setWhisperError(msg);
       console.error("Whisper download failed:", e);
     } finally {
       unlisten();
@@ -264,6 +289,7 @@ export function useModels() {
   }, []);
 
   const deleteWhisperModelAction = useCallback(async () => {
+    setWhisperError(null);
     try {
       await deleteWhisperModel(settingsRef.current.whisperModel);
       setWhisperFileStatus({ exists: false, size_mb: 0, model_name: settingsRef.current.whisperModel });
@@ -274,12 +300,21 @@ export function useModels() {
   }, []);
 
   const loadWhisperModel = useCallback(async () => {
+    setWhisperLoading(true);
+    setWhisperError(null);
     try {
       await reloadModels();
       const status = await checkModelsStatus();
       setWhisperLoaded(status.whisper_loaded);
+      if (!status.whisper_loaded) {
+        setWhisperError("Model file may be corrupted. Try deleting and re-downloading.");
+      }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Load failed";
+      setWhisperError(msg);
       console.error("Whisper load failed:", e);
+    } finally {
+      setWhisperLoading(false);
     }
   }, []);
 
@@ -298,6 +333,8 @@ export function useModels() {
     // Local LLM model
     llmFileStatus,
     llmLoaded,
+    llmLoading,
+    llmError,
     llmDownloading,
     llmDownloadProgress,
     downloadLocalModel,
@@ -307,6 +344,8 @@ export function useModels() {
     // Whisper model
     whisperFileStatus,
     whisperLoaded,
+    whisperLoading,
+    whisperError,
     whisperDownloading,
     whisperDownloadProgress,
     downloadWhisperModelAction,

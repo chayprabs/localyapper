@@ -147,6 +147,8 @@ function LocalContent({
   fileExists,
   sizeMb,
   loaded,
+  loading,
+  error,
   downloading,
   downloadProgress,
   onDownload,
@@ -157,6 +159,8 @@ function LocalContent({
   fileExists: boolean;
   sizeMb: number;
   loaded: boolean;
+  loading: boolean;
+  error: string | null;
   downloading: boolean;
   downloadProgress: { percent: number; downloaded_mb: number; total_mb: number; speed_mbps: number } | null;
   onDownload: () => void;
@@ -226,11 +230,16 @@ function LocalContent({
 
       {/* Load status (only if downloaded) */}
       {fileExists && !downloading && (
-        <Row label="Engine Status" isLast>
+        <Row label="Engine Status" isLast={!error}>
           {loaded ? (
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-[#28CD41]" />
               <span className="text-[13px] font-medium text-[#28CD41]">Loaded</span>
+            </div>
+          ) : loading ? (
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px] text-[#0058bc] animate-spin">progress_activity</span>
+              <span className="text-[13px] text-black/50">Loading...</span>
             </div>
           ) : (
             <div className="flex items-center gap-3">
@@ -247,6 +256,11 @@ function LocalContent({
             </div>
           )}
         </Row>
+      )}
+      {error && (
+        <div className="px-4 pb-3">
+          <p className="text-[11px] text-[#ba1a1a]">{error}</p>
+        </div>
       )}
     </div>
   );
@@ -373,6 +387,8 @@ export function ModelsPage() {
     testConnection,
     llmFileStatus,
     llmLoaded,
+    llmLoading,
+    llmError,
     llmDownloading,
     llmDownloadProgress,
     downloadLocalModel,
@@ -381,6 +397,8 @@ export function ModelsPage() {
     loadLocalModel,
     whisperFileStatus,
     whisperLoaded,
+    whisperLoading,
+    whisperError,
     whisperDownloading,
     whisperDownloadProgress,
     downloadWhisperModelAction,
@@ -468,11 +486,16 @@ export function ModelsPage() {
           )}
 
           {whisperFileStatus.exists && !whisperDownloading && (
-            <Row label="Engine Status" isLast>
+            <Row label="Engine Status" isLast={!whisperError}>
               {whisperLoaded ? (
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-[#28CD41]" />
                   <span className="text-[13px] font-medium text-[#28CD41]">Loaded</span>
+                </div>
+              ) : whisperLoading ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px] text-[#0058bc] animate-spin">progress_activity</span>
+                  <span className="text-[13px] text-black/50">Loading...</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
@@ -490,6 +513,11 @@ export function ModelsPage() {
               )}
             </Row>
           )}
+          {whisperError && (
+            <div className="px-4 pb-3">
+              <p className="text-[11px] text-[#ba1a1a]">{whisperError}</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -506,6 +534,8 @@ export function ModelsPage() {
               fileExists={llmFileStatus.exists}
               sizeMb={llmFileStatus.size_mb}
               loaded={llmLoaded}
+              loading={llmLoading}
+              error={llmError}
               downloading={llmDownloading}
               downloadProgress={llmDownloadProgress}
               onDownload={downloadLocalModel}
