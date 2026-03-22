@@ -28,39 +28,6 @@ function TabButton({
   );
 }
 
-function InfoCards() {
-  return (
-    <div className="mt-8 grid grid-cols-2 gap-6">
-      <div className="p-6 bg-white rounded-xl border border-black/[0.07] shadow-sm">
-        <div className="flex items-center gap-3 mb-3">
-          <span className="material-symbols-outlined text-[22px] text-[#0058bc]">
-            info
-          </span>
-          <h3 className="text-[13px] font-semibold">How it works</h3>
-        </div>
-        <p className="text-[13px] text-black/50 leading-relaxed">
-          LocalYapper scans your voice transcripts in real-time. If it hears any
-          of the &lsquo;Whisper Heard&rsquo; phrases, it automatically replaces
-          them with your &lsquo;Corrected To&rsquo; preference before delivery.
-        </p>
-      </div>
-      <div className="p-6 bg-white rounded-xl border border-black/[0.07] shadow-sm">
-        <div className="flex items-center gap-3 mb-3">
-          <span className="material-symbols-outlined text-[22px] text-[#28CD41]">
-            auto_fix
-          </span>
-          <h3 className="text-[13px] font-semibold">Smart Suggestions</h3>
-        </div>
-        <p className="text-[13px] text-black/50 leading-relaxed">
-          Frequent manual edits in the &lsquo;History&rsquo; tab will
-          automatically suggest new dictionary entries here. Switch to the
-          &lsquo;Training&rsquo; tab to review automated learning.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 export function DictionaryPage() {
   const [activeTab, setActiveTab] = useState<TabId>("corrections");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -136,8 +103,15 @@ export function DictionaryPage() {
           <TrainingTab onDone={handleTrainingDone} />
         )}
 
-        {/* Info Cards — shared below both tabs */}
-        <InfoCards />
+        <div className="mt-6 text-center">
+          <a
+            href="#"
+            onClick={(e) => e.preventDefault()}
+            className="text-[12px] text-[#0058bc] hover:underline cursor-pointer"
+          >
+            Learn more about voice training
+          </a>
+        </div>
       </div>
     </div>
   );

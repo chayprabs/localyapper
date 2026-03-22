@@ -209,8 +209,9 @@ pub fn run() {
             }
 
             // Register global hotkeys (hold-to-talk, cancel, paste-last, open-app)
-            if let Err(e) = hotkey::manager::register_hotkeys(app.handle()) {
-                log::error!("Failed to register hotkeys: {e}");
+            match hotkey::manager::register_hotkeys(app.handle()) {
+                Ok(()) => println!("STARTUP: Hotkeys registered successfully"),
+                Err(e) => println!("STARTUP: FAILED to register hotkeys: {e}"),
             }
 
             // Setup system tray icon and menu

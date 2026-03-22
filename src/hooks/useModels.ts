@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useAtom } from "jotai";
 import { listen } from "@tauri-apps/api/event";
 import type { OllamaStatus, ConnectionResult, DownloadProgress, LlmFileStatus, WhisperFileStatus } from "@/types/commands";
 import { getAllSettings, setSetting } from "@/lib/commands/settings";
@@ -15,6 +16,12 @@ import {
   cancelModelDownload,
   reloadModels,
 } from "@/lib/commands/models";
+import {
+  modelsSettingsCacheAtom,
+  ollamaStatusCacheAtom,
+  modelStatusCacheAtom,
+} from "@/stores/appStore";
+import type { ModelsSettingsCache, ModelStatusCache } from "@/stores/appStore";
 
 type LlmMode = "local" | "ollama" | "byok";
 type WhisperModel = "tiny.en" | "base.en" | "small.en" | "medium.en";
@@ -36,54 +43,106 @@ const DEFAULTS: ModelsState = {
   byokApiKey: "",
 };
 
+function settingsFromCache(cache: ModelsSettingsCache): ModelsState {
+  return {
+    whisperModel: (cache.whisperModel as WhisperModel) ?? DEFAULTS.whisperModel,
+    llmMode: (cache.llmMode as LlmMode) ?? DEFAULTS.llmMode,
+    ollamaModel: cache.ollamaModel ?? DEFAULTS.ollamaModel,
+    byokProvider: (cache.byokProvider as ByokProvider) ?? DEFAULTS.byokProvider,
+    byokApiKey: cache.byokApiKey ?? DEFAULTS.byokApiKey,
+  };
+}
+
 export function useModels() {
-  const [settings, setSettings] = useState<ModelsState>(DEFAULTS);
-  const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null);
+  const [settingsCache, setSettingsCache] = useAtom(modelsSettingsCacheAtom);
+  const [ollamaStatusCache, setOllamaStatusCache] = useAtom(ollamaStatusCacheAtom);
+  const [statusCache, setStatusCache] = useAtom(modelStatusCacheAtom);
+
+  // Initialize from cache if available — skip loading state entirely on revisit
+  const hasCached = settingsCache !== null && statusCache !== null;
+
+  const [settings, setSettings] = useState<ModelsState>(
+    settingsCache ? settingsFromCache(settingsCache) : DEFAULTS
+  );
+  const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(ollamaStatusCache);
   const [connectionResult, setConnectionResult] =
     useState<ConnectionResult | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!hasCached);
   const [isTesting, setIsTesting] = useState(false);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
   // Local LLM state
-  const [llmFileStatus, setLlmFileStatus] = useState<LlmFileStatus>({ exists: false, size_mb: 0 });
-  const [llmLoaded, setLlmLoaded] = useState(false);
+  const [llmFileStatus, setLlmFileStatus] = useState<LlmFileStatus>(
+    statusCache?.llmFileStatus ?? { exists: false, size_mb: 0 }
+  );
+  const [llmLoaded, setLlmLoaded] = useState(statusCache?.llmLoaded ?? false);
   const [llmDownloading, setLlmDownloading] = useState(false);
   const [llmDownloadProgress, setLlmDownloadProgress] = useState<DownloadProgress | null>(null);
   const [llmLoading, setLlmLoading] = useState(false);
   const [llmError, setLlmError] = useState<string | null>(null);
 
   // Whisper state
-  const [whisperFileStatus, setWhisperFileStatus] = useState<WhisperFileStatus>({ exists: false, size_mb: 0, model_name: "base.en" });
-  const [whisperLoaded, setWhisperLoaded] = useState(false);
+  const [whisperFileStatus, setWhisperFileStatus] = useState<WhisperFileStatus>(
+    statusCache?.whisperFileStatus ?? { exists: false, size_mb: 0, model_name: "base.en" }
+  );
+  const [whisperLoaded, setWhisperLoaded] = useState(statusCache?.whisperLoaded ?? false);
   const [whisperDownloading, setWhisperDownloading] = useState(false);
   const [whisperDownloadProgress, setWhisperDownloadProgress] = useState<DownloadProgress | null>(null);
   const [whisperLoading, setWhisperLoading] = useState(false);
   const [whisperError, setWhisperError] = useState<string | null>(null);
 
+  // Track whether Ollama has been checked this mount
+  const ollamaCheckedRef = useRef(false);
+
   const refreshOllama = useCallback(async () => {
     try {
       const status = await checkOllama();
       setOllamaStatus(status);
+      setOllamaStatusCache(status);
+      ollamaCheckedRef.current = true;
     } catch (e) {
       console.error("Failed to check Ollama:", e);
     }
-  }, []);
+  }, [setOllamaStatusCache]);
+
+  // Helper to update Jotai caches
+  const updateCaches = useCallback((
+    newSettings: ModelsState,
+    newLlmFile: LlmFileStatus,
+    newWhisperFile: WhisperFileStatus,
+    newLlmLoaded: boolean,
+    newWhisperLoaded: boolean,
+  ) => {
+    setSettingsCache({
+      whisperModel: newSettings.whisperModel,
+      llmMode: newSettings.llmMode,
+      ollamaModel: newSettings.ollamaModel,
+      byokProvider: newSettings.byokProvider,
+      byokApiKey: newSettings.byokApiKey,
+    });
+    setStatusCache({
+      llmFileStatus: newLlmFile,
+      whisperFileStatus: newWhisperFile,
+      llmLoaded: newLlmLoaded,
+      whisperLoaded: newWhisperLoaded,
+    });
+  }, [setSettingsCache, setStatusCache]);
 
   useEffect(() => {
     async function load() {
-      const [settingsResult, ollamaResult, modelsResult, llmFileResult, whisperFileResult] = await Promise.allSettled([
+      // Fetch everything EXCEPT Ollama status
+      const [settingsResult, modelsResult, llmFileResult, whisperFileResult] = await Promise.allSettled([
         getAllSettings(),
-        checkOllama(),
         checkModelsStatus(),
         checkLlmFileExists(),
         checkWhisperFileExists(),
       ]);
 
+      let newSettings = settings;
       if (settingsResult.status === "fulfilled") {
         const s = settingsResult.value;
-        setSettings({
+        newSettings = {
           whisperModel:
             (s["whisper_model"] as WhisperModel) ?? DEFAULTS.whisperModel,
           llmMode: (s["llm_mode"] as LlmMode) ?? DEFAULTS.llmMode,
@@ -91,27 +150,40 @@ export function useModels() {
           byokProvider:
             (s["byok_provider"] as ByokProvider) ?? DEFAULTS.byokProvider,
           byokApiKey: s["byok_api_key"] ?? DEFAULTS.byokApiKey,
-        });
+        };
+        setSettings(newSettings);
       }
 
-      if (ollamaResult.status === "fulfilled") {
-        setOllamaStatus(ollamaResult.value);
-      }
-
+      let newLlmLoaded = false;
+      let newWhisperLoaded = false;
       if (modelsResult.status === "fulfilled") {
-        setLlmLoaded(modelsResult.value.llm_loaded);
-        setWhisperLoaded(modelsResult.value.whisper_loaded);
+        newLlmLoaded = modelsResult.value.llm_loaded;
+        newWhisperLoaded = modelsResult.value.whisper_loaded;
+        setLlmLoaded(newLlmLoaded);
+        setWhisperLoaded(newWhisperLoaded);
       }
 
+      let newLlmFile: LlmFileStatus = { exists: false, size_mb: 0 };
       if (llmFileResult.status === "fulfilled") {
-        setLlmFileStatus(llmFileResult.value);
+        newLlmFile = llmFileResult.value;
+        setLlmFileStatus(newLlmFile);
       }
 
+      let newWhisperFile: WhisperFileStatus = { exists: false, size_mb: 0, model_name: "base.en" };
       if (whisperFileResult.status === "fulfilled") {
-        setWhisperFileStatus(whisperFileResult.value);
+        newWhisperFile = whisperFileResult.value;
+        setWhisperFileStatus(newWhisperFile);
       }
+
+      // Write to Jotai cache for instant render on revisit
+      updateCaches(newSettings, newLlmFile, newWhisperFile, newLlmLoaded, newWhisperLoaded);
 
       setIsLoading(false);
+
+      // If current mode is ollama and we haven't checked yet, check in background
+      if (newSettings.llmMode === "ollama" && !ollamaCheckedRef.current) {
+        void refreshOllama();
+      }
     }
 
     void load();
@@ -124,15 +196,36 @@ export function useModels() {
       settingKey: string,
     ) => {
       const previous = settingsRef.current[key];
-      setSettings((prev) => ({ ...prev, [key]: value }));
+      setSettings((prev) => {
+        const next = { ...prev, [key]: value };
+        // Update settings cache inline
+        setSettingsCache({
+          whisperModel: next.whisperModel,
+          llmMode: next.llmMode,
+          ollamaModel: next.ollamaModel,
+          byokProvider: next.byokProvider,
+          byokApiKey: next.byokApiKey,
+        });
+        return next;
+      });
       try {
         await setSetting(settingKey, String(value));
       } catch (e) {
         console.error(`Failed to update ${settingKey}:`, e);
-        setSettings((prev) => ({ ...prev, [key]: previous }));
+        setSettings((prev) => {
+          const reverted = { ...prev, [key]: previous };
+          setSettingsCache({
+            whisperModel: reverted.whisperModel,
+            llmMode: reverted.llmMode,
+            ollamaModel: reverted.ollamaModel,
+            byokProvider: reverted.byokProvider,
+            byokApiKey: reverted.byokApiKey,
+          });
+          return reverted;
+        });
       }
     },
-    [],
+    [setSettingsCache],
   );
 
   const setLlmMode = useCallback(
@@ -184,6 +277,19 @@ export function useModels() {
     }
   }, []);
 
+  // Helper to sync model status cache
+  const updateStatusCache = useCallback((updates: Partial<ModelStatusCache>) => {
+    setStatusCache((prev) => {
+      const base = prev ?? {
+        llmFileStatus: { exists: false, size_mb: 0 },
+        whisperFileStatus: { exists: false, size_mb: 0, model_name: "base.en" },
+        llmLoaded: false,
+        whisperLoaded: false,
+      };
+      return { ...base, ...updates };
+    });
+  }, [setStatusCache]);
+
   const downloadLocalModel = useCallback(async () => {
     setLlmDownloading(true);
     setLlmDownloadProgress(null);
@@ -194,8 +300,10 @@ export function useModels() {
     try {
       await downloadModel();
       await reloadModels();
-      setLlmFileStatus({ exists: true, size_mb: 397 });
+      const newFile = { exists: true, size_mb: 397 };
+      setLlmFileStatus(newFile);
       setLlmLoaded(true);
+      updateStatusCache({ llmFileStatus: newFile, llmLoaded: true });
     } catch (e) {
       const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Download failed";
       setLlmError(msg);
@@ -204,7 +312,7 @@ export function useModels() {
       unlisten();
       setLlmDownloading(false);
     }
-  }, []);
+  }, [updateStatusCache]);
 
   const cancelLocalModelDownload = useCallback(async () => {
     try {
@@ -220,12 +328,14 @@ export function useModels() {
     setLlmError(null);
     try {
       await deleteLlmModel();
-      setLlmFileStatus({ exists: false, size_mb: 0 });
+      const newFile = { exists: false, size_mb: 0 };
+      setLlmFileStatus(newFile);
       setLlmLoaded(false);
+      updateStatusCache({ llmFileStatus: newFile, llmLoaded: false });
     } catch (e) {
       console.error("Model delete failed:", e);
     }
-  }, []);
+  }, [updateStatusCache]);
 
   const loadLocalModel = useCallback(async () => {
     setLlmLoading(true);
@@ -234,6 +344,7 @@ export function useModels() {
       await reloadModels();
       const status = await checkModelsStatus();
       setLlmLoaded(status.llm_loaded);
+      updateStatusCache({ llmLoaded: status.llm_loaded });
       if (!status.llm_loaded) {
         setLlmError("Model file may be corrupted. Try deleting and re-downloading.");
       }
@@ -244,7 +355,7 @@ export function useModels() {
     } finally {
       setLlmLoading(false);
     }
-  }, []);
+  }, [updateStatusCache]);
 
   // Whisper actions
   const downloadWhisperModelAction = useCallback(async () => {
@@ -261,9 +372,13 @@ export function useModels() {
         checkWhisperFileExists(),
         checkModelsStatus(),
       ]);
-      if (fileResult.status === "fulfilled") setWhisperFileStatus(fileResult.value);
+      if (fileResult.status === "fulfilled") {
+        setWhisperFileStatus(fileResult.value);
+        updateStatusCache({ whisperFileStatus: fileResult.value });
+      }
       if (statusResult.status === "fulfilled") {
         setWhisperLoaded(statusResult.value.whisper_loaded);
+        updateStatusCache({ whisperLoaded: statusResult.value.whisper_loaded });
         if (!statusResult.value.whisper_loaded) {
           setWhisperError("Download complete but model failed to load. Try clicking Load Model.");
         }
@@ -276,7 +391,7 @@ export function useModels() {
       unlisten();
       setWhisperDownloading(false);
     }
-  }, []);
+  }, [updateStatusCache]);
 
   const cancelWhisperDownload = useCallback(async () => {
     try {
@@ -292,12 +407,14 @@ export function useModels() {
     setWhisperError(null);
     try {
       await deleteWhisperModel(settingsRef.current.whisperModel);
-      setWhisperFileStatus({ exists: false, size_mb: 0, model_name: settingsRef.current.whisperModel });
+      const newFile = { exists: false, size_mb: 0, model_name: settingsRef.current.whisperModel };
+      setWhisperFileStatus(newFile);
       setWhisperLoaded(false);
+      updateStatusCache({ whisperFileStatus: newFile, whisperLoaded: false });
     } catch (e) {
       console.error("Whisper delete failed:", e);
     }
-  }, []);
+  }, [updateStatusCache]);
 
   const loadWhisperModel = useCallback(async () => {
     setWhisperLoading(true);
@@ -306,6 +423,7 @@ export function useModels() {
       await reloadModels();
       const status = await checkModelsStatus();
       setWhisperLoaded(status.whisper_loaded);
+      updateStatusCache({ whisperLoaded: status.whisper_loaded });
       if (!status.whisper_loaded) {
         setWhisperError("Model file may be corrupted. Try deleting and re-downloading.");
       }
@@ -316,7 +434,7 @@ export function useModels() {
     } finally {
       setWhisperLoading(false);
     }
-  }, []);
+  }, [updateStatusCache]);
 
   return {
     ...settings,

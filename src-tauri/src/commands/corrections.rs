@@ -23,7 +23,7 @@ pub async fn get_corrections(
     queries::get_corrections(&conn, limit, offset).map_err(|e| e.to_string())
 }
 
-/// Adds a new correction mapping.
+/// Adds a new correction mapping (manual add — active immediately with confidence=1.0, count=0).
 #[tauri::command]
 pub async fn add_correction(
     state: tauri::State<'_, AppState>,
@@ -32,7 +32,7 @@ pub async fn add_correction(
 ) -> Result<Correction, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let id = uuid::Uuid::new_v4().to_string();
-    let result = queries::insert_correction(&conn, &id, &raw_word, &corrected)
+    let result = queries::insert_manual_correction(&conn, &id, &raw_word, &corrected)
         .map_err(|e| e.to_string())?;
     let threshold = get_threshold(&conn);
     state.correction_engine.refresh(&conn, threshold)

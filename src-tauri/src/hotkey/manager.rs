@@ -28,6 +28,8 @@ struct HotkeyState {
 
 /// Initialize global hotkeys. Must be called from Tauri setup() after AppState is managed.
 pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
+    println!("HOTKEY: Registering hotkeys...");
+
     let hotkey_state = Arc::new(HotkeyState {
         mode: AtomicU8::new(MODE_IDLE),
         last_press_time: TokioMutex::new(None),
@@ -39,7 +41,6 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
         let conn = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
         queries::get_setting(&conn, "hotkey_record").unwrap_or_else(|_| "Ctrl+Shift+Space".to_string())
     };
-
 
     let paste_last_hotkey = {
         let state = app.state::<AppState>();
@@ -53,6 +54,8 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
         let conn = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
         queries::get_setting(&conn, "hotkey_open_app").unwrap_or_else(|_| "Alt+L".to_string())
     };
+
+    println!("HOTKEY: record='{}', paste_last='{}', open_app='{}'", record_hotkey, paste_last_hotkey, open_app_hotkey);
 
     // Register the record hotkey (hold-to-talk + double-tap hands-free)
     let state_clone = hotkey_state.clone();
@@ -74,8 +77,8 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
                 }
             }
         }) {
-        Ok(()) => log::info!("Record hotkey registered: {record_hotkey}"),
-        Err(e) => log::error!("Failed to register record hotkey '{record_hotkey}': {e}"),
+        Ok(()) => println!("HOTKEY: Record hotkey registered: {record_hotkey}"),
+        Err(e) => println!("HOTKEY: FAILED to register record hotkey '{}': {}", record_hotkey, e),
     }
 
     // Register paste-last hotkey
@@ -83,14 +86,15 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
     match app.global_shortcut()
         .on_shortcut(paste_last_hotkey.as_str(), move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
+                println!("HOTKEY: Paste-last triggered");
                 let handle = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
                     handle_paste_last(handle).await;
                 });
             }
         }) {
-        Ok(()) => log::info!("Paste-last hotkey registered: {paste_last_hotkey}"),
-        Err(e) => log::error!("Failed to register paste-last hotkey '{paste_last_hotkey}': {e}"),
+        Ok(()) => println!("HOTKEY: Paste-last hotkey registered: {paste_last_hotkey}"),
+        Err(e) => println!("HOTKEY: FAILED to register paste-last hotkey '{}': {}", paste_last_hotkey, e),
     }
 
     // Register open-app hotkey
@@ -98,19 +102,21 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
     match app.global_shortcut()
         .on_shortcut(open_app_hotkey.as_str(), move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
+                println!("HOTKEY: Open-app triggered");
                 if let Some(window) = app_handle.get_webview_window("main") {
                     let _ = window.show();
                     let _ = window.set_focus();
                 }
             }
         }) {
-        Ok(()) => log::info!("Open-app hotkey registered: {open_app_hotkey}"),
-        Err(e) => log::error!("Failed to register open-app hotkey '{open_app_hotkey}': {e}"),
+        Ok(()) => println!("HOTKEY: Open-app hotkey registered: {open_app_hotkey}"),
+        Err(e) => println!("HOTKEY: FAILED to register open-app hotkey '{}': {}", open_app_hotkey, e),
     }
 
     // NOTE: Escape is registered dynamically when recording starts to avoid
     // capturing all Escape keypresses system-wide.
 
+    println!("HOTKEY: Registration complete");
     Ok(())
 }
 

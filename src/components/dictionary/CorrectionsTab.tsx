@@ -28,14 +28,14 @@ function InlineAddForm({
   };
 
   return (
-    <div className="px-6 py-4 flex items-center justify-between bg-[rgba(0,88,188,0.03)]">
+    <div className="p-4 flex items-center justify-between bg-white">
       <div className="flex items-center gap-4 flex-1 max-w-[800px]">
         <input
           type="text"
           value={rawWord}
           onChange={(e) => setRawWord(e.target.value)}
           placeholder="Whisper heard..."
-          className="w-full h-[28px] px-3 bg-white border border-[#0058bc] rounded-[6px] text-[13px] placeholder:text-[rgba(0,0,0,0.35)] focus:ring-0 focus:outline-none"
+          className="w-full h-9 px-3 bg-white border border-black/[0.12] rounded-lg text-[13px] placeholder:text-black/[0.35] focus:outline-none focus:border-[#0058bc] focus:ring-1 focus:ring-[#0058bc] transition-colors"
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSave();
           }}
@@ -45,22 +45,22 @@ function InlineAddForm({
           value={corrected}
           onChange={(e) => setCorrected(e.target.value)}
           placeholder="Corrected to..."
-          className="w-full h-[28px] px-3 bg-white border border-[#0058bc] rounded-[6px] text-[13px] placeholder:text-[rgba(0,0,0,0.35)] focus:ring-0 focus:outline-none"
+          className="w-full h-9 px-3 bg-white border border-black/[0.12] rounded-lg text-[13px] placeholder:text-black/[0.35] focus:outline-none focus:border-[#0058bc] focus:ring-1 focus:ring-[#0058bc] transition-colors"
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSave();
           }}
         />
       </div>
-      <div className="flex items-center gap-4 ml-6">
+      <div className="flex items-center gap-3 ml-6">
         <button
           onClick={handleSave}
-          className="bg-[#0058bc] text-white text-[11px] font-medium w-[52px] h-[28px] rounded-[6px] shadow-sm hover:brightness-110 transition-all"
+          className="bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium px-4 h-9 rounded-lg hover:from-[#0058bc] hover:to-[#004ea8] transition-all"
         >
           Save
         </button>
         <button
           onClick={onClose}
-          className="flex items-center justify-center text-[rgba(0,0,0,0.35)] hover:text-black/85 transition-colors"
+          className="flex items-center justify-center text-black/[0.35] hover:text-black/85 transition-colors"
         >
           <span className="material-symbols-outlined text-[20px]">close</span>
         </button>

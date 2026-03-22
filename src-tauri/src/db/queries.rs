@@ -186,6 +186,41 @@ pub fn insert_correction(
     Ok(correction)
 }
 
+/// Inserts a manually-added correction with count=0 and confidence=1.0 (active immediately).
+/// If the pair already exists, updates confidence to 1.0.
+pub fn insert_manual_correction(
+    conn: &Connection,
+    id: &str,
+    raw_word: &str,
+    corrected: &str,
+) -> Result<Correction, LocalYapperError> {
+    conn.execute(
+        "INSERT INTO corrections (id, raw_word, corrected, count, confidence, last_used_at, created_at)
+         VALUES (?1, ?2, ?3, 0, 1.0, datetime('now'), datetime('now'))
+         ON CONFLICT(raw_word, corrected) DO UPDATE SET confidence = 1.0, last_used_at = datetime('now')",
+        params![id, raw_word, corrected],
+    )?;
+
+    let correction = conn.query_row(
+        "SELECT id, raw_word, corrected, count, confidence, last_used_at, created_at
+         FROM corrections WHERE raw_word = ?1 AND corrected = ?2",
+        params![raw_word, corrected],
+        |row| {
+            Ok(Correction {
+                id: row.get(0)?,
+                raw_word: row.get(1)?,
+                corrected: row.get(2)?,
+                count: row.get(3)?,
+                confidence: row.get(4)?,
+                last_used_at: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        },
+    )?;
+
+    Ok(correction)
+}
+
 /// Returns all corrections above a confidence threshold for engine loading.
 /// Results are ordered so that for each raw_word, the highest-confidence (then highest-count) row comes first.
 pub fn get_all_corrections_for_engine(

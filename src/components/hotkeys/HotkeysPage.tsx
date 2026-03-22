@@ -56,7 +56,7 @@ function eventToShortcut(e: KeyboardEvent): string | null {
 
 function KeyBadge({ label }: { label: string }) {
   return (
-    <span className="px-2 h-6 flex items-center bg-black/[0.06] rounded-[6px] text-[12px] font-medium font-mono">
+    <span className="px-2 h-6 flex items-center bg-[rgba(0,0,0,0.06)] rounded-[6px] text-[12px] font-medium font-mono text-[#1C1C1E]">
       {label}
     </span>
   );
@@ -66,6 +66,7 @@ function KeySelector({
   value,
   isEditing,
   readOnly,
+  isDoubleTap,
   onStartEdit,
   onCapture,
   onCancel,
@@ -73,6 +74,7 @@ function KeySelector({
   value: string;
   isEditing: boolean;
   readOnly: boolean;
+  isDoubleTap?: boolean;
   onStartEdit: () => void;
   onCapture: (shortcut: string) => void;
   onCancel: () => void;
@@ -124,6 +126,11 @@ function KeySelector({
   const displayValue = pendingKeys ?? value;
   const parts = parseHotkeyParts(displayValue);
 
+  // For double-tap display: duplicate modifier keys (e.g., Ctrl → Ctrl Ctrl)
+  const displayParts = isDoubleTap
+    ? [...parts.slice(0, -1), ...parts.slice(0, -1), ...parts.slice(-1)]
+    : parts;
+
   return (
     <div
       ref={containerRef}
@@ -140,13 +147,13 @@ function KeySelector({
         </span>
       ) : (
         <div className="flex items-center gap-[6px]">
-          {parts.map((part, i) => (
+          {displayParts.map((part, i) => (
             <KeyBadge key={i} label={part} />
           ))}
         </div>
       )}
       {!readOnly && (
-        <span className="material-symbols-outlined text-[12px] text-black/30 ml-1">
+        <span className="material-symbols-outlined text-[12px] text-[rgba(0,0,0,0.30)] mr-1">
           expand_more
         </span>
       )}
@@ -217,6 +224,7 @@ export function HotkeysPage() {
               value={entry.value}
               isEditing={editingKey === entry.key}
               readOnly={entry.readOnly}
+              isDoubleTap={entry.key === "hotkey_hands_free"}
               onStartEdit={() => startEditing(entry.key)}
               onCapture={(shortcut) => handleCapture(entry.key, shortcut)}
               onCancel={stopEditing}

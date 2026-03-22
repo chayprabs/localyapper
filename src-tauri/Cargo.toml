@@ -38,7 +38,7 @@ futures-util = "0.3"
 mistralrs = "0.7"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
+windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Threading"] }
 
 # Build whisper C dependency in release mode even in debug Rust builds.
 # Suppresses MSVC CRT debug assertions in whisper.cpp/ggml.
