@@ -21,3 +21,12 @@ body {
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 20;
   vertical-align: middle;
 }
+
+/* Hide scrollbars globally but keep scroll functionality */
+*::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+}

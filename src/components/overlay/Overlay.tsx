@@ -33,7 +33,7 @@ export function Overlay() {
   const pillRadius = isTranscribed ? "rounded-[36px]" : "rounded-full";
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-transparent">
+    <div data-tauri-drag-region className="h-screen w-screen flex items-center justify-center bg-transparent">
       <div
         className={`w-[320px] ${pillHeight} ${pillRadius} ${pillBase} relative overflow-hidden`}
       >

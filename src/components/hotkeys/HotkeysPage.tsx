@@ -135,7 +135,7 @@ function KeySelector({
     <div
       ref={containerRef}
       onClick={readOnly ? undefined : onStartEdit}
-      className={`w-[140px] h-[36px] bg-white border rounded-[8px] shadow-sm px-2 flex items-center justify-between ${
+      className={`w-[200px] h-[36px] bg-white border rounded-[8px] shadow-sm px-2 flex items-center justify-between ${
         readOnly
           ? "cursor-default opacity-60"
           : "cursor-pointer hover:border-black/20"
@@ -172,6 +172,8 @@ export function HotkeysPage() {
     stopEditing,
   } = useHotkeys();
 
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   const handleCapture = useCallback(
     (key: string, shortcut: string) => {
       updateHotkey(key, shortcut);
@@ -192,12 +194,30 @@ export function HotkeysPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-[26px] font-semibold text-black/85">Hotkeys</h1>
-        <button
-          onClick={resetToDefaults}
-          className="bg-white border border-black/[0.15] px-4 h-8 rounded-lg text-[13px] font-medium shadow-sm hover:bg-black/[0.02] active:bg-black/[0.04] transition-colors"
-        >
-          Reset to Defaults
-        </button>
+        {showResetConfirm ? (
+          <div className="flex items-center gap-3">
+            <span className="text-[13px] text-black/50">Reset all hotkeys?</span>
+            <button
+              onClick={() => setShowResetConfirm(false)}
+              className="bg-white border border-black/[0.15] px-3 h-8 rounded-lg text-[13px] font-medium shadow-sm hover:bg-black/[0.02] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { resetToDefaults(); setShowResetConfirm(false); }}
+              className="bg-[#ba1a1a] text-white px-3 h-8 rounded-lg text-[13px] font-medium shadow-sm hover:bg-[#a01616] transition-colors"
+            >
+              Reset
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            className="bg-white border border-black/[0.15] px-4 h-8 rounded-lg text-[13px] font-medium shadow-sm hover:bg-black/[0.02] active:bg-black/[0.04] transition-colors"
+          >
+            Reset to Defaults
+          </button>
+        )}
       </div>
 
       {/* Card */}

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useAtom } from "jotai";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { PhysicalPosition } from "@tauri-apps/api/dpi";
 import { overlayDataAtom } from "@/stores/overlayStore";
+import { getSetting, setSetting } from "@/lib/commands/settings";
 import type { OverlayData, OverlayVisualState, PipelineEvent } from "@/types/overlay";
 
 const MAX_RECORDING_SECONDS = 120;
@@ -50,6 +52,22 @@ export function useOverlayState() {
       const win = getCurrentWindow();
       await win.show();
       // Do NOT call setFocus() — the overlay must not steal focus from the target app
+      // Restore saved position
+      try {
+        const [savedX, savedY] = await Promise.all([
+          getSetting("overlay_x"),
+          getSetting("overlay_y"),
+        ]);
+        if (savedX && savedY) {
+          const x = parseInt(savedX, 10);
+          const y = parseInt(savedY, 10);
+          if (!isNaN(x) && !isNaN(y)) {
+            await win.setPosition(new PhysicalPosition(x, y));
+          }
+        }
+      } catch {
+        // Position restore is best-effort
+      }
     } catch (e) {
       console.error("[overlay] Failed to show overlay window:", e);
     }
@@ -57,7 +75,18 @@ export function useOverlayState() {
 
   const hideOverlay = useCallback(async () => {
     try {
-      await getCurrentWindow().hide();
+      const win = getCurrentWindow();
+      // Save position before hiding
+      try {
+        const pos = await win.outerPosition();
+        await Promise.all([
+          setSetting("overlay_x", String(pos.x)),
+          setSetting("overlay_y", String(pos.y)),
+        ]);
+      } catch {
+        // Position save is best-effort
+      }
+      await win.hide();
     } catch (e) {
       console.error("Failed to hide overlay window:", e);
     }

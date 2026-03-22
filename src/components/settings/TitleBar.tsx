@@ -1,8 +1,10 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-const win = getCurrentWindow();
-
 export function TitleBar() {
+  const handleMinimize = () => getCurrentWindow().minimize();
+  const handleMaximize = () => getCurrentWindow().toggleMaximize();
+  const handleClose = () => getCurrentWindow().close();
+
   return (
     <div
       data-tauri-drag-region
@@ -17,40 +19,32 @@ export function TitleBar() {
 
       <div className="flex items-center">
         <button
-          onClick={() => win.minimize()}
+          onClick={handleMinimize}
           className="w-10 h-8 flex items-center justify-center text-black/35 hover:bg-black/[0.08] transition-colors"
           title="Minimize"
         >
-          <span
-            className="material-symbols-outlined text-[14px]"
-            style={{ fontVariationSettings: "'opsz' 14" }}
-          >
-            remove
-          </span>
+          <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor">
+            <rect width="10" height="1" />
+          </svg>
         </button>
         <button
-          onClick={() => win.toggleMaximize()}
+          onClick={handleMaximize}
           className="w-10 h-8 flex items-center justify-center text-black/35 hover:bg-black/[0.08] transition-colors"
           title="Maximize"
         >
-          <span
-            className="material-symbols-outlined text-[14px]"
-            style={{ fontVariationSettings: "'opsz' 14" }}
-          >
-            crop_square
-          </span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
+            <rect x="0.5" y="0.5" width="9" height="9" />
+          </svg>
         </button>
         <button
-          onClick={() => win.close()}
+          onClick={handleClose}
           className="w-10 h-8 flex items-center justify-center text-black/35 hover:bg-red-500 hover:text-white transition-colors"
           title="Close"
         >
-          <span
-            className="material-symbols-outlined text-[14px]"
-            style={{ fontVariationSettings: "'opsz' 14" }}
-          >
-            close
-          </span>
+          <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
+            <line x1="1" y1="1" x2="9" y2="9" />
+            <line x1="9" y1="1" x2="1" y2="9" />
+          </svg>
         </button>
       </div>
     </div>

@@ -94,7 +94,12 @@
       "Bash(find C:Userschait.cargoregistrysrc -path */mistralrs-0* -name *.rs)",
       "Bash(taskkill //PID 11828 //F)",
       "Bash(taskkill //PID 1596 //F)",
-      "Bash(taskkill //PID 31468 //F)"
+      "Bash(taskkill //PID 31468 //F)",
+      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(s[''''screenId''''], s.get\\(''''displayName'''',''''''''\\)\\) for s in data[''''screens'''']]\")",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(s[''''screenId''''], s.get\\(''''displayName'''',''''''''\\)\\) for s in data[''''screens'''']]\")",
+      "Bash(python3 -c \"import json; data=json.load\\(open\\(''mcp-stitch-list_screens-1774185859869.txt''\\)\\); s=data[''screens''][0]; print\\(list\\(s.keys\\(\\)\\)[:10]\\)\")",
+      "Bash(python3 -c \"import json; data=json.load\\(open\\(''mcp-stitch-list_screens-1774185859869.txt'', encoding=''utf-8''\\)\\); s=data[''screens''][0]; print\\(list\\(s.keys\\(\\)\\)[:10]\\)\")",
+      "Bash(python3 -c \"import json; data=json.load\\(open\\(''mcp-stitch-list_screens-1774185859869.txt'', encoding=''utf-8''\\)\\); [print\\(s[''name''], ''|'', s[''title'']\\) for s in data[''screens'']]\")"
     ]
   }
 }

@@ -1,8 +1,6 @@
-import { useEffect } from "react";
-import { useAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { activePageAtom, sidebarCollapsedAtom, type PageId } from "@/stores/appStore";
 import { cn } from "@/lib/utils";
-import { getSetting, setSetting } from "@/lib/commands/settings";
 
 interface NavItem {
   id: PageId;
@@ -19,20 +17,9 @@ const navItems: NavItem[] = [
 ];
 
 export function Sidebar() {
-  const [activePage, setActivePage] = useAtom(activePageAtom);
-  const [isCollapsed, setIsCollapsed] = useAtom(sidebarCollapsedAtom);
-
-  useEffect(() => {
-    getSetting("sidebar_collapsed")
-      .then((val) => setIsCollapsed(val === "true"))
-      .catch(() => {});
-  }, [setIsCollapsed]);
-
-  const toggle = () => {
-    const next = !isCollapsed;
-    setIsCollapsed(next);
-    setSetting("sidebar_collapsed", next ? "true" : "false").catch(() => {});
-  };
+  const activePage = useAtomValue(activePageAtom);
+  const setActivePage = useSetAtom(activePageAtom);
+  const isCollapsed = useAtomValue(sidebarCollapsedAtom);
 
   return (
     <aside
@@ -79,20 +66,8 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom: collapse toggle */}
-      <div className="flex justify-center py-3">
-        <button
-          onClick={toggle}
-          className="w-8 h-8 flex items-center justify-center text-black/35 hover:bg-black/[0.08] rounded-md transition-colors"
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <span className="material-symbols-outlined text-[18px]">
-            {isCollapsed
-              ? "keyboard_double_arrow_right"
-              : "keyboard_double_arrow_left"}
-          </span>
-        </button>
-      </div>
+      {/* Bottom spacer for the toggle button positioned in SettingsLayout */}
+      <div className="h-14 shrink-0" />
     </aside>
   );
 }

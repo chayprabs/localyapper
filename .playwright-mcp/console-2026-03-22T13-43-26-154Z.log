@@ -1,0 +1,4 @@
+[     450ms] TypeError: Cannot read properties of undefined (reading 'metadata')
+    at getCurrentWindow (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_window.js?v=8b786045:117:48)
+    at http://localhost:1420/src/components/settings/TitleBar.tsx:18:13
+[     465ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:1420/favicon.ico:0
