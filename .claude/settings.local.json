@@ -91,7 +91,10 @@
       "Bash(find /c/Users/chait/Project/localyapper/src-tauri/resources -type f -name *whisper* -o -name *tiny*)",
       "Bash(find /c/Users/chait/.cargo/registry/src -path */whisper-rs-0.16*/src/lib.rs -o -path */whisper-rs-0.16*/src/*.rs)",
       "Bash(find C:UserschaitProjectlocalyappersrc-tauritarget -path */mistralrs/src/request.rs)",
-      "Bash(find C:Userschait.cargoregistrysrc -path */mistralrs-0* -name *.rs)"
+      "Bash(find C:Userschait.cargoregistrysrc -path */mistralrs-0* -name *.rs)",
+      "Bash(taskkill //PID 11828 //F)",
+      "Bash(taskkill //PID 1596 //F)",
+      "Bash(taskkill //PID 31468 //F)"
     ]
   }
 }
