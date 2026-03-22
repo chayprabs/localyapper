@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { listen } from "@tauri-apps/api/event";
 import type { HistoryEntry } from "@/types/commands";
 import {
   getHistory,
@@ -40,6 +41,18 @@ export function useHistory(): HistoryData {
 
   useEffect(() => {
     void fetchInitial();
+  }, [fetchInitial]);
+
+  // Auto-refresh when a new dictation completes
+  useEffect(() => {
+    const unlisten = listen<{ state: string }>("pipeline-state", (event) => {
+      if (event.payload.state === "injected") {
+        void fetchInitial();
+      }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, [fetchInitial]);
 
   const loadMore = useCallback(async () => {

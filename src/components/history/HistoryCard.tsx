@@ -1,13 +1,13 @@
 import type { HistoryEntry } from "@/types/commands";
+import { CopyButton } from "@/components/ui/CopyButton";
 import { formatHistoryTimestamp } from "@/lib/formatters";
 
 interface HistoryCardProps {
   entry: HistoryEntry;
-  onCopy: (text: string) => void;
   onDelete: (id: string) => void;
 }
 
-export function HistoryCard({ entry, onCopy, onDelete }: HistoryCardProps) {
+export function HistoryCard({ entry, onDelete }: HistoryCardProps) {
   return (
     <div className="bg-white p-4 rounded-xl border border-black/[0.07] shadow-sm flex flex-col">
       {/* Header */}
@@ -37,14 +37,12 @@ export function HistoryCard({ entry, onCopy, onDelete }: HistoryCardProps) {
 
       {/* Footer */}
       <div className="flex justify-end gap-3">
-        <button
-          onClick={() => onCopy(entry.final_text)}
+        <CopyButton
+          text={entry.final_text}
+          variant="icon"
+          iconSize={18}
           className="text-black/[0.26] hover:text-black/85 transition-colors"
-        >
-          <span className="material-symbols-outlined text-[18px]">
-            content_copy
-          </span>
-        </button>
+        />
         <button
           onClick={() => onDelete(entry.id)}
           className="text-black/[0.26] hover:text-[#ba1a1a] transition-colors"

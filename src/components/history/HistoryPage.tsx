@@ -39,10 +39,6 @@ export function HistoryPage() {
 
   const isEmpty = !isLoading && entries.length === 0;
 
-  const handleCopy = (text: string) => {
-    void navigator.clipboard.writeText(text);
-  };
-
   const handleDelete = (id: string) => {
     void deleteEntry(id);
   };
@@ -80,7 +76,6 @@ export function HistoryPage() {
             <HistoryCard
               key={entry.id}
               entry={entry}
-              onCopy={handleCopy}
               onDelete={handleDelete}
             />
           ))}

@@ -124,6 +124,14 @@ pub fn reload_hotkeys(app: &AppHandle) -> Result<(), String> {
 
 /// Handle record hotkey pressed — start recording or stop hands-free.
 async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
+    // Check if dictation is paused via tray menu
+    {
+        let app_state = app.state::<AppState>();
+        if app_state.paused.load(Ordering::SeqCst) {
+            return;
+        }
+    }
+
     let current_mode = state.mode.load(Ordering::SeqCst);
 
     match current_mode {
@@ -194,6 +202,7 @@ async fn handle_record_released(app: AppHandle, state: Arc<HotkeyState>) {
 
 /// Run the full pipeline: stop recording -> VAD -> whisper -> correction -> LLM -> inject.
 async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>) {
+    let pipeline_start = Instant::now();
     log::info!("run_pipeline_and_inject: starting");
     let app_state = app.state::<AppState>();
 
@@ -208,18 +217,18 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
         }
     };
 
-    println!("AUDIO: Capture stopped, buffer size: {} samples", raw_audio.len());
-    log::info!("Recording stopped. {} samples captured", raw_audio.len());
+    let audio_duration_ms = (raw_audio.len() as f64 / 16000.0 * 1000.0) as i64;
+    println!("PIPELINE: Starting for {} samples ({:.1}s audio)", raw_audio.len(), raw_audio.len() as f64 / 16000.0);
+    log::info!("Recording stopped. {} samples captured ({}ms audio)", raw_audio.len(), audio_duration_ms);
 
-    // 2. Emit processing state
-    println!("OVERLAY: Processing state");
-    emit_pipeline_event(&app, "processing", None, None, None, None);
+    // 2. Emit processing state with audio duration for frontend countdown
+    emit_pipeline_event(&app, "processing", None, Some(audio_duration_ms), None, None);
 
     // 3. Run pipeline (VAD -> whisper -> correction -> LLM) with 30s safety timeout
     log::info!("Running pipeline (VAD -> whisper -> correction -> LLM)...");
     let result = match tokio::time::timeout(
         Duration::from_secs(30),
-        execute_pipeline(raw_audio, app_state.inner()),
+        execute_pipeline(raw_audio, app_state.inner(), Some(&app)),
     )
     .await
     {
@@ -242,8 +251,9 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
 
     // 4. Check if there's any text to inject
     if result.final_text.is_empty() {
+        println!("PIPELINE: No speech detected");
         log::info!("No speech detected, returning to idle");
-        emit_pipeline_event(&app, "cancelled", None, None, None, None);
+        emit_pipeline_event(&app, "no-speech", Some("No speech detected"), None, None, None);
         hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
         return;
     }
@@ -266,9 +276,10 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
     // 7. Save to history and run learner
     let app_name = detector::get_focused_window_name();
     save_history_and_learn(app_state.inner(), &result, &app_name);
+    println!("HISTORY: Saved entry");
 
     // 8. Inject text into focused app
-    println!("INJECT: Injecting text into {}", app_name);
+    println!("INJECT: Injecting into [{}]", app_name);
     let text_for_inject = result.final_text.clone();
     match tokio::task::spawn_blocking(move || {
         crate::injection::injector::inject(&text_for_inject, false)
@@ -284,6 +295,7 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
                 Some(result.word_count),
                 None,
             );
+            println!("PIPELINE: Complete in {}ms", pipeline_start.elapsed().as_millis());
             log::info!("Text injected: {} chars", result.final_text.len());
         }
         Ok(Err(e)) => {
@@ -303,7 +315,9 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
         }
     }
 
-    // 9. Return to idle
+    // 9. Wait for transcribed overlay to dismiss (3s), then return to idle.
+    // Keeps MODE_PROCESSING active so new recordings are blocked during display.
+    tokio::time::sleep(Duration::from_secs(3)).await;
     hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
 }
 
@@ -368,7 +382,7 @@ fn unregister_cancel_hotkey(app: &AppHandle) {
     }
 }
 
-/// Emit a pipeline state event to the frontend.
+/// Emit a pipeline state event to the frontend and update tray tooltip.
 fn emit_pipeline_event(
     app: &AppHandle,
     state: &str,
@@ -389,4 +403,12 @@ fn emit_pipeline_event(
     ) {
         log::error!("Failed to emit pipeline-state '{state}': {e}");
     }
+
+    // Update tray tooltip to reflect pipeline state
+    let tooltip = match state {
+        "listening" => "LocalYapper \u{2014} Recording...",
+        "processing" => "LocalYapper \u{2014} Processing...",
+        _ => "LocalYapper",
+    };
+    crate::tray::update_tray_tooltip(app, tooltip);
 }

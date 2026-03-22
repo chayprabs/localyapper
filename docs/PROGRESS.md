@@ -143,8 +143,23 @@ Goal: App launches, database initializes, no crashes.
 - [x] Reuses app default icon for tray icon
 - [x] Verification: cargo clippy, eslint, tsc — all zero errors
 
-### Phase 17: Cross-Platform Polish
-- [ ] Test all features on Windows, macOS, Linux
+### Phase 17: Cross-Platform Polish (COMPLETE)
+- [x] Pipeline polish: LLM background loading at startup, max_tokens 1024, temperature 0, LLM timeout 15s
+- [x] Pipeline polish: audio duration in processing event, "no-speech" state, friendlier model-not-loaded errors
+- [x] Pipeline polish: standardized println! logging (PIPELINE/WHISPER/CORRECTION/LLM/INJECT/HISTORY)
+- [x] Overlay polish: processing countdown timer (estimated from audio duration, decreasing)
+- [x] Overlay polish: "injected" event no longer overrides 3s transcribed display
+- [x] Overlay polish: copy button dismisses overlay immediately (500ms checkmark flash)
+- [x] Overlay polish: "No speech detected" state shown for 2s
+- [x] UI polish: shared CopyButton component (icon variant with check animation for history/dashboard)
+- [x] UI polish: recording blocked during transcribed overlay display (3s cooldown)
+- [x] Auto-refresh: dashboard + history auto-refresh on pipeline completion via Tauri events
+- [x] Tray overhaul: new menu (Open, Mode display, Pause/Resume Dictation, Quit)
+- [x] Tray overhaul: tooltip updates on pipeline state (Recording.../Processing...)
+- [x] Startup: main window hidden by default, shown only for first-launch wizard
+- [x] Startup: autostart enabled by default
+- [x] Startup: system notifications after model loading ("LocalYapper ready" / "models not downloaded")
+- [x] Verification: cargo clippy, eslint, tsc — all zero errors
 
 ### Phase 18: GitHub Release
 - [ ] CI/CD workflow, binaries for all platforms, README

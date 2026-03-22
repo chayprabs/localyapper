@@ -82,6 +82,14 @@ fn load_whisper_model(app: &tauri::App, conn: &rusqlite::Connection) -> Option<A
 }
 
 
+/// Send a system notification via tauri-plugin-notification.
+fn send_notification(handle: &tauri::AppHandle, title: &str, body: &str) {
+    use tauri_plugin_notification::NotificationExt;
+    if let Err(e) = handle.notification().builder().title(title).body(body).show() {
+        log::warn!("Failed to send notification: {e}");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
@@ -112,9 +120,8 @@ pub fn run() {
             } else {
                 log::warn!("Whisper model not found at startup — STT unavailable until downloaded");
             }
-            // LLM loaded lazily via reload_models() — not at startup.
+            // LLM starts as None — loaded in background thread below.
             let llm: Option<Arc<LlmEngine>> = None;
-            log::info!("LLM will be loaded lazily (via reload_models or first dictation).");
 
             // Initialize correction engine
             let correction_engine = Arc::new(CorrectionEngine::new());
@@ -134,7 +141,63 @@ pub fn run() {
                 last_injection: Arc::new(Mutex::new(None)),
                 correction_engine,
                 download_cancel: Arc::new(AtomicBool::new(false)),
+                paused: Arc::new(AtomicBool::new(false)),
             });
+
+            // Spawn background LLM loading (non-blocking, does not delay startup)
+            {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let start = std::time::Instant::now();
+                    let models_dir = match handle.path().app_data_dir() {
+                        Ok(d) => d.join("models"),
+                        Err(e) => {
+                            log::warn!("Cannot resolve app data dir for LLM: {e}");
+                            return;
+                        }
+                    };
+
+                    let gguf_path = models_dir.join(llm::engine::LLM_MODEL_FILENAME);
+                    let tokenizer_path = models_dir.join(llm::engine::LLM_TOKENIZER_FILENAME);
+
+                    if !gguf_path.exists() || !tokenizer_path.exists() {
+                        log::info!("LLM model files not found, skipping background load");
+                        // Notify user if Whisper is also missing
+                        let whisper_loaded = {
+                            let app_state = handle.state::<AppState>();
+                            app_state.whisper.lock().map(|g| g.is_some()).unwrap_or(false)
+                        };
+                        if whisper_loaded {
+                            send_notification(&handle, "LocalYapper", "Whisper ready \u{2014} download LLM in Settings for full cleanup");
+                        } else {
+                            send_notification(&handle, "LocalYapper", "Models not downloaded \u{2014} open Settings to get started");
+                        }
+                        return;
+                    }
+
+                    println!("LLM: Loading model in background...");
+                    match LlmEngine::new(&models_dir).await {
+                        Ok(engine) => {
+                            let app_state = handle.state::<AppState>();
+                            if let Ok(mut g) = app_state.llm.lock() {
+                                *g = Some(Arc::new(engine));
+                            }
+                            println!("LLM: Model loaded at startup in {}ms", start.elapsed().as_millis());
+                            log::info!("LLM loaded in background in {}ms", start.elapsed().as_millis());
+
+                            // Check if both models are loaded and send notification
+                            let whisper_loaded = app_state.whisper.lock()
+                                .map(|g| g.is_some()).unwrap_or(false);
+                            if whisper_loaded {
+                                send_notification(&handle, "LocalYapper", "Ready \u{2014} voice dictation is active");
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("Background LLM load failed: {e}");
+                        }
+                    }
+                });
+            }
 
             // Register global hotkeys (hold-to-talk, cancel, paste-last, open-app)
             if let Err(e) = hotkey::manager::register_hotkeys(app.handle()) {
@@ -144,6 +207,19 @@ pub fn run() {
             // Setup system tray icon and menu
             if let Err(e) = tray::setup_tray(app) {
                 log::error!("Failed to setup system tray: {e}");
+            }
+
+            // Enable autostart by default (user can toggle off via tray menu)
+            {
+                use tauri_plugin_autostart::ManagerExt;
+                let manager = app.autolaunch();
+                if !manager.is_enabled().unwrap_or(false) {
+                    if let Err(e) = manager.enable() {
+                        log::warn!("Failed to enable autostart: {e}");
+                    } else {
+                        log::info!("Autostart enabled by default");
+                    }
+                }
             }
 
             log::info!("LocalYapper initialized. DB at {:?}", app_data_dir);

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { listen } from "@tauri-apps/api/event";
 import type { Stats, HistoryEntry, ModelsStatus } from "@/types/commands";
 import { getStats, getHistory, deleteHistoryEntry } from "@/lib/commands/history";
 import { checkModelsStatus, checkOllama } from "@/lib/commands/models";
@@ -61,6 +62,18 @@ export function useDashboard(): DashboardData {
 
   useEffect(() => {
     void fetchAll();
+  }, [fetchAll]);
+
+  // Auto-refresh when a new dictation completes
+  useEffect(() => {
+    const unlisten = listen<{ state: string }>("pipeline-state", (event) => {
+      if (event.payload.state === "injected") {
+        void fetchAll();
+      }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, [fetchAll]);
 
   const deleteLastDictation = useCallback(

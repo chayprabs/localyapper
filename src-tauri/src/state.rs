@@ -17,4 +17,6 @@ pub struct AppState {
     pub last_injection: Arc<Mutex<Option<String>>>,
     pub correction_engine: Arc<CorrectionEngine>,
     pub download_cancel: Arc<AtomicBool>,
+    /// When true, hotkeys are disabled (dictation paused via tray menu).
+    pub paused: Arc<AtomicBool>,
 }

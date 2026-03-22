@@ -4,7 +4,8 @@ export type OverlayVisualState =
   | "stopping-soon"
   | "processing"
   | "long-recording"
-  | "transcribed";
+  | "transcribed"
+  | "no-speech";
 
 export interface PipelineEvent {
   state: string;

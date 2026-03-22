@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useAtom } from "jotai";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Overlay } from "@/components/overlay/Overlay";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import { TitleBar } from "@/components/settings/TitleBar";
@@ -16,6 +17,13 @@ function MainWindow() {
       .then((value) => setSetupComplete(value === "true"))
       .catch(() => setSetupComplete(false));
   }, [setSetupComplete]);
+
+  // Show window for wizard (first launch). Returning users stay in tray.
+  useEffect(() => {
+    if (setupComplete === false) {
+      getCurrentWindow().show().catch(() => {});
+    }
+  }, [setupComplete]);
 
   // Load models in the background once setup is complete
   useEffect(() => {

@@ -9,10 +9,6 @@ export function DashboardPage() {
 
   const isEmpty = !stats || stats.total_sessions === 0;
 
-  const handleCopy = (text: string) => {
-    void navigator.clipboard.writeText(text);
-  };
-
   const handleDelete = (id: string) => {
     void deleteLastDictation(id);
   };
@@ -56,7 +52,6 @@ export function DashboardPage() {
       {/* Last Dictation */}
       <LastDictationCard
         entry={isEmpty ? null : lastDictation}
-        onCopy={handleCopy}
         onDelete={handleDelete}
       />
     </div>

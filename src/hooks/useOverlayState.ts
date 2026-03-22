@@ -14,6 +14,7 @@ export function useOverlayState() {
   const [overlayData, setOverlayData] = useAtom(overlayDataAtom);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [autoInjectProgress, setAutoInjectProgress] = useState(0);
+  const [processingCountdown, setProcessingCountdown] = useState<number | null>(null);
 
   const generationRef = useRef(0);
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -21,6 +22,8 @@ export function useOverlayState() {
   const injectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const injectAnimRef = useRef<number | null>(null);
   const recordingStartRef = useRef<number | null>(null);
+  const overlayDataRef = useRef(overlayData);
+  overlayDataRef.current = overlayData;
 
   const clearAllTimers = useCallback(() => {
     if (elapsedIntervalRef.current) {
@@ -70,6 +73,13 @@ export function useOverlayState() {
     },
     [setOverlayData],
   );
+
+  const dismissOverlay = useCallback(() => {
+    clearAllTimers();
+    generationRef.current++;
+    transition("hidden");
+    hideOverlay();
+  }, [clearAllTimers, transition, hideOverlay]);
 
   const startElapsedTimer = useCallback(
     (gen: number, initialElapsed = 0) => {
@@ -122,6 +132,13 @@ export function useOverlayState() {
     const unlisten = listen<PipelineEvent>("pipeline-state", (event) => {
       const { state, text, duration_ms, word_count, error } = event.payload;
       console.log("[overlay] Received pipeline-state:", state, { text, duration_ms, word_count, error });
+
+      // "injected" while showing transcribed text — don't interrupt the 3s display
+      if (state === "injected" && overlayDataRef.current.visualState === "transcribed") {
+        console.log("[overlay] Ignoring 'injected' — transcribed display still active");
+        return;
+      }
+
       const gen = ++generationRef.current;
       clearAllTimers();
 
@@ -129,6 +146,7 @@ export function useOverlayState() {
         case "listening": {
           setElapsedSeconds(0);
           setAutoInjectProgress(0);
+          setProcessingCountdown(null);
           transition("listening", {
             text: null,
             durationMs: null,
@@ -163,10 +181,35 @@ export function useOverlayState() {
           transition(isLong ? "long-recording" : "processing", {
             durationMs: duration_ms,
           });
+
+          // Start countdown timer based on audio duration
+          if (!isLong && duration_ms != null) {
+            const estimatedSeconds = Math.min(15, (duration_ms / 1000) * 0.08 + 1.5);
+            setProcessingCountdown(estimatedSeconds);
+            const countdownStart = Date.now();
+
+            elapsedIntervalRef.current = setInterval(() => {
+              if (generationRef.current !== gen) return;
+              const elapsed = (Date.now() - countdownStart) / 1000;
+              const remaining = estimatedSeconds - elapsed;
+              if (remaining <= 0) {
+                setProcessingCountdown(0);
+                if (elapsedIntervalRef.current) {
+                  clearInterval(elapsedIntervalRef.current);
+                  elapsedIntervalRef.current = null;
+                }
+              } else {
+                setProcessingCountdown(remaining);
+              }
+            }, 100);
+          } else if (!isLong) {
+            setProcessingCountdown(null);
+          }
           break;
         }
 
         case "transcribed": {
+          setProcessingCountdown(null);
           transition("transcribed", {
             text: text ?? null,
             durationMs: duration_ms,
@@ -182,6 +225,18 @@ export function useOverlayState() {
             if (generationRef.current !== gen) return;
             hideOverlay();
           }, 500);
+          break;
+        }
+
+        case "no-speech": {
+          transition("no-speech", {
+            text: text ?? "No speech detected",
+          });
+          hideTimeoutRef.current = setTimeout(() => {
+            if (generationRef.current !== gen) return;
+            transition("hidden");
+            hideOverlay();
+          }, 2000);
           break;
         }
 
@@ -227,5 +282,7 @@ export function useOverlayState() {
     recordingElapsed,
     remainingSeconds,
     autoInjectProgress,
+    processingCountdown,
+    dismissOverlay,
   };
 }

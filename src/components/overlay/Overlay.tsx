@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
 import { useOverlayState } from "@/hooks/useOverlayState";
+import { CopyButton } from "@/components/ui/CopyButton";
 import { Waveform } from "./Waveform";
 import { CountdownTimer } from "./CountdownTimer";
 import { YappingEmoji } from "./YappingEmoji";
@@ -15,27 +15,8 @@ function Spinner({ slow }: { slow?: boolean }) {
   );
 }
 
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }, [text]);
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="text-[11px] font-semibold text-primary hover:text-[#004ea8] transition-colors"
-    >
-      {copied ? "\u2713" : "Copy"}
-    </button>
-  );
-}
-
 export function Overlay() {
-  const { overlayData, elapsedSeconds, remainingSeconds, autoInjectProgress } =
+  const { overlayData, elapsedSeconds, remainingSeconds, autoInjectProgress, processingCountdown, dismissOverlay } =
     useOverlayState();
   const { visualState, text, durationMs } = overlayData;
 
@@ -83,7 +64,17 @@ export function Overlay() {
         {visualState === "processing" && (
           <div className="flex items-center justify-between h-full">
             <Spinner />
-            <CountdownTimer mode="elapsed" seconds={elapsedSeconds} />
+            {processingCountdown !== null && processingCountdown > 0 ? (
+              <span className="text-[14px] font-semibold text-black/60 tabular-nums">
+                {processingCountdown.toFixed(1)}s
+              </span>
+            ) : processingCountdown === 0 ? (
+              <span className="text-[12px] font-medium text-black/35 tracking-tight">
+                Almost done...
+              </span>
+            ) : (
+              <CountdownTimer mode="elapsed" seconds={elapsedSeconds} />
+            )}
             <span className="text-[12px] font-medium text-black/35 tracking-tight">
               Processing...
             </span>
@@ -109,12 +100,25 @@ export function Overlay() {
           </div>
         )}
 
+        {visualState === "no-speech" && (
+          <div className="flex items-center justify-center h-full">
+            <span className="text-[13px] font-medium text-black/40 tracking-tight">
+              No speech detected
+            </span>
+          </div>
+        )}
+
         {isTranscribed && text != null && (
           <>
             {!isLong ? (
               <>
                 <div className="absolute inset-y-0 right-5 flex items-center z-10">
-                  <CopyButton text={text} />
+                  <CopyButton
+                    text={text}
+                    variant="text"
+                    onAfterCopy={dismissOverlay}
+                    className="text-[11px] font-semibold text-primary hover:text-[#004ea8] transition-colors"
+                  />
                 </div>
                 <div className="flex items-center h-full px-6">
                   <span className="text-[13px] font-medium text-black/85 truncate pr-12">
@@ -125,7 +129,12 @@ export function Overlay() {
             ) : (
               <>
                 <div className="absolute inset-y-0 right-6 flex items-center z-10">
-                  <CopyButton text={text} />
+                  <CopyButton
+                    text={text}
+                    variant="text"
+                    onAfterCopy={dismissOverlay}
+                    className="text-[11px] font-semibold text-primary hover:text-[#004ea8] transition-colors"
+                  />
                 </div>
                 <div className="flex items-center h-full px-6">
                   <span className="text-[13px] font-medium text-black/85 line-clamp-2 leading-tight pr-8">

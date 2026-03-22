@@ -1,9 +1,9 @@
 import type { HistoryEntry } from "@/types/commands";
+import { CopyButton } from "@/components/ui/CopyButton";
 import { formatRelativeTime } from "@/lib/formatters";
 
 interface LastDictationCardProps {
   entry: HistoryEntry | null;
-  onCopy: (text: string) => void;
   onDelete: (id: string) => void;
 }
 
@@ -32,7 +32,7 @@ function EmptyState() {
   );
 }
 
-export function LastDictationCard({ entry, onCopy, onDelete }: LastDictationCardProps) {
+export function LastDictationCard({ entry, onDelete }: LastDictationCardProps) {
   if (!entry) {
     return (
       <div className="bg-white p-8 rounded-xl border border-black/[0.07] shadow-sm min-h-[300px] flex items-center justify-center">
@@ -58,12 +58,12 @@ export function LastDictationCard({ entry, onCopy, onDelete }: LastDictationCard
             </span>
           )}
         </div>
-        <button
-          onClick={() => onCopy(entry.final_text)}
+        <CopyButton
+          text={entry.final_text}
+          variant="icon"
+          iconSize={20}
           className="text-[#0058bc] hover:bg-[rgba(0,88,188,0.12)] p-1.5 rounded-md transition-colors flex items-center justify-center"
-        >
-          <span className="material-symbols-outlined text-[20px]">content_copy</span>
-        </button>
+        />
       </div>
 
       {/* Body */}

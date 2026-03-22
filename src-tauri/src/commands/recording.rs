@@ -1,6 +1,8 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use tauri::Manager;
+
 use crate::audio::vad;
 use crate::context::detector;
 use crate::correction::learner;
@@ -12,9 +14,11 @@ use crate::state::AppState;
 
 /// Run the full voice pipeline: VAD -> Whisper -> Correction -> LLM.
 /// Does NOT inject or save to history — caller decides.
+/// Optional `app_handle` enables friendlier error messages (file-exists check).
 pub(crate) async fn execute_pipeline(
     raw_audio: Vec<f32>,
     state: &AppState,
+    app_handle: Option<&tauri::AppHandle>,
 ) -> Result<PipelineResult, String> {
     let vad_config = vad::default_config();
     let vad_result = vad::apply_vad(&raw_audio, &vad_config);
@@ -34,12 +38,27 @@ pub(crate) async fn execute_pipeline(
         .lock()
         .map_err(|e| format!("Whisper lock error: {e}"))?
         .as_ref()
-        .ok_or_else(|| "Whisper model not loaded. Download it via the wizard or Models page.".to_string())?
+        .ok_or_else(|| {
+            // Check if model file exists on disk to give a friendlier error
+            if let Some(handle) = app_handle {
+                if let Ok(data_dir) = handle.path().app_data_dir() {
+                    let models_dir = data_dir.join("models");
+                    if std::fs::read_dir(&models_dir)
+                        .map(|entries| entries.filter_map(|e| e.ok())
+                            .any(|e| e.file_name().to_string_lossy().starts_with("ggml-")))
+                        .unwrap_or(false)
+                    {
+                        return "Whisper model is still loading, please try again shortly".to_string();
+                    }
+                }
+            }
+            "Whisper model not downloaded. Use Settings > Models to download it".to_string()
+        })?
         .clone();
 
     let trimmed_audio = vad_result.trimmed_audio;
 
-    println!("STT: Transcribing...");
+    println!("WHISPER: Transcribing...");
     let stt_start = Instant::now();
     let raw_text = tokio::task::spawn_blocking(move || {
         whisper.transcribe(&trimmed_audio)
@@ -47,7 +66,7 @@ pub(crate) async fn execute_pipeline(
     .await
     .map_err(|e| format!("Transcription task failed: {e}"))?
     .map_err(|e| e.to_string())?;
-    println!("STT: Done in {}ms, result: [{}]", stt_start.elapsed().as_millis(), raw_text);
+    println!("WHISPER: Result: [{}] ({}ms)", raw_text, stt_start.elapsed().as_millis());
 
     let word_count = if raw_text.is_empty() {
         0
@@ -77,26 +96,26 @@ pub(crate) async fn execute_pipeline(
                 .map_err(|e| format!("LLM lock error: {e}"))?
                 .as_ref().expect("checked above").clone();
 
-            let system_prompt = {
+            let (system_prompt, mode_name) = {
                 let db = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
                 queries::get_active_mode(&db)
-                    .map(|m| m.system_prompt)
+                    .map(|m| (m.system_prompt, m.name))
                     .unwrap_or_default()
             };
 
             let app_name = detector::get_focused_window_name();
             let system_prompt_full = prompt::build_system_prompt(&system_prompt, &app_name);
 
-            println!("LLM: Running cleanup...");
+            println!("LLM: Processing with mode [{}]...", mode_name);
             let llm_start = Instant::now();
             match tokio::time::timeout(
-                Duration::from_secs(20),
+                Duration::from_secs(15),
                 llm.generate(&system_prompt_full, &corrected_text),
             )
             .await
             {
                 Ok(Ok(llm_output)) if !llm_output.is_empty() => {
-                    println!("LLM: Done in {}ms, result: [{}]", llm_start.elapsed().as_millis(), llm_output);
+                    println!("LLM: Result: [{}] ({}ms)", llm_output, llm_start.elapsed().as_millis());
                     log::info!("LLM cleanup applied ({} -> {} chars)", corrected_text.len(), llm_output.len());
                     llm_output
                 }
@@ -110,8 +129,8 @@ pub(crate) async fn execute_pipeline(
                     corrected_text
                 }
                 Err(_timeout) => {
-                    println!("LLM: Timed out after 20s, using corrected text");
-                    log::warn!("LLM generation timed out after 20s, using corrected text");
+                    println!("LLM: Timed out after 15s, using corrected text");
+                    log::warn!("LLM generation timed out after 15s, using corrected text");
                     corrected_text
                 }
             }
@@ -189,7 +208,7 @@ pub async fn stop_recording(
     _app_handle: tauri::AppHandle,
 ) -> Result<PipelineResult, String> {
     let raw_audio = state.recorder.stop().map_err(|e| e.to_string())?;
-    let result = execute_pipeline(raw_audio, state.inner()).await?;
+    let result = execute_pipeline(raw_audio, state.inner(), Some(&_app_handle)).await?;
 
     if !result.final_text.is_empty() {
         let app_name = detector::get_focused_window_name();
@@ -205,7 +224,7 @@ pub async fn run_pipeline(
     audio: Vec<f32>,
     state: tauri::State<'_, AppState>,
 ) -> Result<PipelineResult, String> {
-    execute_pipeline(audio, state.inner()).await
+    execute_pipeline(audio, state.inner(), None).await
 }
 
 /// Inject text into the currently focused application.
