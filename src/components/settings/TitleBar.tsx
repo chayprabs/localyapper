@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import logoImg from "@/assets/logo-nobg.png";
 
 export function TitleBar() {
   const handleMinimize = () => getCurrentWindow().minimize();
@@ -8,14 +9,17 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="flex items-center justify-between h-8 bg-[#f9f9f9] shrink-0 select-none"
+      className="flex items-center justify-between h-8 bg-[#eeeeee] shrink-0 select-none"
     >
-      <span
+      <div
         data-tauri-drag-region
-        className="pl-4 text-[13px] font-semibold text-[#1C1C1E]"
+        className="pl-4 flex items-center gap-1.5"
       >
-        LocalYapper
-      </span>
+        <img src={logoImg} alt="LocalYapper" className="w-[14px] h-[14px]" draggable={false} />
+        <span data-tauri-drag-region className="text-[13px] font-semibold text-[#1C1C1E]">
+          LocalYapper
+        </span>
+      </div>
 
       <div className="flex items-center">
         <button

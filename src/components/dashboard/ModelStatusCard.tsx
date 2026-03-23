@@ -25,8 +25,8 @@ export function ModelStatusCard({ status, llmMode, llmLabel }: ModelStatusCardPr
   const llmText = llmReady ? "text-[#006b19]" : "text-black/[0.26]";
 
   return (
-    <div className="bg-white p-5 rounded-xl border border-black/[0.07] shadow-sm">
-      <p className="text-[10px] font-bold text-black/[0.26] tracking-[0.06em] uppercase mb-2">
+    <div className="bg-white p-4 rounded-xl border border-black/[0.07] shadow-sm">
+      <p className="text-[10px] font-bold text-black/[0.26] tracking-[0.06em] uppercase mb-1.5">
         MODEL STATUS
       </p>
       <div className="flex items-center gap-2 mb-1.5">

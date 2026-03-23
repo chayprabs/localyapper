@@ -14,14 +14,14 @@ export function DashboardPage() {
   };
 
   return (
-    <div className="px-12 py-10">
+    <div className="px-8 py-6">
       {/* Header */}
-      <header className="mb-10">
-        <h1 className="text-[26px] font-bold text-[#1C1C1E]">Dashboard</h1>
+      <header className="mb-5">
+        <h1 className="text-[24px] font-bold text-[#1C1C1E]">Dashboard</h1>
       </header>
 
       {/* Stat Cards Row */}
-      <section className="grid grid-cols-4 gap-4 mb-6">
+      <section className="grid grid-cols-4 gap-3 mb-4">
         <StatCard
           label="WORDS TODAY"
           value={isEmpty ? null : formatNumber(stats.words_today)}
@@ -41,7 +41,7 @@ export function DashboardPage() {
       </section>
 
       {/* Sessions & Model Status Row */}
-      <section className="grid grid-cols-2 gap-4 mb-6">
+      <section className="grid grid-cols-2 gap-3 mb-4">
         <StatCard
           label="TOTAL SESSIONS"
           value={isEmpty ? null : formatNumber(stats.total_sessions)}

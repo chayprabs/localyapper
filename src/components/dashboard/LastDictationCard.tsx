@@ -35,16 +35,16 @@ function EmptyState() {
 export function LastDictationCard({ entry, onDelete }: LastDictationCardProps) {
   if (!entry) {
     return (
-      <div className="bg-white p-8 rounded-xl border border-black/[0.07] shadow-sm min-h-[300px] flex items-center justify-center">
+      <div className="bg-white p-6 rounded-xl border border-black/[0.07] shadow-sm min-h-[200px] flex items-center justify-center">
         <EmptyState />
       </div>
     );
   }
 
   return (
-    <div className="bg-white p-8 rounded-xl border border-black/[0.07] shadow-sm">
+    <div className="bg-white p-6 rounded-xl border border-black/[0.07] shadow-sm">
       {/* Header */}
-      <div className="flex justify-between items-start mb-6">
+      <div className="flex justify-between items-start mb-4">
         <div className="flex items-baseline gap-4">
           <h3 className="text-[10px] font-bold text-black/[0.26] tracking-[0.06em] uppercase">
             LAST DICTATION
@@ -67,14 +67,14 @@ export function LastDictationCard({ entry, onDelete }: LastDictationCardProps) {
       </div>
 
       {/* Body */}
-      <div className="mb-8">
-        <p className="text-[17px] font-medium italic leading-relaxed text-black/85">
+      <div className="mb-4">
+        <p className="text-[15px] font-medium italic leading-relaxed text-black/85">
           &ldquo;{entry.final_text}&rdquo;
         </p>
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-6 border-t border-black/[0.07]">
+      <div className="flex items-center justify-between pt-4 border-t border-black/[0.07]">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-black/50 text-[18px]">
             description

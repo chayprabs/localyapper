@@ -37,8 +37,10 @@ export function SettingsLayout() {
   return (
     <div className="flex h-full bg-[#eeeeee] relative">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-[#f9f9f9]">
-        <PageComponent />
+      <main className="flex-1 bg-[#eeeeee] p-3">
+        <div className="bg-white rounded-2xl h-full overflow-y-auto overflow-x-hidden">
+          <PageComponent />
+        </div>
       </main>
       {/* Toggle button — fixed position at bottom-left */}
       <button

@@ -20,7 +20,7 @@
     "clsx": "^2.1.1",
     "jotai": "^2",
     "lucide-react": "^0.577.0",
-    "material-symbols": "^0.42.2",
+    "material-symbols": "^0.42.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2",
