@@ -1,3 +1,4 @@
+// Wizard download complete -- confirmation with continue action
 export function DownloadCompleteStep({
   onContinue,
 }: {
