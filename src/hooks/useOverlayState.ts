@@ -1,3 +1,4 @@
+// Overlay state hook -- pipeline event listener and timer management
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useAtom } from "jotai";
 import { listen } from "@tauri-apps/api/event";
