@@ -1,3 +1,4 @@
+// LLM inference engine -- mistral.rs Candle backend
 // LLM engine powered by mistral.rs (Candle backend, no ggml dependency).
 // Loads a Qwen3 GGUF model for local text cleanup/formatting.
 
