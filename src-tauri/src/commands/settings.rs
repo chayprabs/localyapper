@@ -1,3 +1,4 @@
+// IPC command handlers -- user settings read and write
 use std::collections::HashMap;
 
 use crate::db::queries;
