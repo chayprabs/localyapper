@@ -1,3 +1,4 @@
+// Overlay state atoms -- visual state and transcription data
 import { atom } from "jotai";
 import type { OverlayData, OverlayVisualState } from "@/types/overlay";
 
