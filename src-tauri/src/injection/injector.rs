@@ -1,3 +1,4 @@
+// Text injection -- clipboard save, paste simulation, clipboard restore
 use crate::injection::platform::{self, Platform};
 use std::time::Duration;
 
