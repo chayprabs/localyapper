@@ -1,3 +1,4 @@
+// Dashboard hook -- stats, last dictation, and model status with auto-refresh
 import { useState, useEffect, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { Stats, HistoryEntry, ModelsStatus } from "@/types/commands";
