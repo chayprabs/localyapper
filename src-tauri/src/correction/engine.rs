@@ -1,3 +1,4 @@
+// Correction engine -- dictionary-based word substitution
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 
