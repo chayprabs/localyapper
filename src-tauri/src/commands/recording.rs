@@ -1,3 +1,4 @@
+// IPC command handlers -- recording pipeline and text injection
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
