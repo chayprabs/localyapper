@@ -1,3 +1,4 @@
+// Hotkeys hook -- settings load, optimistic update, and reset to defaults
 import { useState, useEffect, useCallback } from "react";
 import { getAllSettings } from "@/lib/commands/settings";
 import {
