@@ -22,6 +22,8 @@ export async function deleteCorrection(id: string): Promise<void> {
   return invoke<void>("delete_correction", { id });
 }
 
+// Bulk operations
+
 export async function exportDictionary(): Promise<string> {
   return invoke<string>("export_dictionary");
 }
