@@ -1,3 +1,4 @@
+// Models hook -- download, load, delete lifecycle for Whisper and LLM
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAtom } from "jotai";
 import { listen } from "@tauri-apps/api/event";
