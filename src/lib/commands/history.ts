@@ -1,3 +1,4 @@
+// IPC wrappers -- history entries and aggregated statistics
 import { invoke } from "@tauri-apps/api/core";
 import type { HistoryEntry, Stats } from "@/types/commands";
 
