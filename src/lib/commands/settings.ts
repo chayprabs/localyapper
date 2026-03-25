@@ -1,3 +1,4 @@
+// IPC wrappers -- key-value settings store
 import { invoke } from "@tauri-apps/api/core";
 import type { AllSettings } from "@/types/commands";
 
