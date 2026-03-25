@@ -1,3 +1,4 @@
+// Context detection -- identifies the currently focused application
 /// Returns the clean application name of the currently focused window.
 ///
 /// Examples: "Notepad", "Chrome", "VS Code", "Firefox".
