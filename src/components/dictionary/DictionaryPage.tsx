@@ -1,3 +1,4 @@
+// Dictionary page -- corrections table and voice training tabs
 import { useState, useCallback } from "react";
 import { exportDictionary } from "@/lib/commands/corrections";
 import { CorrectionsTab } from "./CorrectionsTab";
