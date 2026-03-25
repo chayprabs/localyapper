@@ -1,3 +1,4 @@
+// Hotkeys page -- remappable keyboard shortcuts with live key capture
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useHotkeys } from "@/hooks/useHotkeys";
 
