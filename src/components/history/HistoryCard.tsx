@@ -1,3 +1,4 @@
+// History entry card -- timestamp, word count, app badge, and text preview
 import type { HistoryEntry } from "@/types/commands";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { formatHistoryTimestamp } from "@/lib/formatters";
