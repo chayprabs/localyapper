@@ -1,3 +1,4 @@
+// Wizard hotkey configuration -- set primary recording shortcut
 import { useEffect, useRef, useState, useCallback } from "react";
 
 const isMac =
