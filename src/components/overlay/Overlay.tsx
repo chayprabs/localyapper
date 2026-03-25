@@ -1,3 +1,4 @@
+// Floating overlay pill -- displays recording, processing, and transcription states
 import { useOverlayState } from "@/hooks/useOverlayState";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Waveform } from "./Waveform";
