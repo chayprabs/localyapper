@@ -1,3 +1,4 @@
+// Database subsystem re-exports
 pub mod queries;
 pub mod schema;
 
