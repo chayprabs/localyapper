@@ -1,3 +1,4 @@
+// Stat display card -- label with large formatted number
 interface StatCardProps {
   label: string;
   value: string | null;
