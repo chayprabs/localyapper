@@ -1,3 +1,4 @@
+// Voice activity detection -- energy-based silence filtering
 /// Energy-based voice activity detection configuration.
 #[derive(Clone, Debug)]
 pub struct VadConfig {
