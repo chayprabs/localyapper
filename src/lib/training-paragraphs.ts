@@ -1,3 +1,4 @@
+// Training paragraph constants -- 15 diverse texts for voice profile calibration
 export const TRAINING_PARAGRAPHS: readonly string[] = [
   "The weather has been quite pleasant this week, though yesterday's forecast was slightly off. I brought my umbrella anyway, just in case; it's better to be prepared than caught in the rain. Their house is about fifteen minutes from here, right past the old library. We're planning to meet there at noon — or maybe twelve-thirty, if the traffic is heavy. \"Would you rather walk or drive?\" she asked. I'd prefer to walk, but it depends on whether the clouds clear up.",
 
