@@ -1,3 +1,4 @@
+// Platform detection -- OS and display server identification
 /// Detected operating system and display server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Platform {
