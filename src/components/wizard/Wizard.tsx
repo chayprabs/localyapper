@@ -1,3 +1,4 @@
+// First-launch wizard -- 9-step onboarding flow for model setup
 import { useCallback } from "react";
 import { useSetAtom } from "jotai";
 import { setupCompleteAtom } from "@/stores/wizardStore";
