@@ -1,3 +1,4 @@
+// Models page -- Whisper STT and LLM configuration with download management
 import { useState, useRef, useEffect } from "react";
 import { useModels } from "@/hooks/useModels";
 
