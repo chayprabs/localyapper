@@ -9,6 +9,7 @@ interface NavItem {
   icon: string;
 }
 
+// Sidebar navigation entries -- order matches design spec
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
   { id: "history", label: "History", icon: "history" },
