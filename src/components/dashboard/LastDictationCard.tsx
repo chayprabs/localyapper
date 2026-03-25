@@ -1,3 +1,4 @@
+// Last dictation preview -- shows most recent transcription with actions
 import type { HistoryEntry } from "@/types/commands";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { formatRelativeTime } from "@/lib/formatters";
