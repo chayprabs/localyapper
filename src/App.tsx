@@ -1,3 +1,4 @@
+// Root application component -- routes between overlay and main window
 import { useEffect } from "react";
 import { useAtom } from "jotai";
 import { getCurrentWindow } from "@tauri-apps/api/window";
