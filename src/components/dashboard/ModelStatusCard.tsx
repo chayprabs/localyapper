@@ -1,3 +1,4 @@
+// Model status card -- Whisper and LLM loaded indicators
 import type { ModelsStatus } from "@/types/commands";
 
 interface ModelStatusCardProps {
