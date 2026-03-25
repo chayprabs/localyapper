@@ -1,3 +1,4 @@
+// Wizard welcome step -- app introduction with Get Started action
 export function WelcomeStep({
   onGetStarted,
   onSkip,
