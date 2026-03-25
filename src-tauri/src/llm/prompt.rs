@@ -1,3 +1,4 @@
+// Prompt construction -- system prompt builder for mode-aware cleanup
 /// Build the system prompt content by combining the mode's system prompt with app context.
 ///
 /// If `app_name` is empty or `"Unknown"`, the app context line is omitted.
