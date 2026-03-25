@@ -1,6 +1,7 @@
 import { atom } from "jotai";
 import type { OverlayData, OverlayVisualState } from "@/types/overlay";
 
+// Initial overlay state — hidden until first pipeline event
 const defaultOverlayData: OverlayData = {
   visualState: "hidden",
   text: null,
