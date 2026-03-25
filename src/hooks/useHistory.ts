@@ -8,6 +8,7 @@ import {
   clearHistory,
 } from "@/lib/commands/history";
 
+// Number of entries fetched per page
 const PAGE_SIZE = 20;
 
 interface HistoryData {
