@@ -1,3 +1,4 @@
+// Corrections tab -- table with inline add, pagination, and empty state
 import { useState } from "react";
 import { useCorrections } from "@/hooks/useCorrections";
 
