@@ -1,3 +1,4 @@
+// Main settings layout -- sidebar navigation with page content area
 import { useEffect } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { activePageAtom, sidebarCollapsedAtom } from "@/stores/appStore";
