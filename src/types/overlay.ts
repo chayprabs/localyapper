@@ -1,3 +1,4 @@
+// Maps 1:1 to pipeline-state event values from Rust backend
 export type OverlayVisualState =
   | "hidden"
   | "listening"
