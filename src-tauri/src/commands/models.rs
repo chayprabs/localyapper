@@ -1,3 +1,4 @@
+// IPC command handlers -- model download, status, and lifecycle
 use std::sync::atomic::Ordering;
 
 use futures_util::StreamExt;
