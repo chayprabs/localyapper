@@ -1,3 +1,4 @@
+// Wizard Whisper-only warning -- limited mode without LLM cleanup
 const MISSING_FEATURES = [
   "Smart punctuation and capitalization",
   "Context-aware formatting",
