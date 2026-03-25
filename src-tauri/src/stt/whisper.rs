@@ -1,3 +1,4 @@
+// Whisper speech-to-text engine wrapper
 use std::path::Path;
 use std::sync::Mutex;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
