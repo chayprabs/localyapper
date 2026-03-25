@@ -1,3 +1,4 @@
+// IPC wrappers -- recording control and text injection
 import { invoke } from "@tauri-apps/api/core";
 import type { PipelineResult } from "@/types/commands";
 
