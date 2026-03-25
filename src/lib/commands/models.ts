@@ -31,6 +31,8 @@ export async function testByokConnection(
   });
 }
 
+// Status & lifecycle
+
 export async function reloadModels(): Promise<void> {
   return invoke<void>("reload_models");
 }
