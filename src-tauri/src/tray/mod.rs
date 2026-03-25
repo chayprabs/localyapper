@@ -1,3 +1,4 @@
+// System tray -- menu, autostart toggle, and close-to-tray behavior
 use std::sync::atomic::Ordering;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
