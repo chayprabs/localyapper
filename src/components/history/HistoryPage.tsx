@@ -1,3 +1,4 @@
+// History page -- paginated list of all past dictations
 import { useHistory } from "@/hooks/useHistory";
 import { HistoryCard } from "./HistoryCard";
 
