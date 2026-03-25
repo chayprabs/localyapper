@@ -1,3 +1,4 @@
+// IPC command handlers -- transcription history and statistics
 use crate::db::queries;
 use crate::models::{HistoryEntry, Stats};
 use crate::state::AppState;
