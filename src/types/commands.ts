@@ -49,6 +49,8 @@ export interface AppProfile {
   mode_id: string;
 }
 
+// Pipeline & model types
+
 export interface PipelineResult {
   raw_text: string;
   final_text: string;
