@@ -1,3 +1,4 @@
+// Application entry point -- mounts React root with StrictMode
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
