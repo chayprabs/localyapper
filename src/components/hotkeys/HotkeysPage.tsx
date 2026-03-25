@@ -2,6 +2,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useHotkeys } from "@/hooks/useHotkeys";
 
+// Platform detection for key symbol display
 const isMac =
   typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent);
 
