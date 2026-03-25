@@ -1,3 +1,4 @@
+// Custom window title bar with minimize, maximize, and close controls
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import logoImg from "@/assets/logo-nobg.png";
 
