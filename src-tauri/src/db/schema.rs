@@ -1,3 +1,4 @@
+// Database schema -- table creation, migrations, and seed data
 use rusqlite::Connection;
 
 use crate::error::LocalYapperError;
