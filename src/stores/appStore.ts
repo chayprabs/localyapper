@@ -7,7 +7,7 @@ export const activePageAtom = atom<PageId>("dashboard");
 
 export const sidebarCollapsedAtom = atom<boolean>(false);
 
-// Models page cache — survives page switches for instant re-render
+// Models page cache — survives page switches so the Models tab re-renders instantly without refetching
 export interface ModelsSettingsCache {
   whisperModel: string;
   llmMode: string;
