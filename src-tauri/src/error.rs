@@ -1,3 +1,4 @@
+// Error types for the application
 /// Custom error types for LocalYapper.
 #[derive(Debug, thiserror::Error)]
 pub enum LocalYapperError {
