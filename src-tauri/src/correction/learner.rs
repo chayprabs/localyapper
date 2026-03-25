@@ -1,3 +1,4 @@
+// Correction learner -- diff computation and confidence scoring
 use rusqlite::Connection;
 
 use crate::correction::engine::CorrectionEngine;
