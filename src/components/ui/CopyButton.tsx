@@ -1,3 +1,4 @@
+// Reusable copy-to-clipboard button with check animation feedback
 import { useState, useCallback, useRef } from "react";
 
 interface CopyButtonProps {
