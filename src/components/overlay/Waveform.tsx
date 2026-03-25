@@ -1,3 +1,4 @@
+// Animated 5-bar audio waveform visualization
 interface WaveformProps {
   color: "blue" | "red";
 }
