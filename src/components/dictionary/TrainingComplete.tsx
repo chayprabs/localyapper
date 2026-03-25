@@ -1,3 +1,4 @@
+// Training complete screen -- success checkmark with corrections count
 interface TrainingCompleteProps {
   correctionsCount: number;
   onDone: () => void;
