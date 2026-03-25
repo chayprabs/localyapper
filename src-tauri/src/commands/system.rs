@@ -1,3 +1,4 @@
+// IPC command handlers -- system utilities and permission checks
 use crate::context::detector;
 use crate::models::PermissionsStatus;
 
