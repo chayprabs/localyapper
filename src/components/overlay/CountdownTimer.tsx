@@ -1,3 +1,4 @@
+// Timer display -- elapsed seconds or countdown for recording limits
 interface CountdownTimerProps {
   mode: "elapsed" | "countdown";
   seconds: number;
