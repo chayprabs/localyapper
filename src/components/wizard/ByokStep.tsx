@@ -1,3 +1,4 @@
+// Wizard BYOK setup -- API key input with provider selection
 import { useState, useRef, useEffect } from "react";
 import type { ConnectionResult } from "@/types/commands";
 
