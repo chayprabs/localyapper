@@ -1,3 +1,4 @@
+// Global application state atoms -- page navigation and model caches
 import { atom } from "jotai";
 import type { OllamaStatus, LlmFileStatus, WhisperFileStatus } from "@/types/commands";
 
