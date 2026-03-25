@@ -7,6 +7,7 @@ export function formatNumber(n: number): string {
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
+const WEEK = 604_800_000;
 
 export function formatRelativeTime(isoDate: string): string {
   const timestamp = new Date(isoDate.endsWith("Z") ? isoDate : isoDate + "Z");
