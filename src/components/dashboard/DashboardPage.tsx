@@ -1,3 +1,4 @@
+// Dashboard page -- stats cards, model status, and last dictation preview
 import { useDashboard } from "@/hooks/useDashboard";
 import { formatNumber } from "@/lib/formatters";
 import { StatCard } from "./StatCard";
