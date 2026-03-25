@@ -1,3 +1,4 @@
+// Navigation sidebar -- 5 pages with Material Symbols icons
 import { useAtomValue, useSetAtom } from "jotai";
 import { activePageAtom, sidebarCollapsedAtom, type PageId } from "@/stores/appStore";
 import { cn } from "@/lib/utils";
