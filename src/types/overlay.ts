@@ -1,3 +1,4 @@
+// Overlay type definitions -- visual states and pipeline event payloads
 // Maps 1:1 to pipeline-state event values from Rust backend
 export type OverlayVisualState =
   | "hidden"
