@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useModels } from "@/hooks/useModels";
 
+// Supported BYOK API providers
 const PROVIDER_OPTIONS: { value: string; label: string }[] = [
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
