@@ -1,3 +1,4 @@
+// IPC wrappers -- system utilities, permissions, and OS settings
 import { invoke } from "@tauri-apps/api/core";
 import type { PermissionsStatus } from "@/types/commands";
 
