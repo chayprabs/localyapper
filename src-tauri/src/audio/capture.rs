@@ -1,3 +1,4 @@
+// Audio capture module -- cpal-based recording with resampling
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
