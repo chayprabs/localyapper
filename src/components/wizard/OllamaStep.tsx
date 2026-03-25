@@ -1,3 +1,4 @@
+// Wizard Ollama setup -- model dropdown and service status check
 import { useEffect, useState, useRef } from "react";
 import type { OllamaStatus } from "@/types/commands";
 
