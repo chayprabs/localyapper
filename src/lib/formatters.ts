@@ -1,3 +1,4 @@
+// Number and date formatting utilities for display
 const numberFormatter = new Intl.NumberFormat("en-US");
 
 export function formatNumber(n: number): string {
