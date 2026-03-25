@@ -1,3 +1,4 @@
+// Command module re-exports -- all IPC handlers
 pub mod corrections;
 pub mod history;
 pub mod hotkeys;
