@@ -1,3 +1,4 @@
+// IPC wrappers -- hotkey update and reset operations
 import { invoke } from "@tauri-apps/api/core";
 import type { AllSettings } from "@/types/commands";
 
