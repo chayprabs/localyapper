@@ -8,6 +8,7 @@ import { overlayDataAtom } from "@/stores/overlayStore";
 import { getSetting, setSetting } from "@/lib/commands/settings";
 import type { OverlayData, OverlayVisualState, PipelineEvent } from "@/types/overlay";
 
+// Recording and display timing constants
 const MAX_RECORDING_SECONDS = 120;
 const WARNING_THRESHOLD_SECONDS = 105;
 const LONG_RECORDING_THRESHOLD_MS = 30_000;
