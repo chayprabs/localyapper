@@ -1,3 +1,4 @@
+// Shared data models and pipeline event types
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
