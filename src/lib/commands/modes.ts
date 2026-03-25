@@ -1,3 +1,4 @@
+// IPC wrappers -- AI mode CRUD and active mode selection
 import { invoke } from "@tauri-apps/api/core";
 import type { Mode, NewMode } from "@/types/commands";
 
