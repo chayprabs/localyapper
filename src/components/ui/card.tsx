@@ -1,3 +1,4 @@
+// shadcn/ui Card primitive -- used across dashboard, history, and settings
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
