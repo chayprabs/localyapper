@@ -1,3 +1,4 @@
+// Database queries -- typed CRUD operations for all 6 tables
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
 
