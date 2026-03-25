@@ -13,6 +13,8 @@ export async function runPipeline(audio: number[]): Promise<PipelineResult> {
   return invoke<PipelineResult>("run_pipeline", { audio });
 }
 
+// Text injection
+
 export async function injectText(
   text: string,
   holdShift: boolean,
