@@ -1,3 +1,4 @@
+// Wizard ready step -- final confirmation before completing setup
 const isMac =
   typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent);
 
