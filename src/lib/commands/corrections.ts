@@ -1,3 +1,4 @@
+// IPC wrappers -- correction CRUD and training diff computation
 import { invoke } from "@tauri-apps/api/core";
 import type { Correction, ImportResult } from "@/types/commands";
 
