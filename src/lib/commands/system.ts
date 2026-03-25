@@ -13,6 +13,8 @@ export async function checkPermissions(): Promise<PermissionsStatus> {
   return invoke<PermissionsStatus>("check_permissions");
 }
 
+// OS settings deep links
+
 export async function openAccessibilitySettings(): Promise<void> {
   return invoke<void>("open_accessibility_settings");
 }
