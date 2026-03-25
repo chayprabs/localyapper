@@ -1,3 +1,4 @@
+// Wizard download step -- progress bars for Whisper and LLM downloads
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { DownloadProgress } from "@/types/commands";
