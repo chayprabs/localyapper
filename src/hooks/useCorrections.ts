@@ -1,3 +1,4 @@
+// Corrections hook -- paginated CRUD with optimistic delete
 import { useState, useEffect, useCallback } from "react";
 import type { Correction } from "@/types/commands";
 import {
