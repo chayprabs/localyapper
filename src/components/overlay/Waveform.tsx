@@ -3,6 +3,7 @@ interface WaveformProps {
   color: "blue" | "red";
 }
 
+// Bar heights for the 5-bar waveform pattern
 const baseHeights = [8, 16, 22, 16, 8];
 const animations = [
   "animate-waveform-1",
