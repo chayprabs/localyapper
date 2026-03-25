@@ -1,3 +1,4 @@
+// TypeScript type definitions matching Rust IPC structs
 export interface HistoryEntry {
   id: string;
   raw_text: string;
