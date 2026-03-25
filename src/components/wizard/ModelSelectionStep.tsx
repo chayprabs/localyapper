@@ -1,3 +1,4 @@
+// Wizard model selection -- Local, Ollama, BYOK, or Whisper-only
 import { useState } from "react";
 import type { ModelChoice } from "@/hooks/useWizard";
 
