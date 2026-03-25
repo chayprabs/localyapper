@@ -10,6 +10,7 @@ import { DictionaryPage } from "@/components/dictionary/DictionaryPage";
 import { HotkeysPage } from "@/components/hotkeys/HotkeysPage";
 import { ModelsPage } from "@/components/models/ModelsPage";
 
+// Page ID to component mapping
 const pages = {
   dashboard: DashboardPage,
   history: HistoryPage,
