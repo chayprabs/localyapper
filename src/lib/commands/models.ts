@@ -1,3 +1,4 @@
+// IPC wrappers -- model download, status check, and lifecycle management
 import { invoke } from "@tauri-apps/api/core";
 import type { OllamaStatus, ConnectionResult, ModelsStatus, LlmFileStatus, WhisperFileStatus } from "@/types/commands";
 
