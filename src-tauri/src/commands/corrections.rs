@@ -1,3 +1,4 @@
+// IPC command handlers -- corrections CRUD and training diffs
 use crate::correction::learner;
 use crate::db::queries;
 use crate::models::{Correction, ImportResult};
