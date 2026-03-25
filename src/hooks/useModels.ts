@@ -36,6 +36,7 @@ interface ModelsState {
   byokApiKey: string;
 }
 
+// Fallback values when settings have not been configured
 const DEFAULTS: ModelsState = {
   whisperModel: "base.en",
   llmMode: "local",
