@@ -1,3 +1,4 @@
+// Voice training tab -- 15-paragraph read-aloud session with recording
 import { useState, useEffect, useCallback } from "react";
 import {
   TRAINING_PARAGRAPHS,
