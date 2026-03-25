@@ -1,3 +1,4 @@
+// IPC command handlers -- hotkey update and reset
 use std::collections::HashMap;
 
 use crate::db::queries;
