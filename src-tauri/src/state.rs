@@ -1,3 +1,4 @@
+// Application state -- shared Tauri state container
 use crate::audio::capture::AudioRecorder;
 use crate::correction::engine::CorrectionEngine;
 use crate::llm::engine::LlmEngine;
