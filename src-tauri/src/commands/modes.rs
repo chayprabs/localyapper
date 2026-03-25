@@ -1,3 +1,4 @@
+// IPC command handlers -- AI mode CRUD operations
 use crate::db::queries;
 use crate::models::{Mode, NewMode};
 use crate::state::AppState;
