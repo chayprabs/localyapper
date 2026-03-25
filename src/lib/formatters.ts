@@ -24,8 +24,12 @@ export function formatRelativeTime(isoDate: string): string {
     return `${hours} hour${hours === 1 ? "" : "s"} ago`;
   }
   if (diff < DAY * 2) return "yesterday";
-  const days = Math.floor(diff / DAY);
-  return `${days} days ago`;
+  if (diff < WEEK) {
+    const days = Math.floor(diff / DAY);
+    return `${days} days ago`;
+  }
+  const weeks = Math.floor(diff / WEEK);
+  return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
 }
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
