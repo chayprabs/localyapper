@@ -2,6 +2,8 @@
 use crate::injection::platform::{self, Platform};
 use std::time::Duration;
 
+/// Milliseconds to wait after simulating paste before restoring clipboard.
+/// 80ms gives the target application enough time to read the clipboard contents.
 const PASTE_DELAY_MS: u64 = 80;
 
 /// Inject text into the focused application via clipboard.
