@@ -136,7 +136,8 @@ fn migrate_hotkey_defaults(conn: &Connection) -> Result<(), LocalYapperError> {
     Ok(())
 }
 
-/// Inserts 5 built-in modes. Uses INSERT OR IGNORE for idempotency.
+/// Inserts 5 built-in modes with unique system prompts for different dictation styles.
+/// Uses INSERT OR IGNORE so existing user modifications to mode prompts are preserved.
 fn seed_modes(conn: &Connection) -> Result<(), LocalYapperError> {
     let modes = [
         (
