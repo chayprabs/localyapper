@@ -13,7 +13,9 @@ const PUNCT_CHARS: &[char] = &['.', ',', ';', ':', '!', '?', '\'', '"', '(', ')'
 /// Exact-match correction engine backed by an in-memory HashMap.
 /// Keys are lowercase; lookups are case-insensitive with case preservation on output.
 pub struct CorrectionEngine {
+    /// Lowercase raw_word → corrected_word mapping loaded from DB.
     corrections: RwLock<HashMap<String, String>>,
+    /// Words from personal dictionary that must never be corrected.
     protected_words: RwLock<HashSet<String>>,
 }
 
