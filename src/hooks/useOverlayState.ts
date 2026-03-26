@@ -9,9 +9,13 @@ import { getSetting, setSetting } from "@/lib/commands/settings";
 import type { OverlayData, OverlayVisualState, PipelineEvent } from "@/types/overlay";
 
 // Recording and display timing constants
+/** Hard cap on single recording duration (seconds). */
 const MAX_RECORDING_SECONDS = 120;
+/** Seconds elapsed before switching to red "stopping-soon" state. */
 const WARNING_THRESHOLD_SECONDS = 105;
+/** Recordings longer than 30s show the "long-recording" processing spinner. */
 const LONG_RECORDING_THRESHOLD_MS = 30_000;
+/** Milliseconds the transcribed text stays visible before auto-hiding. */
 const AUTO_INJECT_DISPLAY_MS = 3000;
 
 export function useOverlayState() {
