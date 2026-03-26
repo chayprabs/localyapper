@@ -32,8 +32,9 @@ export async function testByokConnection(
   });
 }
 
-// Status & lifecycle
+// Status & lifecycle — hot-reload models without restarting the app
 
+/** Reload Whisper and LLM models from disk into AppState. */
 export async function reloadModels(): Promise<void> {
   return invoke<void>("reload_models");
 }
