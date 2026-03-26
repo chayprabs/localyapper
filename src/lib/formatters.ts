@@ -5,6 +5,7 @@ export function formatNumber(n: number): string {
   return numberFormatter.format(n);
 }
 
+/** Time unit constants in milliseconds for relative time formatting. */
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
