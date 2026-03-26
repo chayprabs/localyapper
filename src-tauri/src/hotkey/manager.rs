@@ -13,9 +13,13 @@ use crate::db::queries;
 use crate::models::PipelineEvent;
 use crate::state::AppState;
 
+/// State machine mode: no active recording, ready for input.
 const MODE_IDLE: u8 = 0;
+/// State machine mode: key is held down, recording in progress.
 const MODE_HOLD_RECORDING: u8 = 1;
+/// State machine mode: double-tap toggled, recording hands-free.
 const MODE_HANDS_FREE: u8 = 2;
+/// State machine mode: recording stopped, pipeline is running.
 const MODE_PROCESSING: u8 = 3;
 
 /// Double-tap detection window in milliseconds.
