@@ -21,13 +21,17 @@ pub struct HistoryEntry {
     pub created_at: String,
 }
 
-/// A learned correction mapping.
+/// A learned correction mapping stored in the corrections table.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Correction {
     pub id: String,
+    /// Original Whisper token that was corrected.
     pub raw_word: String,
+    /// The replacement text learned from LLM output.
     pub corrected: String,
+    /// Number of times this correction has been observed.
     pub count: i64,
+    /// Computed as min(1.0, count * 0.1) — threshold for auto-apply.
     pub confidence: f64,
     pub last_used_at: Option<String>,
     pub created_at: String,
