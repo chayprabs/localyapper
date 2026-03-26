@@ -11,21 +11,27 @@ pub enum LocalYapperError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 
+    /// Resource lookup failure (mode, history entry, setting key).
     #[error("Not found: {0}")]
     NotFound(String),
 
+    /// Validation failure from user-supplied data.
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
+    /// cpal device or stream initialization failure.
     #[error("Audio error: {0}")]
     AudioError(String),
 
+    /// Whisper model load or inference failure.
     #[error("Transcription error: {0}")]
     TranscriptionError(String),
 
+    /// mistral.rs model load, tokenizer, or generation failure.
     #[error("LLM error: {0}")]
     LlmError(String),
 
+    /// Clipboard or keyboard simulation failure during text injection.
     #[error("Injection error: {0}")]
     InjectionError(String),
 }
