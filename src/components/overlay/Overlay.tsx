@@ -5,9 +5,10 @@ import { Waveform } from "./Waveform";
 import { CountdownTimer } from "./CountdownTimer";
 import { YappingEmoji } from "./YappingEmoji";
 
-// Hard cap on single recording duration
+/** Hard cap on single recording duration — matches backend MAX_RECORDING_SAMPLES. */
 const MAX_RECORDING_SECONDS = 120;
 
+/** CSS spinner used during processing and long-recording states. */
 function Spinner({ slow }: { slow?: boolean }) {
   const speed = slow ? "animate-spin-slow" : "animate-spin";
   return (
