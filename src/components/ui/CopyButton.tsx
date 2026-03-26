@@ -2,8 +2,11 @@
 import { useState, useCallback, useRef } from "react";
 
 interface CopyButtonProps {
+  /** Text content to write to clipboard on click. */
   text: string;
+  /** "icon" shows Material Symbols copy icon; "text" shows "Copy" label. */
   variant?: "icon" | "text";
+  /** Called 500ms after copy — used by overlay to dismiss after copying. */
   onAfterCopy?: () => void;
   className?: string;
   iconSize?: number;
