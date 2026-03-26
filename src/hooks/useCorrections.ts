@@ -8,7 +8,7 @@ import {
   getCorrectionsCount,
 } from "@/lib/commands/corrections";
 
-// Corrections displayed per page
+/** Corrections displayed per page — page-based (not offset-based like history). */
 const PAGE_SIZE = 20;
 
 interface CorrectionsData {
