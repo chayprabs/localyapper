@@ -13,7 +13,9 @@ const PUNCT_CHARS: &[char] = &[
 /// A single word-level diff learned from the pipeline.
 #[derive(Debug, Clone)]
 pub struct LearnedCorrection {
+    /// Lowercased Whisper output token (before LLM cleanup).
     pub raw_word: String,
+    /// Lowercased final output token (after LLM cleanup).
     pub corrected_word: String,
 }
 
