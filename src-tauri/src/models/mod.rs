@@ -6,11 +6,17 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HistoryEntry {
     pub id: String,
+    /// Raw Whisper transcription before correction/LLM.
     pub raw_text: String,
+    /// Final text after correction engine and LLM cleanup.
     pub final_text: String,
+    /// Focused app at recording time (None if detection failed).
     pub app_name: Option<String>,
+    /// Active AI mode used for processing (None if unset).
     pub mode_id: Option<String>,
+    /// Speech duration from VAD in milliseconds.
     pub duration_ms: Option<i64>,
+    /// Whitespace-separated word count of raw text.
     pub word_count: Option<i64>,
     pub created_at: String,
 }
