@@ -25,9 +25,11 @@ const MODE_PROCESSING: u8 = 3;
 /// Double-tap detection window in milliseconds.
 const DOUBLE_TAP_MS: u128 = 300;
 
-/// Shared hotkey state machine.
+/// Shared hotkey state machine tracking recording mode and double-tap timing.
 struct HotkeyState {
+    /// Current mode: idle, hold-recording, hands-free, or processing.
     mode: AtomicU8,
+    /// Timestamp of last key press for double-tap detection within DOUBLE_TAP_MS.
     last_press_time: TokioMutex<Option<Instant>>,
 }
 
