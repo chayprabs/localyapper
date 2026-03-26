@@ -1,6 +1,8 @@
 // Timer display -- elapsed seconds or countdown for recording limits
 interface CountdownTimerProps {
+  /** "elapsed" shows seconds.tenths (e.g. "3.2s"); "countdown" shows integer ceiling (e.g. "12"). */
   mode: "elapsed" | "countdown";
+  /** Current time value — interpreted differently based on mode. */
   seconds: number;
 }
 
