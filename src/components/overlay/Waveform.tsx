@@ -3,8 +3,9 @@ interface WaveformProps {
   color: "blue" | "red";
 }
 
-// Bar heights for the 5-bar waveform pattern
+/** Symmetric 5-bar height pattern in pixels: short-medium-tall-medium-short. */
 const baseHeights = [8, 16, 22, 16, 8];
+/** Per-bar CSS animation class names with staggered timing offsets. */
 const animations = [
   "animate-waveform-1",
   "animate-waveform-2",
