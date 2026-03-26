@@ -12,8 +12,10 @@ const defaultOverlayData: OverlayData = {
   recordingStartedAt: null,
 };
 
+/** Primary overlay state atom — updated by useOverlayState on each pipeline event. */
 export const overlayDataAtom = atom<OverlayData>(defaultOverlayData);
 
+/** Derived read-only atom for components that only need the visual state string. */
 export const overlayVisualStateAtom = atom<OverlayVisualState>(
   (get) => get(overlayDataAtom).visualState,
 );
