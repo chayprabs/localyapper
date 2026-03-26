@@ -91,12 +91,16 @@ pub struct OllamaStatus {
     pub models: Vec<String>,
 }
 
-/// Model download progress event payload.
+/// Model download progress event payload, emitted on "model_download_progress" channel.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DownloadProgress {
+    /// Completion percentage (0.0 to 100.0).
     pub percent: f64,
+    /// Bytes downloaded so far, converted to megabytes.
     pub downloaded_mb: u64,
+    /// Total file size in megabytes.
     pub total_mb: u64,
+    /// Current download speed in megabytes per second.
     pub speed_mbps: f64,
 }
 
