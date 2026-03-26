@@ -3,8 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { DownloadProgress } from "@/types/commands";
 
+/** Approximate Whisper base.en model size for progress bar calculation. */
 const WHISPER_SIZE_MB = 148;
-const TOTAL_SIZE_MB = 545; // 148 Whisper + 397 LLM
+/** Combined download size: Whisper base.en (148MB) + Qwen3 0.6B Q4 (397MB). */
+const TOTAL_SIZE_MB = 545;
 
 export function DownloadStep({
   downloadError,
