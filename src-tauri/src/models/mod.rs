@@ -112,13 +112,17 @@ pub struct ConnectionResult {
     pub error: Option<String>,
 }
 
-/// Dashboard statistics.
+/// Dashboard statistics aggregated from transcription_history.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Stats {
+    /// Words dictated in the current calendar day (UTC).
     pub words_today: i64,
+    /// Words dictated in the current 7-day window.
     pub words_week: i64,
     pub words_all_time: i64,
+    /// Average words per minute across all sessions with duration > 0.
     pub avg_wpm: f64,
+    /// Total number of completed dictation sessions.
     pub total_sessions: i64,
 }
 
