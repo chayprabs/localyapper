@@ -15,7 +15,9 @@ pub const PRE_ROLL_SAMPLES: usize = 8_000;
 /// Maximum recording: 120 seconds at 16kHz.
 pub const MAX_RECORDING_SAMPLES: usize = 1_920_000;
 
+/// Atomic state flag: recorder is idle and ready.
 const STATE_IDLE: u8 = 0;
+/// Atomic state flag: recorder is actively capturing audio.
 const STATE_RECORDING: u8 = 1;
 
 /// Wrapper to make cpal::Stream usable in Arc<Mutex<>>.
