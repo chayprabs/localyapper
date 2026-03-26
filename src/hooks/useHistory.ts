@@ -8,7 +8,7 @@ import {
   clearHistory,
 } from "@/lib/commands/history";
 
-// Number of entries fetched per page
+/** Number of history entries fetched per page — matches backend LIMIT. */
 const PAGE_SIZE = 20;
 
 interface HistoryData {
