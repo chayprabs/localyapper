@@ -18,11 +18,16 @@ export interface PipelineEvent {
   error: string | null;
 }
 
+/** Full overlay state managed by useOverlayState hook. */
 export interface OverlayData {
   visualState: OverlayVisualState;
+  /** Transcribed/final text — populated only in "transcribed" state. */
   text: string | null;
+  /** Speech duration from VAD — populated after processing. */
   durationMs: number | null;
   wordCount: number | null;
+  /** Error message from pipeline failure. */
   error: string | null;
+  /** Date.now() timestamp when recording started (for elapsed timer). */
   recordingStartedAt: number | null;
 }
