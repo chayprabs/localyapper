@@ -47,9 +47,13 @@ pub struct DictionaryWord {
 pub struct Mode {
     pub id: String,
     pub name: String,
+    /// System prompt fed to the LLM for text cleanup (empty = no prompt).
     pub system_prompt: String,
+    /// When true, bypass LLM entirely and use raw/corrected text as-is.
     pub skip_llm: bool,
+    /// Built-in modes cannot be deleted or renamed by the user.
     pub is_builtin: bool,
+    /// UI color identifier (e.g. "blue", "purple", "green").
     pub color: String,
     pub created_at: String,
 }
