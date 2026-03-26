@@ -178,5 +178,6 @@ pub struct WhisperFileStatus {
     pub model_name: String,
 }
 
-/// All settings as a key-value map.
+/// All settings as a key-value map (settings table rows flattened).
+/// Keys are setting identifiers (e.g. "hotkey_record", "llm_mode").
 pub type AllSettings = HashMap<String, String>;
