@@ -27,6 +27,8 @@ Hold a hotkey, speak naturally, release -- polished text appears wherever you're
 <!-- TODO: Replace with actual GIF once recorded -->
 <!-- <p align="center"><img src="docs/demo.gif" alt="LocalYapper Demo" width="720" /></p> -->
 
+Localyapper is set to be publically launched on 7th April 2026.
+
 ---
 
 ## Performance
