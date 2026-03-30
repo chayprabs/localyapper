@@ -7,7 +7,7 @@ Windows 10+ / macOS 12+ / Linux (X11 + Wayland).
 License: MIT.
 
 ## Stack — exact versions, do not deviate
-- **Backend**: Tauri 2, Rust (stable 1.75+), rusqlite 0.31 (bundled), cpal 0.15, sherpa-onnx 1.12 (Parakeet STT + Silero VAD), mistralrs 0.7, tokio 1.x, serde, enigo 0.2
+- **Backend**: Tauri 2, Rust (stable 1.75+), rusqlite 0.31 (bundled), cpal 0.15, whisper-rs 0.16, mistralrs 0.7, tokio 1.x, serde, enigo 0.2
 - **Frontend**: React 19, TypeScript 5, Vite 5, Tailwind CSS 3, shadcn/ui, Jotai 2, Recharts 2
 - **IPC**: Tauri command system — frontend calls Rust via invoke() from @tauri-apps/api/core
 
@@ -20,17 +20,13 @@ License: MIT.
 - No cloud processing ever — everything local
 
 ## Voice pipeline data flow
-hotkey → audio/capture.rs (cpal 16kHz mono + 0.5s pre-roll) → audio/vad.rs (Silero VAD via sherpa-onnx, energy fallback) → stt/whisper.rs (Parakeet 110M INT8 via sherpa-onnx OfflineRecognizer) → correction/engine.rs (dictionary lookup) → context/detector.rs (focused app) → llm/prompt.rs (mode system prompt) → llm/engine.rs (mistralrs, Qwen2.5-1.5B) → injection/injector.rs (clipboard save → paste → restore) → text appears in app
-- Casual mode: STT output used directly (skip LLM — Parakeet provides punctuation + capitalization)
-- Other modes (Formal, Code, Translate): LLM processes STT output for tone/style adjustment
+hotkey → audio/capture.rs (cpal 16kHz mono + 0.5s pre-roll) → audio/vad.rs (energy filter) → stt/whisper.rs (ggml-base.en.bin) → correction/engine.rs (dictionary lookup) → context/detector.rs (focused app) → llm/prompt.rs (mode system prompt) → llm/engine.rs (mistralrs) → injection/injector.rs (clipboard save → paste → restore) → text appears in app
 
-## Models
-- STT: Parakeet TDT-CTC 110M INT8 via sherpa-onnx (~120MB, 2.4% WER, native punctuation + capitalization)
-- VAD: Silero VAD via sherpa-onnx (~2MB, energy-based fallback if missing)
-- LLM: Qwen2.5-1.5B-Instruct Q4_K_M GGUF via mistralrs (~1.0GB)
+## Models — FINAL, never change
+- STT: ggml-base.en.bin downloaded to app data dir on first launch (~148MB)
+- LLM: Qwen3-0.6B-Q4_K_M.gguf downloaded to app data dir on first launch (~397MB)
 - LLM runtime: mistralrs crate (Candle backend, no Ollama dependency)
 - BYOK alternative: OpenAI / Anthropic / Groq via user API key
-- STT models stored in subdirectories: models/parakeet-tdt-ctc-110m-int8/ (model.int8.onnx + tokens.txt)
 
 ## Session limits
 - Max recording: 120 seconds
@@ -57,7 +53,7 @@ ALWAYS read docs/PROGRESS.md before starting ANY work.
 IMPORTANT: Only work on the CURRENT phase. Never skip ahead.
 
 ## Instance coordination
-Two Claude Code instances may be active on this repo:
+Two Codex instances may be active on this repo:
 - **Bedrock instance**: Primary coder. Handles all heavy implementation work (Rust AND React). Does the building.
 - **Pro instance**: Reviewer and helper. Quick questions, code reviews, small fixes, explanations. Lightweight tasks only.
 Both instances can touch any file. If both are running, check with the user before making large changes to avoid conflicts.
@@ -83,4 +79,4 @@ Both instances can touch any file. If both are running, check with the user befo
 - Font: SF Pro / Inter, two weights only: 400 regular, 600 bold
 
 ## Current status
-Phase 17 complete. STT upgraded to sherpa-onnx + Parakeet, LLM upgraded to Qwen2.5-1.5B.
+Fresh repo. Starting Phase 1 — Foundation.

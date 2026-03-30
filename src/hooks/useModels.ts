@@ -25,7 +25,7 @@ import {
 import type { ModelsSettingsCache, ModelStatusCache } from "@/stores/appStore";
 
 type LlmMode = "local" | "ollama" | "byok";
-type WhisperModel = "tiny.en" | "base.en" | "small.en" | "medium.en";
+type WhisperModel = "parakeet-110m" | "parakeet-0.6b" | "tiny.en" | "base.en" | "small.en" | "medium.en";
 type ByokProvider = "openai" | "anthropic" | "groq";
 
 interface ModelsState {
@@ -38,9 +38,9 @@ interface ModelsState {
 
 /** Fallback values when settings table has no entry for a key. */
 const DEFAULTS: ModelsState = {
-  whisperModel: "base.en",
+  whisperModel: "parakeet-110m",
   llmMode: "local",
-  ollamaModel: "qwen3:0.6b",
+  ollamaModel: "qwen2.5:1.5b",
   byokProvider: "openai",
   byokApiKey: "",
 };
@@ -86,7 +86,7 @@ export function useModels() {
 
   // Whisper state
   const [whisperFileStatus, setWhisperFileStatus] = useState<WhisperFileStatus>(
-    statusCache?.whisperFileStatus ?? { exists: false, size_mb: 0, model_name: "base.en" }
+    statusCache?.whisperFileStatus ?? { exists: false, size_mb: 0, model_name: "parakeet-110m" }
   );
   const [whisperLoaded, setWhisperLoaded] = useState(statusCache?.whisperLoaded ?? false);
   const [whisperDownloading, setWhisperDownloading] = useState(false);
@@ -171,7 +171,7 @@ export function useModels() {
         setLlmFileStatus(newLlmFile);
       }
 
-      let newWhisperFile: WhisperFileStatus = { exists: false, size_mb: 0, model_name: "base.en" };
+      let newWhisperFile: WhisperFileStatus = { exists: false, size_mb: 0, model_name: "parakeet-110m" };
       if (whisperFileResult.status === "fulfilled") {
         newWhisperFile = whisperFileResult.value;
         setWhisperFileStatus(newWhisperFile);
@@ -284,7 +284,7 @@ export function useModels() {
     setStatusCache((prev) => {
       const base = prev ?? {
         llmFileStatus: { exists: false, size_mb: 0 },
-        whisperFileStatus: { exists: false, size_mb: 0, model_name: "base.en" },
+        whisperFileStatus: { exists: false, size_mb: 0, model_name: "parakeet-110m" },
         llmLoaded: false,
         whisperLoaded: false,
       };
@@ -302,7 +302,7 @@ export function useModels() {
     try {
       await downloadModel();
       await reloadModels();
-      const newFile = { exists: true, size_mb: 397 };
+      const newFile = { exists: true, size_mb: 1024 };
       setLlmFileStatus(newFile);
       setLlmLoaded(true);
       updateStatusCache({ llmFileStatus: newFile, llmLoaded: true });

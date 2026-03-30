@@ -99,7 +99,20 @@
       "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(s[''''screenId''''], s.get\\(''''displayName'''',''''''''\\)\\) for s in data[''''screens'''']]\")",
       "Bash(python3 -c \"import json; data=json.load\\(open\\(''mcp-stitch-list_screens-1774185859869.txt''\\)\\); s=data[''screens''][0]; print\\(list\\(s.keys\\(\\)\\)[:10]\\)\")",
       "Bash(python3 -c \"import json; data=json.load\\(open\\(''mcp-stitch-list_screens-1774185859869.txt'', encoding=''utf-8''\\)\\); s=data[''screens''][0]; print\\(list\\(s.keys\\(\\)\\)[:10]\\)\")",
-      "Bash(python3 -c \"import json; data=json.load\\(open\\(''mcp-stitch-list_screens-1774185859869.txt'', encoding=''utf-8''\\)\\); [print\\(s[''name''], ''|'', s[''title'']\\) for s in data[''screens'']]\")"
+      "Bash(python3 -c \"import json; data=json.load\\(open\\(''mcp-stitch-list_screens-1774185859869.txt'', encoding=''utf-8''\\)\\); [print\\(s[''name''], ''|'', s[''title'']\\) for s in data[''screens'']]\")",
+      "Bash(where vowen:*)",
+      "Read(//c/Users/chait/Project/localyapper/$LOCALAPPDATA/Programs/**)",
+      "Read(//c/Users/chait/Project/localyapper/$LOCALAPPDATA/**)",
+      "Read(//c/Users/chait/Project/localyapper/$APPDATA/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Bash(powershell -Command \"Get-ItemProperty 'HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Uninstall\\\\*','HKCU:\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Uninstall\\\\*' 2>$null | Where-Object { $_.DisplayName -like '*Vowen*' } | Select-Object DisplayName,InstallLocation,UninstallString | Format-List\")",
+      "Bash(powershell -Command \"Get-Process | Where-Object { $_.ProcessName -like '*vowen*' -or $_.ProcessName -like '*Vowen*' } | Select-Object ProcessName,Path | Format-List\")",
+      "Read(//c/Users/chait/Project/localyapper/$LOCALAPPDATA/Programs/Vowen/resources/**)",
+      "Bash(powershell -Command \"Get-ChildItem 'HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Uninstall','HKCU:\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Uninstall' -ErrorAction SilentlyContinue | Get-ItemProperty | Where-Object { \\\\$_.DisplayName -like '*wispr*' -or \\\\$_.DisplayName -like '*flow*' } | Select-Object DisplayName,InstallLocation,UninstallString | Format-List\")",
+      "Bash(powershell -Command \"Get-Process -ErrorAction SilentlyContinue | Where-Object { \\\\$_.ProcessName -match 'wispr|flow' } | Select-Object ProcessName,Path | Format-List\")",
+      "Read(//c/Users/chait/Project/localyapper/$LOCALAPPDATA/WisprFlow/app-1.4.604/resources/**)",
+      "Read(//c/Users/chait/Project/localyapper/$LOCALAPPDATA/WisprFlow/app-1.4.604/resources/Release/**)",
+      "Read(//c/Users/chait/Project/localyapper/$LOCALAPPDATA/WisprFlow/**)"
     ]
   }
 }

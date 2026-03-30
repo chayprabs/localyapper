@@ -173,7 +173,7 @@ function LocalContent({
   return (
     <div className="border-t border-black/[0.07]">
       <Row label="Model">
-        <span className="text-[13px] text-black/50">Qwen3 0.6B (397 MB)</span>
+        <span className="text-[13px] text-black/50">Qwen2.5 1.5B (1.0 GB)</span>
       </Row>
 
       {/* Download status / progress */}
@@ -431,7 +431,7 @@ export function ModelsPage() {
         </h2>
         <div className="bg-white rounded-[10px] border border-black/[0.07] shadow-sm overflow-hidden">
           <Row label="Model">
-            <span className="text-[13px] text-black/50">Whisper base.en (148 MB)</span>
+            <span className="text-[13px] text-black/50">Parakeet 110M (458 MB)</span>
           </Row>
 
           {whisperDownloading ? (
@@ -443,7 +443,7 @@ export function ModelsPage() {
                 />
               </div>
               <div className="flex justify-between text-[11px] text-black/[0.40] mb-2">
-                <span>{(whisperDownloadProgress?.percent ?? 0).toFixed(0)}% — {whisperDownloadProgress?.downloaded_mb ?? 0} / {whisperDownloadProgress?.total_mb ?? 148} MB</span>
+                <span>{(whisperDownloadProgress?.percent ?? 0).toFixed(0)}% — {whisperDownloadProgress?.downloaded_mb ?? 0} / {whisperDownloadProgress?.total_mb ?? 458} MB</span>
                 <span>{(whisperDownloadProgress?.speed_mbps ?? 0) > 0 ? `${(whisperDownloadProgress?.speed_mbps ?? 0).toFixed(1)} MB/s` : "Starting..."}</span>
               </div>
               <button

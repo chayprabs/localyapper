@@ -165,10 +165,16 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
                 double
             };
 
-            // Start recording
+            // Show overlay IMMEDIATELY — before audio init (which can take 100-300ms)
+            println!("OVERLAY: Showing listening state");
+            emit_pipeline_event(&app, "listening", None, None, None, None);
+
+            // Start recording (cpal stream init may take 100-300ms on Windows)
             let app_state = app.state::<AppState>();
             if let Err(e) = app_state.recorder.start() {
                 log::error!("Failed to start recording: {e}");
+                // Try to cancel any stuck recorder state before reporting error
+                let _ = app_state.recorder.cancel();
                 emit_pipeline_event(&app, "error", None, None, None, Some(&e.to_string()));
                 state.mode.store(MODE_IDLE, Ordering::SeqCst);
                 return;
@@ -181,9 +187,6 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
             } else {
                 log::info!("Hold-to-talk recording started");
             }
-
-            println!("OVERLAY: Showing listening state");
-            emit_pipeline_event(&app, "listening", None, None, None, None);
 
             // Register Escape as cancel while recording
             register_cancel_hotkey(&app, state.clone());

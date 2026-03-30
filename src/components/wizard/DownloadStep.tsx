@@ -3,10 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { DownloadProgress } from "@/types/commands";
 
-/** Approximate Whisper base.en model size for progress bar calculation. */
-const WHISPER_SIZE_MB = 148;
-/** Combined download size: Whisper base.en (148MB) + Qwen3 0.6B Q4 (397MB). */
-const TOTAL_SIZE_MB = 545;
+/** Approximate Parakeet 110M FP32 model size for progress bar calculation. */
+const WHISPER_SIZE_MB = 458;
+/** Combined download size: Parakeet 110M (458MB) + Qwen2.5 1.5B Q4 (1024MB). */
+const TOTAL_SIZE_MB = 1482;
 
 export function DownloadStep({
   downloadError,

@@ -1,5 +1,6 @@
 // Application state -- shared Tauri state container
 use crate::audio::capture::AudioRecorder;
+use crate::audio::vad::SileroVad;
 use crate::correction::engine::CorrectionEngine;
 use crate::llm::engine::LlmEngine;
 use crate::stt::whisper::WhisperEngine;
@@ -17,6 +18,8 @@ pub struct AppState {
     pub whisper: Arc<Mutex<Option<Arc<WhisperEngine>>>>,
     /// Hot-reloadable: locked briefly to clone the inner Arc, then released.
     pub llm: Arc<Mutex<Option<Arc<LlmEngine>>>>,
+    /// Silero VAD engine — loaded from models dir, optional (falls back to energy-based).
+    pub vad: Arc<Mutex<Option<SileroVad>>>,
     /// Most recent injected text, used by paste_last command.
     pub last_injection: Arc<Mutex<Option<String>>>,
     /// In-memory correction lookup, refreshed after learner writes.

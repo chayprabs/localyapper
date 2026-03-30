@@ -15,6 +15,7 @@ mod state;
 mod tray;
 
 use audio::capture::AudioRecorder;
+use audio::vad::SileroVad;
 use correction::engine::CorrectionEngine;
 use llm::engine::LlmEngine;
 use state::AppState;
@@ -23,21 +24,20 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
-/// Candidate paths where the Whisper model might be found.
+/// Candidate directories where the STT model might be found.
 ///
-/// Checks for the selected model first, then falls back to other variants
-/// for backwards compatibility (e.g. user had tiny.en before upgrading).
+/// Checks for the selected model first, then falls back to the default Parakeet model.
 pub(crate) fn whisper_model_candidates(app: &tauri::AppHandle, model_setting: &str) -> Vec<std::path::PathBuf> {
     let models_dir = match app.path().app_data_dir() {
         Ok(d) => d.join("models"),
         Err(_) => return vec![],
     };
 
-    let primary = models_dir.join(stt::whisper::whisper_model_filename(model_setting));
+    let primary = models_dir.join(stt::whisper::stt_model_dir_name(model_setting));
 
-    // Fallback: if selected model isn't found, try tiny.en (backwards compat)
-    let fallback = if model_setting != "tiny.en" {
-        Some(models_dir.join(stt::whisper::whisper_model_filename("tiny.en")))
+    // Fallback: if selected model isn't found, try the default parakeet-110m
+    let fallback = if model_setting != stt::whisper::DEFAULT_WHISPER_MODEL {
+        Some(models_dir.join(stt::whisper::stt_model_dir_name(stt::whisper::DEFAULT_WHISPER_MODEL)))
     } else {
         None
     };
@@ -50,42 +50,41 @@ pub(crate) fn whisper_model_candidates(app: &tauri::AppHandle, model_setting: &s
 }
 
 
-/// Attempt to load the Whisper model by scanning candidate paths.
+/// Attempt to load the STT model by scanning candidate directories.
 /// Reads the `whisper_model` setting from DB to determine which model to load.
-/// Returns `None` with a warning log if the model file is not found or fails to load.
+/// Returns `None` with a warning log if the model is not found or fails to load.
 fn load_whisper_model(app: &tauri::App, conn: &rusqlite::Connection) -> Option<Arc<WhisperEngine>> {
     let model_setting = db::queries::get_setting(conn, "whisper_model")
         .unwrap_or_else(|_| stt::whisper::DEFAULT_WHISPER_MODEL.to_string());
 
     let candidates = whisper_model_candidates(app.handle(), &model_setting);
-    println!("WHISPER: Startup load — model setting='{}', candidates: {:?}",
+    println!("STT: Startup load — model setting='{}', candidates: {:?}",
         model_setting, candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>());
 
     for candidate in &candidates {
-        if candidate.exists() {
-            let size = std::fs::metadata(candidate).map(|m| m.len()).unwrap_or(0);
-            println!("WHISPER: Found model at {} ({} bytes), loading...", candidate.display(), size);
-            log::info!("Found Whisper model at {}", candidate.display());
+        if candidate.exists() && candidate.is_dir() {
+            println!("STT: Found model dir at {}, loading...", candidate.display());
+            log::info!("Found STT model at {}", candidate.display());
             match WhisperEngine::new(candidate) {
                 Ok(engine) => {
-                    println!("WHISPER: Engine loaded successfully");
-                    log::info!("Whisper engine loaded successfully");
+                    println!("STT: Engine loaded successfully");
+                    log::info!("STT engine loaded successfully");
                     return Some(Arc::new(engine));
                 }
                 Err(e) => {
-                    println!("WHISPER: Load FAILED from {}: {}", candidate.display(), e);
-                    log::warn!("Failed to load Whisper model from {}: {}", candidate.display(), e);
+                    println!("STT: Load FAILED from {}: {}", candidate.display(), e);
+                    log::warn!("Failed to load STT model from {}: {}", candidate.display(), e);
                 }
             }
         } else {
-            println!("WHISPER: File not found at {}", candidate.display());
+            println!("STT: Directory not found at {}", candidate.display());
         }
     }
 
-    println!("WHISPER: No model loaded — STT unavailable until downloaded");
+    println!("STT: No model loaded — STT unavailable until downloaded");
     log::warn!(
-        "Whisper model ({}) not found. STT will be unavailable until the model is downloaded.",
-        stt::whisper::whisper_model_filename(&model_setting)
+        "STT model ({}) not found. STT will be unavailable until the model is downloaded.",
+        stt::whisper::stt_model_dir_name(&model_setting)
     );
     None
 }
@@ -122,12 +121,12 @@ pub fn run() {
             let conn = db::open_database(&app_data_dir)
                 .expect("Failed to initialize database");
 
-            // Load Whisper at startup (safe now that llama-cpp-2 is removed).
+            // Load STT model at startup (sherpa-onnx + Parakeet).
             let whisper = load_whisper_model(app, &conn);
             if whisper.is_some() {
-                log::info!("Whisper model loaded at startup");
+                log::info!("STT model loaded at startup");
             } else {
-                log::warn!("Whisper model not found at startup — STT unavailable until downloaded");
+                log::warn!("STT model not found at startup — STT unavailable until downloaded");
             }
             // LLM starts as None — loaded in background thread below.
             let llm: Option<Arc<LlmEngine>> = None;
@@ -142,11 +141,33 @@ pub fn run() {
                 log::warn!("Failed to load correction engine: {e}");
             }
 
+            // Load Silero VAD model (optional — falls back to energy-based if missing)
+            let silero_vad = {
+                let vad_path = app_data_dir.join("models").join(stt::whisper::SILERO_VAD_FILENAME);
+                if vad_path.exists() {
+                    match SileroVad::new(&vad_path) {
+                        Ok(vad) => {
+                            println!("VAD: Silero VAD loaded successfully");
+                            Some(vad)
+                        }
+                        Err(e) => {
+                            println!("VAD: Failed to load Silero VAD: {e}, using energy fallback");
+                            log::warn!("Failed to load Silero VAD: {e}");
+                            None
+                        }
+                    }
+                } else {
+                    println!("VAD: Silero model not found at {}, using energy fallback", vad_path.display());
+                    None
+                }
+            };
+
             app.manage(AppState {
                 db: Arc::new(Mutex::new(conn)),
                 recorder: Arc::new(AudioRecorder::new()),
                 whisper: Arc::new(Mutex::new(whisper)),
                 llm: Arc::new(Mutex::new(llm)),
+                vad: Arc::new(Mutex::new(silero_vad)),
                 last_injection: Arc::new(Mutex::new(None)),
                 correction_engine,
                 download_cancel: Arc::new(AtomicBool::new(false)),
@@ -177,7 +198,7 @@ pub fn run() {
                             app_state.whisper.lock().map(|g| g.is_some()).unwrap_or(false)
                         };
                         if whisper_loaded {
-                            send_notification(&handle, "LocalYapper", "Whisper ready \u{2014} download LLM in Settings for full cleanup");
+                            send_notification(&handle, "LocalYapper", "STT ready \u{2014} download LLM in Settings for full cleanup");
                         } else {
                             send_notification(&handle, "LocalYapper", "Models not downloaded \u{2014} open Settings to get started");
                         }

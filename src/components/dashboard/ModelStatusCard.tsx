@@ -13,7 +13,7 @@ export function ModelStatusCard({ status, llmMode, llmLabel }: ModelStatusCardPr
   const llmReady = status?.llm_loaded ?? false;
 
   // Determine LLM display name
-  let llmName = "Qwen3 0.6B";
+  let llmName = "Qwen2.5 1.5B";
   if (llmMode === "ollama" && llmLabel) {
     llmName = `Ollama: ${llmLabel}`;
   } else if (llmMode === "byok" && llmLabel) {
@@ -32,7 +32,7 @@ export function ModelStatusCard({ status, llmMode, llmLabel }: ModelStatusCardPr
       </p>
       <div className="flex items-center gap-2 mb-1.5">
         <span className={`w-2 h-2 rounded-full ${whisperDot}`} />
-        <span className={`text-[13px] font-medium ${whisperText}`}>Whisper base.en</span>
+        <span className={`text-[13px] font-medium ${whisperText}`}>Parakeet 110M</span>
       </div>
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full ${llmDot}`} />

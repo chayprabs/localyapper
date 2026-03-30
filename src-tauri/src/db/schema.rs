@@ -65,6 +65,9 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
     seed_modes(conn)?;
     migrate_hotkey_defaults(conn)?;
     migrate_whisper_model_default(conn)?;
+    migrate_stt_to_parakeet(conn)?;
+    migrate_casual_skip_llm(conn)?;
+    migrate_prompts_for_parakeet(conn)?;
 
     Ok(())
 }
@@ -77,7 +80,7 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
         ("hotkey_cancel", "Escape"),
         ("hotkey_paste_last", "Alt+Shift+V"),
         ("hotkey_open_app", "Alt+L"),
-        ("whisper_model", "base.en"),
+        ("whisper_model", "parakeet-110m"),
         ("llm_mode", "local"),
         ("ollama_model", "qwen2.5:0.5b"),
         ("byok_provider", "openai"),
@@ -136,6 +139,49 @@ fn migrate_hotkey_defaults(conn: &Connection) -> Result<(), LocalYapperError> {
     Ok(())
 }
 
+/// Migrate whisper_model setting from old Whisper models to Parakeet.
+/// Safe to run repeatedly — only updates known old values.
+fn migrate_stt_to_parakeet(conn: &Connection) -> Result<(), LocalYapperError> {
+    let old_values = ["tiny.en", "base.en", "small.en", "medium.en"];
+    for old_val in &old_values {
+        conn.execute(
+            "UPDATE settings SET value = 'parakeet-110m', updated_at = datetime('now') WHERE key = 'whisper_model' AND value = ?1",
+            rusqlite::params![old_val],
+        )?;
+    }
+    Ok(())
+}
+
+/// Migrate Casual mode to skip LLM — Parakeet's punctuated output is sufficient.
+/// Safe to run repeatedly — only updates if skip_llm is still 0.
+fn migrate_casual_skip_llm(conn: &Connection) -> Result<(), LocalYapperError> {
+    conn.execute(
+        "UPDATE modes SET skip_llm = 1 WHERE id = 'builtin_casual' AND skip_llm = 0",
+        [],
+    )?;
+    Ok(())
+}
+
+/// Simplify mode prompts for Parakeet's clean output (punctuated + capitalized).
+/// Formal prompt no longer needs to fix basic punctuation/caps.
+fn migrate_prompts_for_parakeet(conn: &Connection) -> Result<(), LocalYapperError> {
+    // Update Formal prompt — Parakeet handles punct/caps, LLM only needs to formalize tone
+    conn.execute(
+        "UPDATE modes SET system_prompt = ?1 WHERE id = 'builtin_formal'",
+        rusqlite::params![
+            "You are a voice dictation cleanup assistant. The input is already punctuated and capitalized. Your job is to improve formality: remove casual language, write in complete professional sentences, ensure proper grammar. Preserve the meaning exactly. Output ONLY the cleaned text, nothing else."
+        ],
+    )?;
+
+    // Update Casual — now skips LLM, clear the prompt
+    conn.execute(
+        "UPDATE modes SET system_prompt = '' WHERE id = 'builtin_casual' AND skip_llm = 1",
+        [],
+    )?;
+
+    Ok(())
+}
+
 /// Inserts 5 built-in modes with unique system prompts for different dictation styles.
 /// Uses INSERT OR IGNORE so existing user modifications to mode prompts are preserved.
 fn seed_modes(conn: &Connection) -> Result<(), LocalYapperError> {
@@ -143,8 +189,8 @@ fn seed_modes(conn: &Connection) -> Result<(), LocalYapperError> {
         (
             "builtin_casual",
             "Casual",
-            "You are a voice dictation cleanup assistant. Remove filler words (um, uh, like, you know, basically, literally). Fix punctuation and capitalization. Preserve abbreviations and casual tone. Keep it conversational. Output ONLY the cleaned text, nothing else.",
-            0,
+            "",
+            1,
             "blue",
         ),
         (

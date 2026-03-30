@@ -92,9 +92,9 @@ export function useWizard(onComplete: () => void) {
     setDownloadError(null);
     setDownloadProgress(null);
     try {
-      // Download Whisper base.en first (~148 MB)
+      // Download Parakeet 110M STT model (~120 MB)
       await downloadWhisperModel();
-      // Download LLM model (~397 MB)
+      // Download Qwen2.5 1.5B LLM model (~1.0 GB)
       await downloadModel();
       // Hot-load both models into the engine
       await reloadModels();

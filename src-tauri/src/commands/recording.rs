@@ -13,7 +13,7 @@ use crate::llm::prompt;
 use crate::models::PipelineResult;
 use crate::state::AppState;
 
-/// Run the full voice pipeline: VAD -> Whisper -> Correction -> LLM.
+/// Run the full voice pipeline: VAD -> STT -> Correction -> LLM.
 /// Does NOT inject or save to history — caller decides.
 /// Optional `app_handle` enables friendlier error messages (file-exists check).
 pub(crate) async fn execute_pipeline(
@@ -21,8 +21,13 @@ pub(crate) async fn execute_pipeline(
     state: &AppState,
     app_handle: Option<&tauri::AppHandle>,
 ) -> Result<PipelineResult, String> {
-    let vad_config = vad::default_config();
-    let vad_result = vad::apply_vad(&raw_audio, &vad_config);
+    // Run VAD synchronously — extract Silero ref briefly, then drop the lock
+    let vad_result = {
+        let silero_guard = state.vad.lock().ok();
+        let silero_ref = silero_guard.as_ref().and_then(|g| g.as_ref());
+        vad::apply_vad(&raw_audio, silero_ref)
+        // MutexGuard dropped here before any .await
+    };
 
     if !vad_result.has_speech {
         println!("STT: No speech detected in audio");
@@ -37,29 +42,29 @@ pub(crate) async fn execute_pipeline(
     let whisper = state
         .whisper
         .lock()
-        .map_err(|e| format!("Whisper lock error: {e}"))?
+        .map_err(|e| format!("STT lock error: {e}"))?
         .as_ref()
         .ok_or_else(|| {
-            // Check if model file exists on disk to give a friendlier error
+            // Check if model directory exists on disk to give a friendlier error
             if let Some(handle) = app_handle {
                 if let Ok(data_dir) = handle.path().app_data_dir() {
                     let models_dir = data_dir.join("models");
                     if std::fs::read_dir(&models_dir)
                         .map(|entries| entries.filter_map(|e| e.ok())
-                            .any(|e| e.file_name().to_string_lossy().starts_with("ggml-")))
+                            .any(|e| e.path().is_dir() && e.file_name().to_string_lossy().starts_with("parakeet")))
                         .unwrap_or(false)
                     {
-                        return "Whisper model is still loading, please try again shortly".to_string();
+                        return "STT model is still loading, please try again shortly".to_string();
                     }
                 }
             }
-            "Whisper model not downloaded. Use Settings > Models to download it".to_string()
+            "STT model not downloaded. Use Settings > Models to download it".to_string()
         })?
         .clone();
 
     let trimmed_audio = vad_result.trimmed_audio;
 
-    println!("WHISPER: Transcribing...");
+    println!("STT: Transcribing...");
     let stt_start = Instant::now();
     let raw_text = tokio::task::spawn_blocking(move || {
         whisper.transcribe(&trimmed_audio)
@@ -67,7 +72,7 @@ pub(crate) async fn execute_pipeline(
     .await
     .map_err(|e| format!("Transcription task failed: {e}"))?
     .map_err(|e| e.to_string())?;
-    println!("WHISPER: Result: [{}] ({}ms)", raw_text, stt_start.elapsed().as_millis());
+    println!("STT: Result: [{}] ({}ms)", raw_text, stt_start.elapsed().as_millis());
 
     let word_count = if raw_text.is_empty() {
         0

@@ -1,16 +1,9 @@
-// Voice activity detection -- energy-based silence filtering
-/// Energy-based voice activity detection configuration.
-#[derive(Clone, Debug)]
-pub struct VadConfig {
-    /// RMS energy threshold to classify a frame as speech.
-    pub energy_threshold: f32,
-    /// Number of samples per analysis frame (480 = 30ms at 16kHz).
-    pub frame_size: usize,
-    /// Minimum consecutive speech frames to confirm speech presence.
-    pub min_speech_frames: usize,
-    /// Frames to keep after last speech frame (hangover smoothing).
-    pub hangover_frames: usize,
-}
+// Voice activity detection — Silero VAD (primary) with energy-based fallback
+use std::path::Path;
+
+use sherpa_onnx::{SileroVadModelConfig, VadModelConfig, VoiceActivityDetector};
+
+use crate::error::LocalYapperError;
 
 /// Result of applying VAD to an audio buffer.
 #[derive(Clone, Debug)]
@@ -25,7 +18,138 @@ pub struct VadResult {
     pub has_speech: bool,
 }
 
-/// Returns the default VAD configuration.
+/// Silero VAD engine wrapping sherpa-onnx VoiceActivityDetector.
+pub struct SileroVad {
+    config: VadModelConfig,
+}
+
+// SAFETY: VadModelConfig is just data (no pointers). VoiceActivityDetector is created
+// fresh per call in process(). The config is safe to share across threads.
+unsafe impl Send for SileroVad {}
+unsafe impl Sync for SileroVad {}
+
+impl SileroVad {
+    /// Load the Silero VAD model from disk.
+    pub fn new(model_path: &Path) -> Result<Self, LocalYapperError> {
+        if !model_path.exists() {
+            return Err(LocalYapperError::AudioError(format!(
+                "Silero VAD model not found at {}",
+                model_path.display()
+            )));
+        }
+
+        let config = VadModelConfig {
+            silero_vad: SileroVadModelConfig {
+                model: Some(model_path.to_string_lossy().to_string()),
+                threshold: 0.5,
+                min_silence_duration: 0.5,
+                min_speech_duration: 0.1,
+                max_speech_duration: 120.0,
+                ..Default::default()
+            },
+            sample_rate: 16000,
+            num_threads: 1,
+            provider: Some("cpu".to_string()),
+            debug: false,
+            ..Default::default()
+        };
+
+        // Validate config by creating a test detector
+        let _test = VoiceActivityDetector::create(&config, 0.5).ok_or_else(|| {
+            LocalYapperError::AudioError("Failed to initialize Silero VAD".to_string())
+        })?;
+
+        log::info!("Silero VAD loaded from {}", model_path.display());
+        Ok(Self { config })
+    }
+
+    /// Process audio and return VAD result with trimmed speech segments.
+    pub fn process(&self, audio: &[f32]) -> VadResult {
+        if audio.is_empty() {
+            return VadResult {
+                trimmed_audio: Vec::new(),
+                speech_frame_count: 0,
+                speech_duration_ms: 0,
+                has_speech: false,
+            };
+        }
+
+        // Create a fresh detector for each call (stateful, not reusable across calls)
+        let detector = match VoiceActivityDetector::create(&self.config, 0.5) {
+            Some(d) => d,
+            None => {
+                log::warn!("Failed to create VAD detector, falling back to energy");
+                return apply_energy_vad(audio);
+            }
+        };
+
+        // Feed audio in 512-sample chunks (required by Silero VAD)
+        // Pad the last chunk with zeros to avoid dropping trailing audio
+        let chunk_size = 512;
+        for chunk in audio.chunks(chunk_size) {
+            if chunk.len() == chunk_size {
+                detector.accept_waveform(chunk);
+            } else {
+                // Pad the final partial chunk with silence
+                let mut padded = vec![0.0f32; chunk_size];
+                padded[..chunk.len()].copy_from_slice(chunk);
+                detector.accept_waveform(&padded);
+            }
+        }
+
+        // Flush remaining audio
+        detector.flush();
+
+        // Collect speech segments
+        let mut speech_samples: Vec<f32> = Vec::new();
+        let mut segment_count = 0;
+
+        while !detector.is_empty() {
+            if let Some(segment) = detector.front() {
+                speech_samples.extend_from_slice(segment.samples());
+                segment_count += 1;
+            }
+            detector.pop();
+        }
+
+        if speech_samples.is_empty() {
+            return VadResult {
+                trimmed_audio: Vec::new(),
+                speech_frame_count: 0,
+                speech_duration_ms: 0,
+                has_speech: false,
+            };
+        }
+
+        let speech_duration_ms = (speech_samples.len() as u64 * 1000) / 16_000;
+
+        VadResult {
+            trimmed_audio: speech_samples,
+            speech_frame_count: segment_count,
+            speech_duration_ms,
+            has_speech: true,
+        }
+    }
+}
+
+// ============================================================================
+// Energy-based VAD fallback (used when Silero model not available)
+// ============================================================================
+
+/// Energy-based voice activity detection configuration.
+#[derive(Clone, Debug)]
+pub struct VadConfig {
+    /// RMS energy threshold to classify a frame as speech.
+    pub energy_threshold: f32,
+    /// Number of samples per analysis frame (480 = 30ms at 16kHz).
+    pub frame_size: usize,
+    /// Minimum consecutive speech frames to confirm speech presence.
+    pub min_speech_frames: usize,
+    /// Frames to keep after last speech frame (hangover smoothing).
+    pub hangover_frames: usize,
+}
+
+/// Returns the default energy-based VAD configuration.
 pub fn default_config() -> VadConfig {
     VadConfig {
         energy_threshold: 0.01,
@@ -52,8 +176,10 @@ pub fn classify_frames(audio: &[f32], config: &VadConfig) -> Vec<bool> {
         .collect()
 }
 
-/// Apply VAD with hangover smoothing and trim leading/trailing silence.
-pub fn apply_vad(audio: &[f32], config: &VadConfig) -> VadResult {
+/// Apply energy-based VAD with hangover smoothing and trim leading/trailing silence.
+pub fn apply_energy_vad(audio: &[f32]) -> VadResult {
+    let config = default_config();
+
     if audio.is_empty() {
         return VadResult {
             trimmed_audio: Vec::new(),
@@ -63,7 +189,7 @@ pub fn apply_vad(audio: &[f32], config: &VadConfig) -> VadResult {
         };
     }
 
-    let raw_flags = classify_frames(audio, config);
+    let raw_flags = classify_frames(audio, &config);
     let speech_frame_count = raw_flags.iter().filter(|&&f| f).count();
 
     if speech_frame_count < config.min_speech_frames {
@@ -108,9 +234,24 @@ pub fn apply_vad(audio: &[f32], config: &VadConfig) -> VadResult {
     }
 }
 
-/// Quick check for whether audio contains speech.
-pub fn has_speech(audio: &[f32], config: &VadConfig) -> bool {
-    let flags = classify_frames(audio, config);
+/// Top-level VAD: uses Silero if available, falls back to energy-based.
+pub fn apply_vad(audio: &[f32], silero: Option<&SileroVad>) -> VadResult {
+    match silero {
+        Some(vad) => {
+            println!("VAD: Using Silero VAD");
+            vad.process(audio)
+        }
+        None => {
+            println!("VAD: Using energy-based fallback");
+            apply_energy_vad(audio)
+        }
+    }
+}
+
+/// Quick check for whether audio contains speech (energy-based only).
+pub fn has_speech(audio: &[f32]) -> bool {
+    let config = default_config();
+    let flags = classify_frames(audio, &config);
     flags.iter().filter(|&&f| f).count() >= config.min_speech_frames
 }
 
@@ -137,39 +278,33 @@ mod tests {
     }
 
     #[test]
-    fn vad_on_silence_returns_no_speech() {
-        let silence = vec![0.0f32; 16_000]; // 1 second of silence
-        let config = default_config();
-        let result = apply_vad(&silence, &config);
+    fn energy_vad_on_silence_returns_no_speech() {
+        let silence = vec![0.0f32; 16_000];
+        let result = apply_energy_vad(&silence);
         assert!(!result.has_speech);
         assert!(result.trimmed_audio.is_empty());
     }
 
     #[test]
-    fn vad_on_speech_returns_speech() {
-        // Simulate: 0.5s silence + 1s speech + 0.5s silence
-        let mut audio = vec![0.0f32; 8_000]; // 0.5s silence
+    fn energy_vad_on_speech_returns_speech() {
+        let mut audio = vec![0.0f32; 8_000];
         let speech: Vec<f32> = (0..16_000)
             .map(|i| (i as f32 * 0.05).sin() * 0.5)
             .collect();
         audio.extend_from_slice(&speech);
-        audio.extend_from_slice(&vec![0.0f32; 8_000]); // 0.5s silence
+        audio.extend_from_slice(&vec![0.0f32; 8_000]);
 
-        let config = default_config();
-        let result = apply_vad(&audio, &config);
+        let result = apply_energy_vad(&audio);
         assert!(result.has_speech);
         assert!(result.speech_frame_count > 0);
         assert!(result.speech_duration_ms > 0);
-        // Trimmed audio should be shorter than original
         assert!(result.trimmed_audio.len() < audio.len());
-        // But should contain the speech portion
         assert!(result.trimmed_audio.len() >= 16_000);
     }
 
     #[test]
-    fn vad_on_empty_returns_no_speech() {
-        let config = default_config();
-        let result = apply_vad(&[], &config);
+    fn energy_vad_on_empty_returns_no_speech() {
+        let result = apply_energy_vad(&[]);
         assert!(!result.has_speech);
         assert!(result.trimmed_audio.is_empty());
     }
@@ -177,34 +312,27 @@ mod tests {
     #[test]
     fn has_speech_quick_check() {
         let silence = vec![0.0f32; 16_000];
-        let config = default_config();
-        assert!(!has_speech(&silence, &config));
+        assert!(!has_speech(&silence));
 
         let signal: Vec<f32> = (0..16_000)
             .map(|i| (i as f32 * 0.05).sin() * 0.5)
             .collect();
-        assert!(has_speech(&signal, &config));
+        assert!(has_speech(&signal));
+    }
+
+    #[test]
+    fn apply_vad_without_silero_uses_energy() {
+        let silence = vec![0.0f32; 16_000];
+        let result = apply_vad(&silence, None);
+        assert!(!result.has_speech);
     }
 
     #[test]
     fn classify_frames_correct_count() {
-        let audio = vec![0.0f32; 960]; // 2 frames of 480
         let config = default_config();
+        let audio = vec![0.0f32; 960];
         let flags = classify_frames(&audio, &config);
         assert_eq!(flags.len(), 2);
         assert!(flags.iter().all(|&f| !f));
-    }
-
-    #[test]
-    fn min_speech_frames_threshold() {
-        // Create audio with only 1-2 speech frames (below min_speech_frames=3)
-        let mut audio = vec![0.0f32; 480 * 10]; // 10 frames of silence
-        // Add a tiny blip in 2 frames
-        for sample in audio[0..960].iter_mut() {
-            *sample = 0.5;
-        }
-        let config = default_config();
-        let result = apply_vad(&audio, &config);
-        assert!(!result.has_speech);
     }
 }

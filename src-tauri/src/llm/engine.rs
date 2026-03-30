@@ -9,7 +9,7 @@ use mistralrs::{GgufModelBuilder, Model, RequestBuilder, TextMessageRole, TextMe
 use crate::error::LocalYapperError;
 
 /// Expected filename for the bundled LLM GGUF model.
-pub const LLM_MODEL_FILENAME: &str = "qwen3-0.6b-q4_k_m.gguf";
+pub const LLM_MODEL_FILENAME: &str = "qwen2.5-1.5b-instruct-q4_k_m.gguf";
 
 /// Expected filename for the tokenizer (downloaded alongside the GGUF).
 pub const LLM_TOKENIZER_FILENAME: &str = "tokenizer.json";
@@ -97,7 +97,7 @@ mod tests {
 
     #[test]
     fn model_filename_is_correct() {
-        assert_eq!(LLM_MODEL_FILENAME, "qwen3-0.6b-q4_k_m.gguf");
+        assert_eq!(LLM_MODEL_FILENAME, "qwen2.5-1.5b-instruct-q4_k_m.gguf");
     }
 
     #[test]
