@@ -349,7 +349,7 @@ npm run tauri dev                                   # Full dev mode
 
 ## Contributing
 
-Contributions welcome! Open an [issue](https://github.com/chaitanyarahalkar/localyapper/issues) or submit a pull request.
+Contributions welcome! Open an [issue](https://github.com/chayprabs/localyapper/issues) or submit a pull request.
 
 ---
 
@@ -357,8 +357,8 @@ Contributions welcome! Open an [issue](https://github.com/chaitanyarahalkar/loca
 
 Built by **Chaitanya Rahalkar**.
 
-- Twitter: [@chabornstocode](https://x.com/chabornstocode)
-- LinkedIn: [chaitanya-rahalkar](https://linkedin.com/in/chaitanya-rahalkar)
+- Twitter: [@chayprabs](https://x.com/chayprabs)
+- LinkedIn: [Chaitanya Prabuddha](https://www.linkedin.com/in/chaitanya-prabuddha-bits94/)
 - Email: chaitanyaplusplus@gmail.com
 
 ---
@@ -368,5 +368,5 @@ Built by **Chaitanya Rahalkar**.
 [MIT](LICENSE) -- use it, fork it, ship it.
 
 <p align="center">
-  <sub>Built with Rust, React, and mass amounts of caffeine. Entirely vibe-coded with <a href="https://claude.ai/code">Claude Code</a>.</sub>
+  <sub>Built with Rust, React, and mass amounts of caffeine. Entirely vibe-coded with lots of hardwork & Claude Code</a>.</sub>
 </p>
