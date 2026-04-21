@@ -2,8 +2,7 @@
 use std::path::Path;
 
 use sherpa_onnx::{
-    OfflineModelConfig, OfflineNemoEncDecCtcModelConfig, OfflineRecognizer,
-    OfflineRecognizerConfig,
+    OfflineModelConfig, OfflineNemoEncDecCtcModelConfig, OfflineRecognizer, OfflineRecognizerConfig,
 };
 
 use crate::error::LocalYapperError;
@@ -194,14 +193,8 @@ mod tests {
 
     #[test]
     fn model_dir_names_are_correct() {
-        assert_eq!(
-            stt_model_dir_name("parakeet-110m"),
-            "parakeet-tdt-ctc-110m"
-        );
-        assert_eq!(
-            stt_model_dir_name("parakeet-0.6b"),
-            "parakeet-tdt-0.6b-v2"
-        );
+        assert_eq!(stt_model_dir_name("parakeet-110m"), "parakeet-tdt-ctc-110m");
+        assert_eq!(stt_model_dir_name("parakeet-0.6b"), "parakeet-tdt-0.6b-v2");
         assert_eq!(stt_model_dir_name("base.en"), "whisper-base.en");
     }
 

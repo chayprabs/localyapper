@@ -14,7 +14,7 @@
   },
   "app": {
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://localhost:* https://api.openai.com https://api.anthropic.com https://api.groq.com https://api.github.com; img-src 'self' asset: https://asset.localhost; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; connect-src 'self'; img-src 'self' asset: https://asset.localhost; style-src 'self' 'unsafe-inline'"
     },
     "windows": [
       {

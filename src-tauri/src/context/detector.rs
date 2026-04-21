@@ -105,10 +105,17 @@ fn get_process_name_windows() -> String {
     let mut len = buf.len() as u32;
     // SAFETY: QueryFullProcessImageNameW writes into our stack buffer with bounded length.
     let ok = unsafe {
-        QueryFullProcessImageNameW(handle, PROCESS_NAME_FORMAT(0), windows::core::PWSTR(buf.as_mut_ptr()), &mut len)
+        QueryFullProcessImageNameW(
+            handle,
+            PROCESS_NAME_FORMAT(0),
+            windows::core::PWSTR(buf.as_mut_ptr()),
+            &mut len,
+        )
     };
     // SAFETY: CloseHandle on a valid process handle.
-    unsafe { let _ = CloseHandle(handle); }
+    unsafe {
+        let _ = CloseHandle(handle);
+    }
 
     if ok.is_err() || len == 0 {
         return "Unknown".to_string();
@@ -133,7 +140,11 @@ fn get_app_name_macos() -> String {
     match output {
         Ok(out) if out.status.success() => {
             let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if name.is_empty() { "Unknown".to_string() } else { name }
+            if name.is_empty() {
+                "Unknown".to_string()
+            } else {
+                name
+            }
         }
         _ => "Unknown".to_string(),
     }
@@ -162,7 +173,11 @@ fn get_process_name_linux() -> String {
             match std::fs::read_to_string(&comm_path) {
                 Ok(name) => {
                     let name = name.trim().to_string();
-                    if name.is_empty() { "Unknown".to_string() } else { name }
+                    if name.is_empty() {
+                        "Unknown".to_string()
+                    } else {
+                        name
+                    }
                 }
                 Err(_) => "Unknown".to_string(),
             }

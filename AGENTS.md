@@ -7,26 +7,34 @@ Windows 10+ / macOS 12+ / Linux (X11 + Wayland).
 License: MIT.
 
 ## Stack — exact versions, do not deviate
-- **Backend**: Tauri 2, Rust (stable 1.75+), rusqlite 0.31 (bundled), cpal 0.15, whisper-rs 0.16, mistralrs 0.7, tokio 1.x, serde, enigo 0.2
+- **Backend**: Tauri 2, Rust (stable 1.75+), rusqlite 0.31 (bundled), cpal 0.15, sherpa-onnx 1.12, tokio 1.x, serde, enigo 0.2
 - **Frontend**: React 19, TypeScript 5, Vite 5, Tailwind CSS 3, shadcn/ui, Jotai 2, Recharts 2
-- **IPC**: Tauri command system — frontend calls Rust via invoke() from @tauri-apps/api/core
+- **IPC**: Tauri command system — frontend calls Rust via `invoke()` from `@tauri-apps/api/core`
 
 ## Architecture
-- Two Tauri windows: "main" (settings app, 900×650) and "overlay" (floating pill, 320×80)
-- src-tauri/src/ — All Rust backend code
-- src/ — React/TypeScript frontend
-- All commands use #[tauri::command] and register in generate_handler![] in lib.rs
-- SQLite stores all data — 6 tables (transcription_history, corrections, personal_dictionary, modes, app_profiles, settings)
+- Two Tauri windows: `main` (settings app, 900x650) and `overlay` (floating pill)
+- `src-tauri/src/` — all Rust backend code
+- `src/` — React/TypeScript frontend
+- All commands use `#[tauri::command]` and register in `generate_handler![]` in `lib.rs`
+- SQLite stores app data in 4 active tables: `transcription_history`, `corrections`, `personal_dictionary`, `settings`
 - No cloud processing ever — everything local
 
 ## Voice pipeline data flow
-hotkey → audio/capture.rs (cpal 16kHz mono + 0.5s pre-roll) → audio/vad.rs (energy filter) → stt/whisper.rs (ggml-base.en.bin) → correction/engine.rs (dictionary lookup) → context/detector.rs (focused app) → llm/prompt.rs (mode system prompt) → llm/engine.rs (mistralrs) → injection/injector.rs (clipboard save → paste → restore) → text appears in app
+`hotkey -> audio/capture.rs -> audio/vad.rs -> stt/whisper.rs -> correction/engine.rs -> injection/injector.rs -> text appears in app`
 
-## Models — FINAL, never change
-- STT: ggml-base.en.bin downloaded to app data dir on first launch (~148MB)
-- LLM: Qwen3-0.6B-Q4_K_M.gguf downloaded to app data dir on first launch (~397MB)
-- LLM runtime: mistralrs crate (Candle backend, no Ollama dependency)
-- BYOK alternative: OpenAI / Anthropic / Groq via user API key
+Current pipeline details:
+- Capture: `cpal` 16kHz mono with pre-roll
+- VAD: Silero VAD when available, energy fallback otherwise
+- STT: Parakeet via `sherpa-onnx`
+- Cleanup: correction engine only
+- Injection: clipboard save -> paste simulation -> clipboard restore
+
+## Models
+- STT: Parakeet speech model downloaded to app data directory
+- VAD: Silero VAD model downloaded alongside the speech model
+- No local LLM
+- No Ollama integration
+- No BYOK/API-key cleanup path
 
 ## Session limits
 - Max recording: 120 seconds
@@ -35,48 +43,42 @@ hotkey → audio/capture.rs (cpal 16kHz mono + 0.5s pre-roll) → audio/vad.rs (
 - Auto-inject delay: 10 seconds after transcription complete
 
 ## Commands
-- npm run dev — Vite dev server
-- npm run tauri dev — full Tauri dev mode
-- npm run build — production build
-- cargo test --manifest-path src-tauri/Cargo.toml — Rust tests
-- npm run lint — ESLint
-- cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings — Rust linter
+- `npm run dev` — Vite dev server
+- `npm run tauri dev` — full Tauri dev mode
+- `npm run build` — production build
+- `cargo test --manifest-path src-tauri/Cargo.toml` — Rust tests
+- `npm run lint` — ESLint
+- `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` — Rust linter
 
 ## Verification — ALWAYS run after changes
-1. Frontend: npm run lint && npx tsc --noEmit
-2. Backend: cd src-tauri && cargo clippy -- -D warnings
+1. Frontend: `npm run lint && npx tsc --noEmit`
+2. Backend: `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings`
 3. Run relevant tests for changed code
 
 ## Implementation phases
-18 phases total. See docs/PROGRESS.md for current phase.
-ALWAYS read docs/PROGRESS.md before starting ANY work.
-IMPORTANT: Only work on the CURRENT phase. Never skip ahead.
-
-## Instance coordination
-Two Codex instances may be active on this repo:
-- **Bedrock instance**: Primary coder. Handles all heavy implementation work (Rust AND React). Does the building.
-- **Pro instance**: Reviewer and helper. Quick questions, code reviews, small fixes, explanations. Lightweight tasks only.
-Both instances can touch any file. If both are running, check with the user before making large changes to avoid conflicts.
+18 phases total. See `docs/PROGRESS.md` for the current phase.
+Always read `docs/PROGRESS.md` before starting work.
+Only work on the current phase unless the user explicitly redirects you.
 
 ## Critical rules — NEVER break these
-- NEVER modify main.rs directly — only modify lib.rs
-- All commands must register in generate_handler![] macro
-- IPC permissions must be in src-tauri/capabilities/
-- rusqlite must use bundled feature — never system SQLite
-- Text injection = clipboard save → paste simulation → clipboard restore
+- NEVER modify `main.rs` directly — only modify `lib.rs`
+- All commands must register in `generate_handler![]`
+- IPC permissions must be in `src-tauri/capabilities/`
+- `rusqlite` must use bundled feature — never system SQLite
+- Text injection = clipboard save -> paste simulation -> clipboard restore
 - No cloud processing ever — everything local
-- No unwrap() in production Rust code — use ? operator
+- No `unwrap()` in production Rust code — use `?` or explicit handling
 - No `any` type in TypeScript — strict mode always
-- Windows, macOS, Linux are ALL first-class platforms
-- Audio is NEVER written to disk — RAM only during processing
-- BYOK API keys stored encrypted, never logged
+- Windows, macOS, Linux are all first-class platforms
+- Audio is never written to disk — RAM only during processing
+- Do not reintroduce Ollama, BYOK, or local LLM cleanup paths unless the user explicitly asks for them
 
 ## Design system
-- See DESIGN_SYSTEM.md for all colors, typography, spacing, component specs
+- See `DESIGN_SYSTEM.md` for colors, typography, spacing, and component specs
 - Light mode only
-- Apple macOS HIG design language (macOS Ventura System Settings as gold standard)
-- Primary accent: #0058bc
+- Apple macOS HIG design language
+- Primary accent: `#0058bc`
 - Font: SF Pro / Inter, two weights only: 400 regular, 600 bold
 
 ## Current status
-Fresh repo. Starting Phase 1 — Foundation.
+Phase 17 complete. The current app is speech-recognition-only plus correction learning.

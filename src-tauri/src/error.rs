@@ -23,13 +23,9 @@ pub enum LocalYapperError {
     #[error("Audio error: {0}")]
     AudioError(String),
 
-    /// Whisper model load or inference failure.
+    /// Speech model load or inference failure.
     #[error("Transcription error: {0}")]
     TranscriptionError(String),
-
-    /// mistral.rs model load, tokenizer, or generation failure.
-    #[error("LLM error: {0}")]
-    LlmError(String),
 
     /// Clipboard or keyboard simulation failure during text injection.
     #[error("Injection error: {0}")]

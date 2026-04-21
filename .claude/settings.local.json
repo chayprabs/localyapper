@@ -112,7 +112,8 @@
       "Bash(powershell -Command \"Get-Process -ErrorAction SilentlyContinue | Where-Object { \\\\$_.ProcessName -match 'wispr|flow' } | Select-Object ProcessName,Path | Format-List\")",
       "Read(//c/Users/chait/Project/localyapper/$LOCALAPPDATA/WisprFlow/app-1.4.604/resources/**)",
       "Read(//c/Users/chait/Project/localyapper/$LOCALAPPDATA/WisprFlow/app-1.4.604/resources/Release/**)",
-      "Read(//c/Users/chait/Project/localyapper/$LOCALAPPDATA/WisprFlow/**)"
+      "Read(//c/Users/chait/Project/localyapper/$LOCALAPPDATA/WisprFlow/**)",
+      "mcp__github__get_file_contents"
     ]
   }
 }

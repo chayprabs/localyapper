@@ -7,80 +7,44 @@ Windows 10+ / macOS 12+ / Linux (X11 + Wayland).
 License: MIT.
 
 ## Stack — exact versions, do not deviate
-- **Backend**: Tauri 2, Rust (stable 1.75+), rusqlite 0.31 (bundled), cpal 0.15, sherpa-onnx 1.12 (Parakeet STT + Silero VAD), mistralrs 0.7, tokio 1.x, serde, enigo 0.2
+- **Backend**: Tauri 2, Rust (stable 1.75+), rusqlite 0.31 (bundled), cpal 0.15, sherpa-onnx 1.12, tokio 1.x, serde, enigo 0.2
 - **Frontend**: React 19, TypeScript 5, Vite 5, Tailwind CSS 3, shadcn/ui, Jotai 2, Recharts 2
-- **IPC**: Tauri command system — frontend calls Rust via invoke() from @tauri-apps/api/core
+- **IPC**: Tauri command system — frontend calls Rust via `invoke()` from `@tauri-apps/api/core`
 
 ## Architecture
-- Two Tauri windows: "main" (settings app, 900×650) and "overlay" (floating pill, 320×80)
-- src-tauri/src/ — All Rust backend code
-- src/ — React/TypeScript frontend
-- All commands use #[tauri::command] and register in generate_handler![] in lib.rs
-- SQLite stores all data — 6 tables (transcription_history, corrections, personal_dictionary, modes, app_profiles, settings)
+- Two Tauri windows: `main` (settings app) and `overlay` (floating pill)
+- `src-tauri/src/` — all Rust backend code
+- `src/` — React/TypeScript frontend
+- All commands use `#[tauri::command]` and register in `generate_handler![]` in `lib.rs`
+- SQLite stores active app data in `transcription_history`, `corrections`, `personal_dictionary`, and `settings`
 - No cloud processing ever — everything local
 
 ## Voice pipeline data flow
-hotkey → audio/capture.rs (cpal 16kHz mono + 0.5s pre-roll) → audio/vad.rs (Silero VAD via sherpa-onnx, energy fallback) → stt/whisper.rs (Parakeet 110M INT8 via sherpa-onnx OfflineRecognizer) → correction/engine.rs (dictionary lookup) → context/detector.rs (focused app) → llm/prompt.rs (mode system prompt) → llm/engine.rs (mistralrs, Qwen2.5-1.5B) → injection/injector.rs (clipboard save → paste → restore) → text appears in app
-- Casual mode: STT output used directly (skip LLM — Parakeet provides punctuation + capitalization)
-- Other modes (Formal, Code, Translate): LLM processes STT output for tone/style adjustment
+`hotkey -> audio/capture.rs -> audio/vad.rs -> stt/whisper.rs -> correction/engine.rs -> injection/injector.rs -> text appears in app`
+
+Notes:
+- Silero VAD is optional and falls back to energy-based filtering
+- Correction learning still runs after successful dictations
+- There is no LLM cleanup stage in the current product
 
 ## Models
-- STT: Parakeet TDT-CTC 110M INT8 via sherpa-onnx (~120MB, 2.4% WER, native punctuation + capitalization)
-- VAD: Silero VAD via sherpa-onnx (~2MB, energy-based fallback if missing)
-- LLM: Qwen2.5-1.5B-Instruct Q4_K_M GGUF via mistralrs (~1.0GB)
-- LLM runtime: mistralrs crate (Candle backend, no Ollama dependency)
-- BYOK alternative: OpenAI / Anthropic / Groq via user API key
-- STT models stored in subdirectories: models/parakeet-tdt-ctc-110m-int8/ (model.int8.onnx + tokens.txt)
-
-## Session limits
-- Max recording: 120 seconds
-- Warning state at 105 seconds (last 15s = red countdown)
-- Overlay countdown timer: max 15s safety cap
-- Auto-inject delay: 10 seconds after transcription complete
-
-## Commands
-- npm run dev — Vite dev server
-- npm run tauri dev — full Tauri dev mode
-- npm run build — production build
-- cargo test --manifest-path src-tauri/Cargo.toml — Rust tests
-- npm run lint — ESLint
-- cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings — Rust linter
+- STT: Parakeet via `sherpa-onnx`
+- VAD: Silero VAD
+- No local LLM
+- No Ollama
+- No BYOK/API-key cleanup path
 
 ## Verification — ALWAYS run after changes
-1. Frontend: npm run lint && npx tsc --noEmit
-2. Backend: cd src-tauri && cargo clippy -- -D warnings
+1. Frontend: `npm run lint && npx tsc --noEmit`
+2. Backend: `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings`
 3. Run relevant tests for changed code
 
-## Implementation phases
-18 phases total. See docs/PROGRESS.md for current phase.
-ALWAYS read docs/PROGRESS.md before starting ANY work.
-IMPORTANT: Only work on the CURRENT phase. Never skip ahead.
-
-## Instance coordination
-Two Claude Code instances may be active on this repo:
-- **Bedrock instance**: Primary coder. Handles all heavy implementation work (Rust AND React). Does the building.
-- **Pro instance**: Reviewer and helper. Quick questions, code reviews, small fixes, explanations. Lightweight tasks only.
-Both instances can touch any file. If both are running, check with the user before making large changes to avoid conflicts.
-
-## Critical rules — NEVER break these
-- NEVER modify main.rs directly — only modify lib.rs
-- All commands must register in generate_handler![] macro
-- IPC permissions must be in src-tauri/capabilities/
-- rusqlite must use bundled feature — never system SQLite
-- Text injection = clipboard save → paste simulation → clipboard restore
-- No cloud processing ever — everything local
-- No unwrap() in production Rust code — use ? operator
-- No `any` type in TypeScript — strict mode always
-- Windows, macOS, Linux are ALL first-class platforms
-- Audio is NEVER written to disk — RAM only during processing
-- BYOK API keys stored encrypted, never logged
-
-## Design system
-- See DESIGN_SYSTEM.md for all colors, typography, spacing, component specs
-- Light mode only
-- Apple macOS HIG design language (macOS Ventura System Settings as gold standard)
-- Primary accent: #0058bc
-- Font: SF Pro / Inter, two weights only: 400 regular, 600 bold
+## Critical rules
+- NEVER modify `main.rs` directly — only `lib.rs`
+- `rusqlite` must use bundled feature
+- Text injection must remain clipboard save -> paste -> restore
+- Audio is never written to disk
+- Do not reintroduce LLM/Ollama/BYOK paths unless explicitly requested
 
 ## Current status
-Phase 17 complete. STT upgraded to sherpa-onnx + Parakeet, LLM upgraded to Qwen2.5-1.5B.
+Phase 17 complete. The shipped app is now STT + correction only.

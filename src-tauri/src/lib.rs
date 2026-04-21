@@ -8,62 +8,71 @@ mod db;
 mod error;
 mod hotkey;
 mod injection;
-mod llm;
 mod models;
-mod stt;
 mod state;
+mod stt;
 mod tray;
 
 use audio::capture::AudioRecorder;
 use audio::vad::SileroVad;
 use correction::engine::CorrectionEngine;
-use llm::engine::LlmEngine;
 use state::AppState;
-use stt::whisper::WhisperEngine;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
+use stt::whisper::WhisperEngine;
 use tauri::Manager;
 
 /// Candidate directories where the STT model might be found.
 ///
 /// Checks for the selected model first, then falls back to the default Parakeet model.
-pub(crate) fn whisper_model_candidates(app: &tauri::AppHandle, model_setting: &str) -> Vec<std::path::PathBuf> {
+pub(crate) fn speech_model_candidates(
+    app: &tauri::AppHandle,
+    model_setting: &str,
+) -> Vec<std::path::PathBuf> {
     let models_dir = match app.path().app_data_dir() {
         Ok(d) => d.join("models"),
         Err(_) => return vec![],
     };
 
     let primary = models_dir.join(stt::whisper::stt_model_dir_name(model_setting));
-
-    // Fallback: if selected model isn't found, try the default parakeet-110m
     let fallback = if model_setting != stt::whisper::DEFAULT_WHISPER_MODEL {
-        Some(models_dir.join(stt::whisper::stt_model_dir_name(stt::whisper::DEFAULT_WHISPER_MODEL)))
+        Some(models_dir.join(stt::whisper::stt_model_dir_name(
+            stt::whisper::DEFAULT_WHISPER_MODEL,
+        )))
     } else {
         None
     };
 
     let mut candidates = vec![primary];
-    if let Some(fb) = fallback {
-        candidates.push(fb);
+    if let Some(fallback) = fallback {
+        candidates.push(fallback);
     }
     candidates
 }
 
-
 /// Attempt to load the STT model by scanning candidate directories.
-/// Reads the `whisper_model` setting from DB to determine which model to load.
+/// Reads the `speech_model` setting from DB to determine which model to load.
 /// Returns `None` with a warning log if the model is not found or fails to load.
-fn load_whisper_model(app: &tauri::App, conn: &rusqlite::Connection) -> Option<Arc<WhisperEngine>> {
-    let model_setting = db::queries::get_setting(conn, "whisper_model")
+fn load_speech_model(app: &tauri::App, conn: &rusqlite::Connection) -> Option<Arc<WhisperEngine>> {
+    let model_setting = db::queries::get_setting(conn, "speech_model")
         .unwrap_or_else(|_| stt::whisper::DEFAULT_WHISPER_MODEL.to_string());
 
-    let candidates = whisper_model_candidates(app.handle(), &model_setting);
-    println!("STT: Startup load — model setting='{}', candidates: {:?}",
-        model_setting, candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>());
+    let candidates = speech_model_candidates(app.handle(), &model_setting);
+    println!(
+        "STT: Startup load - model setting='{}', candidates: {:?}",
+        model_setting,
+        candidates
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+    );
 
     for candidate in &candidates {
         if candidate.exists() && candidate.is_dir() {
-            println!("STT: Found model dir at {}, loading...", candidate.display());
+            println!(
+                "STT: Found model dir at {}, loading...",
+                candidate.display()
+            );
             log::info!("Found STT model at {}", candidate.display());
             match WhisperEngine::new(candidate) {
                 Ok(engine) => {
@@ -73,7 +82,11 @@ fn load_whisper_model(app: &tauri::App, conn: &rusqlite::Connection) -> Option<A
                 }
                 Err(e) => {
                     println!("STT: Load FAILED from {}: {}", candidate.display(), e);
-                    log::warn!("Failed to load STT model from {}: {}", candidate.display(), e);
+                    log::warn!(
+                        "Failed to load STT model from {}: {}",
+                        candidate.display(),
+                        e
+                    );
                 }
             }
         } else {
@@ -81,7 +94,7 @@ fn load_whisper_model(app: &tauri::App, conn: &rusqlite::Connection) -> Option<A
         }
     }
 
-    println!("STT: No model loaded — STT unavailable until downloaded");
+    println!("STT: No model loaded - STT unavailable until downloaded");
     log::warn!(
         "STT model ({}) not found. STT will be unavailable until the model is downloaded.",
         stt::whisper::stt_model_dir_name(&model_setting)
@@ -89,19 +102,23 @@ fn load_whisper_model(app: &tauri::App, conn: &rusqlite::Connection) -> Option<A
     None
 }
 
-
 /// Send a system notification via tauri-plugin-notification.
 fn send_notification(handle: &tauri::AppHandle, title: &str, body: &str) {
     use tauri_plugin_notification::NotificationExt;
-    if let Err(e) = handle.notification().builder().title(title).body(body).show() {
+    if let Err(e) = handle
+        .notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show()
+    {
         log::warn!("Failed to send notification: {e}");
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -118,20 +135,15 @@ pub fn run() {
                 .app_data_dir()
                 .expect("Failed to resolve app data directory");
 
-            let conn = db::open_database(&app_data_dir)
-                .expect("Failed to initialize database");
+            let conn = db::open_database(&app_data_dir).expect("Failed to initialize database");
 
-            // Load STT model at startup (sherpa-onnx + Parakeet).
-            let whisper = load_whisper_model(app, &conn);
+            let whisper = load_speech_model(app, &conn);
             if whisper.is_some() {
                 log::info!("STT model loaded at startup");
             } else {
-                log::warn!("STT model not found at startup — STT unavailable until downloaded");
+                log::warn!("STT model not found at startup - STT unavailable until downloaded");
             }
-            // LLM starts as None — loaded in background thread below.
-            let llm: Option<Arc<LlmEngine>> = None;
 
-            // Initialize correction engine
             let correction_engine = Arc::new(CorrectionEngine::new());
             let threshold: f64 = db::queries::get_setting(&conn, "confidence_threshold")
                 .ok()
@@ -141,9 +153,10 @@ pub fn run() {
                 log::warn!("Failed to load correction engine: {e}");
             }
 
-            // Load Silero VAD model (optional — falls back to energy-based if missing)
             let silero_vad = {
-                let vad_path = app_data_dir.join("models").join(stt::whisper::SILERO_VAD_FILENAME);
+                let vad_path = app_data_dir
+                    .join("models")
+                    .join(stt::whisper::SILERO_VAD_FILENAME);
                 if vad_path.exists() {
                     match SileroVad::new(&vad_path) {
                         Ok(vad) => {
@@ -157,7 +170,10 @@ pub fn run() {
                         }
                     }
                 } else {
-                    println!("VAD: Silero model not found at {}, using energy fallback", vad_path.display());
+                    println!(
+                        "VAD: Silero model not found at {}, using energy fallback",
+                        vad_path.display()
+                    );
                     None
                 }
             };
@@ -166,7 +182,6 @@ pub fn run() {
                 db: Arc::new(Mutex::new(conn)),
                 recorder: Arc::new(AudioRecorder::new()),
                 whisper: Arc::new(Mutex::new(whisper)),
-                llm: Arc::new(Mutex::new(llm)),
                 vad: Arc::new(Mutex::new(silero_vad)),
                 last_injection: Arc::new(Mutex::new(None)),
                 correction_engine,
@@ -174,73 +189,35 @@ pub fn run() {
                 paused: Arc::new(AtomicBool::new(false)),
             });
 
-            // Spawn background LLM loading (non-blocking, does not delay startup)
-            {
-                let handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    let start = std::time::Instant::now();
-                    let models_dir = match handle.path().app_data_dir() {
-                        Ok(d) => d.join("models"),
-                        Err(e) => {
-                            log::warn!("Cannot resolve app data dir for LLM: {e}");
-                            return;
-                        }
-                    };
-
-                    let gguf_path = models_dir.join(llm::engine::LLM_MODEL_FILENAME);
-                    let tokenizer_path = models_dir.join(llm::engine::LLM_TOKENIZER_FILENAME);
-
-                    if !gguf_path.exists() || !tokenizer_path.exists() {
-                        log::info!("LLM model files not found, skipping background load");
-                        // Notify user if Whisper is also missing
-                        let whisper_loaded = {
-                            let app_state = handle.state::<AppState>();
-                            app_state.whisper.lock().map(|g| g.is_some()).unwrap_or(false)
-                        };
-                        if whisper_loaded {
-                            send_notification(&handle, "LocalYapper", "STT ready \u{2014} download LLM in Settings for full cleanup");
-                        } else {
-                            send_notification(&handle, "LocalYapper", "Models not downloaded \u{2014} open Settings to get started");
-                        }
-                        return;
-                    }
-
-                    println!("LLM: Loading model in background...");
-                    match LlmEngine::new(&models_dir).await {
-                        Ok(engine) => {
-                            let app_state = handle.state::<AppState>();
-                            if let Ok(mut g) = app_state.llm.lock() {
-                                *g = Some(Arc::new(engine));
-                            }
-                            println!("LLM: Model loaded at startup in {}ms", start.elapsed().as_millis());
-                            log::info!("LLM loaded in background in {}ms", start.elapsed().as_millis());
-
-                            // Check if both models are loaded and send notification
-                            let whisper_loaded = app_state.whisper.lock()
-                                .map(|g| g.is_some()).unwrap_or(false);
-                            if whisper_loaded {
-                                send_notification(&handle, "LocalYapper", "Ready \u{2014} voice dictation is active");
-                            }
-                        }
-                        Err(e) => {
-                            log::warn!("Background LLM load failed: {e}");
-                        }
-                    }
-                });
+            let speech_model_loaded = app
+                .state::<AppState>()
+                .whisper
+                .lock()
+                .map(|g| g.is_some())
+                .unwrap_or(false);
+            if speech_model_loaded {
+                send_notification(
+                    app.handle(),
+                    "LocalYapper",
+                    "Ready - voice dictation is active",
+                );
+            } else {
+                send_notification(
+                    app.handle(),
+                    "LocalYapper",
+                    "Speech model not downloaded - open Settings to get started",
+                );
             }
 
-            // Register global hotkeys (hold-to-talk, cancel, paste-last, open-app)
             match hotkey::manager::register_hotkeys(app.handle()) {
                 Ok(()) => println!("STARTUP: Hotkeys registered successfully"),
                 Err(e) => println!("STARTUP: FAILED to register hotkeys: {e}"),
             }
 
-            // Setup system tray icon and menu
             if let Err(e) = tray::setup_tray(app) {
                 log::error!("Failed to setup system tray: {e}");
             }
 
-            // Enable autostart by default (user can toggle off via tray menu)
             {
                 use tauri_plugin_autostart::ManagerExt;
                 let manager = app.autolaunch();
@@ -265,34 +242,18 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            // Recording & pipeline (6)
             commands::recording::start_recording,
             commands::recording::stop_recording,
             commands::recording::run_pipeline,
             commands::recording::inject_text,
             commands::recording::paste_last,
             commands::recording::cancel_recording,
-            // Model management (12)
-            commands::models::check_ollama,
-            commands::models::download_model,
-            commands::models::download_whisper_model,
+            commands::models::download_speech_model,
             commands::models::cancel_model_download,
-            commands::models::get_ollama_models,
-            commands::models::test_byok_connection,
             commands::models::reload_models,
             commands::models::check_models_status,
-            commands::models::check_llm_file_exists,
-            commands::models::delete_llm_model,
-            commands::models::check_whisper_file_exists,
-            commands::models::delete_whisper_model,
-            // Modes (6)
-            commands::modes::get_modes,
-            commands::modes::create_mode,
-            commands::modes::update_mode,
-            commands::modes::delete_mode,
-            commands::modes::set_active_mode,
-            commands::modes::get_active_mode,
-            // Corrections (7)
+            commands::models::check_speech_model_file_exists,
+            commands::models::delete_speech_model,
             commands::corrections::get_corrections,
             commands::corrections::add_correction,
             commands::corrections::delete_correction,
@@ -300,19 +261,15 @@ pub fn run() {
             commands::corrections::import_dictionary,
             commands::corrections::get_corrections_count,
             commands::corrections::compute_training_diffs,
-            // History (4)
             commands::history::get_history,
             commands::history::delete_history_entry,
             commands::history::clear_history,
             commands::history::get_stats,
-            // Settings (3)
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::settings::get_all_settings,
-            // Hotkeys (2)
             commands::hotkeys::update_hotkey,
             commands::hotkeys::reset_hotkeys,
-            // System (5)
             commands::system::get_focused_app,
             commands::system::check_update,
             commands::system::check_permissions,

@@ -2,7 +2,6 @@
 use crate::audio::capture::AudioRecorder;
 use crate::audio::vad::SileroVad;
 use crate::correction::engine::CorrectionEngine;
-use crate::llm::engine::LlmEngine;
 use crate::stt::whisper::WhisperEngine;
 use rusqlite::Connection;
 use std::sync::atomic::AtomicBool;
@@ -16,8 +15,6 @@ pub struct AppState {
     pub recorder: Arc<AudioRecorder>,
     /// Hot-reloadable: locked briefly to clone the inner Arc, then released.
     pub whisper: Arc<Mutex<Option<Arc<WhisperEngine>>>>,
-    /// Hot-reloadable: locked briefly to clone the inner Arc, then released.
-    pub llm: Arc<Mutex<Option<Arc<LlmEngine>>>>,
     /// Silero VAD engine — loaded from models dir, optional (falls back to energy-based).
     pub vad: Arc<Mutex<Option<SileroVad>>>,
     /// Most recent injected text, used by paste_last command.

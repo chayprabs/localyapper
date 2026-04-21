@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use crate::error::LocalYapperError;
 
-/// Target sample rate for capture (16kHz for Whisper).
+/// Target sample rate for capture (16kHz for the local speech engine).
 pub const SAMPLE_RATE: u32 = 16_000;
 /// Mono channel.
 pub const CHANNELS: u16 = 1;
@@ -140,7 +140,12 @@ impl AudioRecorder {
             sample_rate: cpal::SampleRate(native_rate),
             buffer_size: cpal::BufferSize::Default,
         };
-        log::info!("Audio: native {}Hz {}ch, target {}Hz 1ch", native_rate, native_channels, SAMPLE_RATE);
+        log::info!(
+            "Audio: native {}Hz {}ch, target {}Hz 1ch",
+            native_rate,
+            native_channels,
+            SAMPLE_RATE
+        );
 
         let buffer = Arc::clone(&self.buffer);
         let stop_signal = Arc::clone(&self.stop_signal);

@@ -6,10 +6,7 @@ use crate::state::AppState;
 
 /// Gets a single setting value by key.
 #[tauri::command]
-pub async fn get_setting(
-    state: tauri::State<'_, AppState>,
-    key: String,
-) -> Result<String, String> {
+pub async fn get_setting(state: tauri::State<'_, AppState>, key: String) -> Result<String, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     queries::get_setting(&conn, &key).map_err(|e| e.to_string())
 }

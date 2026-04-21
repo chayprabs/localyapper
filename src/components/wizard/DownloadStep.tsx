@@ -1,82 +1,56 @@
-// Wizard download step -- progress bars for Whisper and LLM downloads
-import { useEffect, useRef, useState } from "react";
+// Wizard download step -- progress bar for the speech model download
+import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { DownloadProgress } from "@/types/commands";
 
-/** Approximate Parakeet 110M FP32 model size for progress bar calculation. */
-const WHISPER_SIZE_MB = 458;
-/** Combined download size: Parakeet 110M (458MB) + Qwen2.5 1.5B Q4 (1024MB). */
-const TOTAL_SIZE_MB = 1482;
+const TOTAL_SIZE_MB = 458;
 
 export function DownloadStep({
+  downloadProgress,
   downloadError,
   onProgress,
-  onError,
   onStartDownload,
   onCancel,
 }: {
   downloadProgress: DownloadProgress | null;
   downloadError: string | null;
   onProgress: (progress: DownloadProgress) => void;
-  onError: (error: string) => void;
   onStartDownload: () => Promise<void>;
   onCancel: () => void;
 }) {
   const startedRef = useRef(false);
-  const [combinedMb, setCombinedMb] = useState(0);
-  const [speedMbps, setSpeedMbps] = useState(0);
 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    let unlistenWhisperFn: (() => void) | null = null;
-    let unlistenLlmFn: (() => void) | null = null;
+    let unlistenFn: (() => void) | null = null;
 
     async function run() {
-      // Register listeners FIRST and wait for them to be ready
-      unlistenWhisperFn = await listen<DownloadProgress>(
-        "whisper_download_progress",
+      unlistenFn = await listen<DownloadProgress>(
+        "speech_model_download_progress",
         (event) => {
-          setCombinedMb(event.payload.downloaded_mb);
-          setSpeedMbps(event.payload.speed_mbps);
-          onProgress(event.payload);
-        },
-      );
-      unlistenLlmFn = await listen<DownloadProgress>(
-        "model_download_progress",
-        (event) => {
-          setCombinedMb(WHISPER_SIZE_MB + event.payload.downloaded_mb);
-          setSpeedMbps(event.payload.speed_mbps);
           onProgress(event.payload);
         },
       );
 
-      // NOW start the download
-      onStartDownload().catch((e) => {
-        onError(
-          typeof e === "string"
-            ? e
-            : e instanceof Error
-              ? e.message
-              : "Download failed",
-        );
-      });
+      void onStartDownload();
     }
 
-    run();
+    void run();
 
     return () => {
-      unlistenWhisperFn?.();
-      unlistenLlmFn?.();
+      unlistenFn?.();
     };
-  }, [onProgress, onError, onStartDownload]);
+  }, [onProgress, onStartDownload]);
 
-  const percent = TOTAL_SIZE_MB > 0 ? (combinedMb / TOTAL_SIZE_MB) * 100 : 0;
+  const percent = downloadProgress?.percent ?? 0;
+  const downloadedMb = downloadProgress?.downloaded_mb ?? 0;
+  const totalMb = downloadProgress?.total_mb ?? TOTAL_SIZE_MB;
+  const speedMbps = downloadProgress?.speed_mbps ?? 0;
 
   return (
     <div className="flex flex-col items-center text-center">
-      {/* Animated icon */}
       <div className="w-14 h-14 bg-[#0058bc]/[0.08] rounded-full flex items-center justify-center mb-5">
         <span className="material-symbols-outlined text-[28px] text-[#0058bc] animate-pulse">
           download
@@ -84,15 +58,14 @@ export function DownloadStep({
       </div>
 
       <h2 className="text-[20px] font-semibold text-black/85 mb-1">
-        Downloading Models
+        Downloading Local Speech
       </h2>
       <p className="text-[13px] text-black/50 mb-6">
         {downloadError
           ? "Download failed"
-          : `${combinedMb.toFixed(0)} MB / ${TOTAL_SIZE_MB > 0 ? TOTAL_SIZE_MB.toFixed(0) : "?"} MB`}
+          : `${downloadedMb.toFixed(0)} MB / ${totalMb.toFixed(0)} MB`}
       </p>
 
-      {/* Progress bar */}
       <div className="w-full h-2 rounded-full bg-black/[0.06] mb-2">
         <div
           className="h-full rounded-full bg-[#0058bc] transition-all duration-300"
@@ -117,9 +90,7 @@ export function DownloadStep({
           <button
             onClick={() => {
               startedRef.current = false;
-              onStartDownload().catch((e) =>
-                onError(e instanceof Error ? e.message : "Download failed"),
-              );
+              void onStartDownload();
             }}
             className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 transition-all"
           >

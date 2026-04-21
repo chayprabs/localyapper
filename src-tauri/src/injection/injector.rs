@@ -36,8 +36,8 @@ fn inject_native(text: &str, auto_send: bool, platform: Platform) -> Result<(), 
         .map_err(|e| format!("Clipboard set failed: {e}"))?;
 
     // Simulate paste keystroke
-    let mut enigo = Enigo::new(&Settings::default())
-        .map_err(|e| format!("Enigo init failed: {e}"))?;
+    let mut enigo =
+        Enigo::new(&Settings::default()).map_err(|e| format!("Enigo init failed: {e}"))?;
 
     let modifier = match platform {
         Platform::MacOS => Key::Meta,
@@ -82,7 +82,13 @@ fn inject_x11(text: &str, auto_send: bool) -> Result<(), String> {
         .args(["-selection", "clipboard", "-o"])
         .output()
         .ok()
-        .and_then(|o| if o.status.success() { String::from_utf8(o.stdout).ok() } else { None });
+        .and_then(|o| {
+            if o.status.success() {
+                String::from_utf8(o.stdout).ok()
+            } else {
+                None
+            }
+        });
 
     // Set new text via xclip
     let mut child = Command::new("xclip")
@@ -97,7 +103,9 @@ fn inject_x11(text: &str, auto_send: bool) -> Result<(), String> {
             .write_all(text.as_bytes())
             .map_err(|e| format!("xclip write failed: {e}"))?;
     }
-    child.wait().map_err(|e| format!("xclip wait failed: {e}"))?;
+    child
+        .wait()
+        .map_err(|e| format!("xclip wait failed: {e}"))?;
 
     // Simulate Ctrl+V via xdotool
     Command::new("xdotool")
@@ -141,7 +149,13 @@ fn inject_wayland(text: &str, auto_send: bool) -> Result<(), String> {
         .arg("--no-newline")
         .output()
         .ok()
-        .and_then(|o| if o.status.success() { String::from_utf8(o.stdout).ok() } else { None });
+        .and_then(|o| {
+            if o.status.success() {
+                String::from_utf8(o.stdout).ok()
+            } else {
+                None
+            }
+        });
 
     // Set new text
     let mut child = Command::new("wl-copy")
@@ -155,7 +169,9 @@ fn inject_wayland(text: &str, auto_send: bool) -> Result<(), String> {
             .write_all(text.as_bytes())
             .map_err(|e| format!("wl-copy write failed: {e}"))?;
     }
-    child.wait().map_err(|e| format!("wl-copy wait failed: {e}"))?;
+    child
+        .wait()
+        .map_err(|e| format!("wl-copy wait failed: {e}"))?;
 
     // Simulate paste via wtype
     Command::new("wtype")

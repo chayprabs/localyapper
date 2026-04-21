@@ -1,6 +1,5 @@
 // IPC command handlers -- recording pipeline and text injection
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use tauri::Manager;
 
@@ -8,12 +7,10 @@ use crate::audio::vad;
 use crate::context::detector;
 use crate::correction::learner;
 use crate::db::queries;
-use crate::llm::engine::LlmEngine;
-use crate::llm::prompt;
 use crate::models::PipelineResult;
 use crate::state::AppState;
 
-/// Run the full voice pipeline: VAD -> STT -> Correction -> LLM.
+/// Run the full voice pipeline: VAD -> STT -> Correction.
 /// Does NOT inject or save to history — caller decides.
 /// Optional `app_handle` enables friendlier error messages (file-exists check).
 pub(crate) async fn execute_pipeline(
@@ -50,8 +47,12 @@ pub(crate) async fn execute_pipeline(
                 if let Ok(data_dir) = handle.path().app_data_dir() {
                     let models_dir = data_dir.join("models");
                     if std::fs::read_dir(&models_dir)
-                        .map(|entries| entries.filter_map(|e| e.ok())
-                            .any(|e| e.path().is_dir() && e.file_name().to_string_lossy().starts_with("parakeet")))
+                        .map(|entries| {
+                            entries.filter_map(|e| e.ok()).any(|e| {
+                                e.path().is_dir()
+                                    && e.file_name().to_string_lossy().starts_with("parakeet")
+                            })
+                        })
                         .unwrap_or(false)
                     {
                         return "STT model is still loading, please try again shortly".to_string();
@@ -66,13 +67,15 @@ pub(crate) async fn execute_pipeline(
 
     println!("STT: Transcribing...");
     let stt_start = Instant::now();
-    let raw_text = tokio::task::spawn_blocking(move || {
-        whisper.transcribe(&trimmed_audio)
-    })
-    .await
-    .map_err(|e| format!("Transcription task failed: {e}"))?
-    .map_err(|e| e.to_string())?;
-    println!("STT: Result: [{}] ({}ms)", raw_text, stt_start.elapsed().as_millis());
+    let raw_text = tokio::task::spawn_blocking(move || whisper.transcribe(&trimmed_audio))
+        .await
+        .map_err(|e| format!("Transcription task failed: {e}"))?
+        .map_err(|e| e.to_string())?;
+    println!(
+        "STT: Result: [{}] ({}ms)",
+        raw_text,
+        stt_start.elapsed().as_millis()
+    );
 
     let word_count = if raw_text.is_empty() {
         0
@@ -80,75 +83,16 @@ pub(crate) async fn execute_pipeline(
         raw_text.split_whitespace().count() as i64
     };
 
-    let corrected_text = state.correction_engine.apply(&raw_text)
+    let corrected_text = state
+        .correction_engine
+        .apply(&raw_text)
         .unwrap_or_else(|_| raw_text.clone());
-    println!("CORRECTION: Applied corrections, result: [{}]", corrected_text);
+    println!(
+        "CORRECTION: Applied corrections, result: [{}]",
+        corrected_text
+    );
 
-    // LLM cleanup step — skipped if no model or mode says skip_llm
-    let final_text = {
-        let llm_available = state.llm.lock()
-            .map(|g| g.is_some())
-            .unwrap_or(false);
-        let should_run_llm = llm_available && {
-            let db = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
-            match queries::get_active_mode(&db) {
-                Ok(mode) => !mode.skip_llm,
-                Err(_) => false,
-            }
-        };
-
-        if should_run_llm {
-            let llm: Arc<LlmEngine> = state.llm.lock()
-                .map_err(|e| format!("LLM lock error: {e}"))?
-                .as_ref().expect("checked above").clone();
-
-            let (system_prompt, mode_name) = {
-                let db = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
-                queries::get_active_mode(&db)
-                    .map(|m| (m.system_prompt, m.name))
-                    .unwrap_or_default()
-            };
-
-            let app_name = detector::get_focused_window_name();
-            let system_prompt_full = prompt::build_system_prompt(&system_prompt, &app_name);
-
-            println!("LLM: Processing with mode [{}]...", mode_name);
-            let llm_start = Instant::now();
-            match tokio::time::timeout(
-                Duration::from_secs(15),
-                llm.generate(&system_prompt_full, &corrected_text),
-            )
-            .await
-            {
-                Ok(Ok(llm_output)) if !llm_output.is_empty() => {
-                    println!("LLM: Result: [{}] ({}ms)", llm_output, llm_start.elapsed().as_millis());
-                    log::info!("LLM cleanup applied ({} -> {} chars)", corrected_text.len(), llm_output.len());
-                    llm_output
-                }
-                Ok(Ok(_)) => {
-                    println!("LLM: Empty response in {}ms, using corrected text", llm_start.elapsed().as_millis());
-                    corrected_text
-                }
-                Ok(Err(e)) => {
-                    println!("LLM: Failed in {}ms ({}), using corrected text", llm_start.elapsed().as_millis(), e);
-                    log::warn!("LLM generation failed, using corrected text: {e}");
-                    corrected_text
-                }
-                Err(_timeout) => {
-                    println!("LLM: Timed out after 15s, using corrected text");
-                    log::warn!("LLM generation timed out after 15s, using corrected text");
-                    corrected_text
-                }
-            }
-        } else {
-            if !llm_available {
-                println!("LLM: Skipped (model not loaded), using corrected text");
-            } else {
-                println!("LLM: Skipped (mode skip_llm=true), using corrected text");
-            }
-            corrected_text
-        }
-    };
+    let final_text = corrected_text;
 
     Ok(PipelineResult {
         final_text,
@@ -164,18 +108,11 @@ pub(crate) fn save_history_and_learn(state: &AppState, result: &PipelineResult, 
         return;
     }
 
-    // Save to history
-    let mode_id = {
-        let conn = state.db.lock().ok();
-        conn.and_then(|c| queries::get_active_mode(&c).ok().map(|m| m.id))
-    };
-
     let entry = crate::models::HistoryEntry {
         id: uuid::Uuid::new_v4().to_string(),
         raw_text: result.raw_text.clone(),
         final_text: result.final_text.clone(),
         app_name: Some(app_name.to_string()),
-        mode_id,
         duration_ms: Some(result.duration_ms),
         word_count: Some(result.word_count),
         created_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
@@ -201,9 +138,7 @@ pub(crate) fn save_history_and_learn(state: &AppState, result: &PipelineResult, 
 
 /// Start audio capture from the default microphone.
 #[tauri::command]
-pub async fn start_recording(
-    state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn start_recording(state: tauri::State<'_, AppState>) -> Result<(), String> {
     state.recorder.start().map_err(|e| e.to_string())
 }
 
@@ -255,18 +190,14 @@ pub async fn inject_text(
 
     let t = text;
     let s = hold_shift;
-    tokio::task::spawn_blocking(move || {
-        crate::injection::injector::inject(&t, s)
-    })
-    .await
-    .map_err(|e| format!("Injection task failed: {e}"))?
+    tokio::task::spawn_blocking(move || crate::injection::injector::inject(&t, s))
+        .await
+        .map_err(|e| format!("Injection task failed: {e}"))?
 }
 
 /// Re-inject the last dictated text.
 #[tauri::command]
-pub async fn paste_last(
-    state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn paste_last(state: tauri::State<'_, AppState>) -> Result<(), String> {
     let text = {
         let last = state
             .last_injection
@@ -277,11 +208,9 @@ pub async fn paste_last(
 
     match text {
         Some(t) if !t.is_empty() => {
-            tokio::task::spawn_blocking(move || {
-                crate::injection::injector::inject(&t, false)
-            })
-            .await
-            .map_err(|e| format!("Injection task failed: {e}"))?
+            tokio::task::spawn_blocking(move || crate::injection::injector::inject(&t, false))
+                .await
+                .map_err(|e| format!("Injection task failed: {e}"))?
         }
         _ => Err("No previous injection to paste".to_string()),
     }
@@ -289,8 +218,6 @@ pub async fn paste_last(
 
 /// Cancel ongoing recording and discard audio.
 #[tauri::command]
-pub async fn cancel_recording(
-    state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn cancel_recording(state: tauri::State<'_, AppState>) -> Result<(), String> {
     state.recorder.cancel().map_err(|e| e.to_string())
 }

@@ -1,6 +1,6 @@
-// Global application state atoms -- page navigation and model caches
+// Global application state atoms -- page navigation and speech model cache
 import { atom } from "jotai";
-import type { OllamaStatus, LlmFileStatus, WhisperFileStatus } from "@/types/commands";
+import type { SpeechModelFileStatus } from "@/types/commands";
 
 /** Five-page navigation enum — order matches sidebar nav items. */
 export type PageId = "dashboard" | "history" | "dictionary" | "hotkeys" | "models";
@@ -11,22 +11,14 @@ export const activePageAtom = atom<PageId>("dashboard");
 /** Sidebar collapse state — persisted in settings table as "sidebar_collapsed". */
 export const sidebarCollapsedAtom = atom<boolean>(false);
 
-// Models page cache — survives page switches so the Models tab re-renders instantly without refetching
 export interface ModelsSettingsCache {
-  whisperModel: string;
-  llmMode: string;
-  ollamaModel: string;
-  byokProvider: string;
-  byokApiKey: string;
+  speechModel: string;
 }
 
 export interface ModelStatusCache {
-  llmFileStatus: LlmFileStatus;
-  whisperFileStatus: WhisperFileStatus;
-  llmLoaded: boolean;
-  whisperLoaded: boolean;
+  speechModelFileStatus: SpeechModelFileStatus;
+  speechModelLoaded: boolean;
 }
 
 export const modelsSettingsCacheAtom = atom<ModelsSettingsCache | null>(null);
-export const ollamaStatusCacheAtom = atom<OllamaStatus | null>(null);
 export const modelStatusCacheAtom = atom<ModelStatusCache | null>(null);

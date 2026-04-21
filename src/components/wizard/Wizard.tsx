@@ -1,17 +1,13 @@
-// First-launch wizard -- 9-step onboarding flow for model setup
+// First-launch wizard -- onboarding flow for speech model setup
 import { useCallback } from "react";
 import { useSetAtom } from "jotai";
 import { setupCompleteAtom } from "@/stores/wizardStore";
 import { useWizard } from "@/hooks/useWizard";
-import { WelcomeStep } from "./WelcomeStep";
-import { ModelSelectionStep } from "./ModelSelectionStep";
-import { DownloadStep } from "./DownloadStep";
 import { DownloadCompleteStep } from "./DownloadCompleteStep";
-import { OllamaStep } from "./OllamaStep";
-import { ByokStep } from "./ByokStep";
-import { WhisperWarningStep } from "./WhisperWarningStep";
+import { DownloadStep } from "./DownloadStep";
 import { HotkeyStep } from "./HotkeyStep";
 import { ReadyStep } from "./ReadyStep";
+import { WelcomeStep } from "./WelcomeStep";
 
 export function Wizard() {
   const setSetupComplete = useSetAtom(setupCompleteAtom);
@@ -26,15 +22,8 @@ export function Wizard() {
       case "welcome":
         return (
           <WelcomeStep
-            onGetStarted={wizard.goToModelSelection}
+            onGetStarted={wizard.goToDownload}
             onSkip={wizard.skipSetup}
-          />
-        );
-      case "model-selection":
-        return (
-          <ModelSelectionStep
-            onSelect={wizard.selectModelAndContinue}
-            onBack={wizard.goToWelcome}
           />
         );
       case "downloading":
@@ -43,48 +32,12 @@ export function Wizard() {
             downloadProgress={wizard.downloadProgress}
             downloadError={wizard.downloadError}
             onProgress={wizard.handleDownloadProgress}
-            onError={wizard.handleDownloadError}
             onStartDownload={wizard.startDownload}
             onCancel={wizard.cancelDownload}
           />
         );
       case "download-complete":
-        return (
-          <DownloadCompleteStep onContinue={wizard.goToHotkey} />
-        );
-      case "ollama":
-        return (
-          <OllamaStep
-            ollamaStatus={wizard.ollamaStatus}
-            ollamaModel={wizard.ollamaModel}
-            ollamaLoading={wizard.ollamaLoading}
-            onModelChange={wizard.setOllamaModel}
-            onRefresh={wizard.refreshOllama}
-            onContinue={wizard.goToHotkey}
-            onBack={wizard.goBack}
-          />
-        );
-      case "byok":
-        return (
-          <ByokStep
-            provider={wizard.byokProvider}
-            apiKey={wizard.byokApiKey}
-            connectionResult={wizard.byokResult}
-            isTesting={wizard.byokTesting}
-            onProviderChange={wizard.setByokProvider}
-            onApiKeyChange={wizard.setByokApiKey}
-            onTestConnection={wizard.testConnection}
-            onContinue={wizard.goToHotkey}
-            onBack={wizard.goBack}
-          />
-        );
-      case "whisper-warning":
-        return (
-          <WhisperWarningStep
-            onContinue={wizard.goToHotkey}
-            onBack={wizard.goBack}
-          />
-        );
+        return <DownloadCompleteStep onContinue={wizard.goToHotkey} />;
       case "hotkey":
         return (
           <HotkeyStep
@@ -94,12 +47,7 @@ export function Wizard() {
           />
         );
       case "ready":
-        return (
-          <ReadyStep
-            hotkey={wizard.hotkey}
-            onFinish={wizard.finishWizard}
-          />
-        );
+        return <ReadyStep hotkey={wizard.hotkey} onFinish={wizard.finishWizard} />;
     }
   }
 

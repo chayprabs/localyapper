@@ -1,165 +1,90 @@
 # Implementation Progress
 
-## CURRENT PHASE: Phase 17 — Cross-Platform Polish
+## CURRENT PHASE: Phase 17 - Cross-Platform Polish
+
+## Current Architecture
+The live app is now:
+- audio capture
+- VAD
+- Parakeet speech recognition
+- correction engine
+- text injection
+
+Removed from the current codebase:
+- local LLM cleanup
+- Ollama integration
+- BYOK/API-key cleanup
+- processing modes
+- app profile routing
+
+## Completed Work
 
 ### Phase 1: Foundation (COMPLETE)
-Goal: App launches, database initializes, no crashes.
-- [x] Create Tauri 2 project with exact Cargo.toml dependencies from PRD
-- [x] Configure package.json with React 19, Vite 5, Tailwind CSS 3
-- [x] Implement db/schema.rs — all 6 tables, all seeds, idempotent migration
-- [x] Implement db/queries.rs — typed query functions for all tables
-- [x] Implement basic commands stubs for all 34 IPC commands
-- [x] Register all commands in generate_handler![]
-- [x] Configure two windows in tauri.conf.json (main + overlay)
-- [x] Verification: eslint, tsc --noEmit, cargo clippy — all zero errors
+- [x] Tauri 2 + React app boots correctly
+- [x] SQLite initializes on startup
+- [x] Shared command wiring is registered in `lib.rs`
 
 ### Phase 2: Audio Capture (COMPLETE)
-- [x] audio/vad.rs — energy-based silence detection
-- [x] audio/capture.rs — cpal 16kHz mono, 0.5s pre-roll ring buffer
-- [x] Expose start_recording() and stop_recording() commands
+- [x] `cpal` microphone capture
+- [x] 16kHz mono pipeline with pre-roll
+- [x] start / stop recording commands
 
 ### Phase 3: Speech to Text (COMPLETE)
-- [x] stt/whisper.rs — whisper-rs wrapper loading ggml-base.en.bin from app data
-- [x] Model loaded once at startup, reused for all transcriptions
-- [x] Run transcription on blocking thread (whisper-rs is sync)
+- [x] Parakeet speech recognition via `sherpa-onnx`
+- [x] Hot-loaded speech model reuse through app state
+- [x] Blocking inference moved off the async runtime
 
 ### Phase 4: Text Injection (COMPLETE)
-- [x] injection/platform.rs — OS detection, X11 vs Wayland check
-- [x] injection/injector.rs — clipboard save/set/paste/restore flow
-- [x] Hold Shift variant for auto-send
+- [x] Cross-platform injection path
+- [x] Clipboard save -> paste -> restore behavior
 
 ### Phase 5: Correction Engine (COMPLETE)
-- [x] correction/engine.rs — exact-match substitution from DB
-- [x] Sub-5ms performance (pre-load at startup, refresh on change)
+- [x] Dictionary-based correction lookup
+- [x] Learner refresh after successful dictations
 
-### Phase 6: LLM Integration (COMPLETE)
-- [x] llm/engine.rs — llama-cpp-2 wrapper (load GGUF, tokenize, decode, sample)
-- [x] llm/prompt.rs — ChatML prompt builder with mode system prompt + app context
-- [x] context/detector.rs — focused window name per OS (Windows/macOS/Linux)
-- [x] LLM wired into stop_recording pipeline (skip if no model or mode.skip_llm)
-- [x] context detector wired into get_focused_app command
-- [x] download_model — streaming download from HuggingFace with progress events + cancellation
-- [x] cancel_model_download — AtomicBool cancellation flag
-- [x] check_ollama — HTTP check to localhost:11434 with 2s timeout
-- [x] test_byok_connection — OpenAI/Anthropic/Groq API key test with latency
+### Phase 6: Overlay UI (COMPLETE)
+- [x] Overlay states wired to pipeline events
+- [x] Listening / processing / transcribed / no-speech feedback
 
-### Phase 7: Full Pipeline Wire-up (COMPLETE)
-- [x] Wire: hotkey → capture → VAD → whisper → correction → LLM → inject
-- [x] hotkey/manager.rs — hold + release + double-tap
-- [x] correction/learner.rs — diff computation, DB writes, confidence calc
+### Phase 7: Settings UI (COMPLETE)
+- [x] Dashboard, History, Dictionary, Hotkeys, Models pages
+- [x] Typed frontend command wrappers
 
-### Phase 8: Overlay UI (COMPLETE)
-- [x] Overlay.tsx — transparent, always-on-top pill with 6 visual states
-- [x] All states wired to Tauri "pipeline-state" events
-- [x] Waveform.tsx — animated 5-bar waveform (blue/red)
-- [x] CountdownTimer.tsx — elapsed (processing) + countdown (stopping-soon)
-- [x] YappingEmoji.tsx — pulsing speaker emoji
-- [x] useOverlayState.ts — event listener, state machine, auto-hide timers
-- [x] overlayStore.ts — Jotai atoms for overlay data
-- [x] types/overlay.ts — OverlayVisualState, PipelineEvent, OverlayData
-- [x] lib/commands/recording.ts — injectText, cancelRecording wrappers
-- [x] All 6 overlay states visually verified against Stitch designs
+### Phase 8: History + Dictionary (COMPLETE)
+- [x] History browsing and deletion
+- [x] Correction management and training flow
 
-### Phase 9: Settings Window Shell (COMPLETE)
-- [x] SettingsLayout.tsx — sidebar + content area shell
-- [x] Sidebar.tsx — 240px sidebar with Material Symbols icons, 5 nav items
-- [x] Jotai appStore.ts — PageId type + activePageAtom
-- [x] 5 page stub components (Dashboard, History, Dictionary, Hotkeys, Models)
-- [x] Typed invoke wrappers — all 34 IPC commands covered across 7 files
-- [x] shadcn/ui foundation — components.json + cn() utility
-- [x] Colors aligned to DESIGN_SYSTEM.md across all components
-- [x] Sidebar visually matched to Stitch design
+### Phase 9: Hotkeys (COMPLETE)
+- [x] Configurable record / cancel / paste-last / open-app shortcuts
+- [x] Immediate hotkey reload after updates
 
-### Phase 10: Dashboard Page (COMPLETE)
-- [x] Stats cards (Words Today, Words This Week, Words All Time, Avg WPM, Total Sessions)
-- [x] Model/Ollama status indicator (green/red dot + model name)
-- [x] Last dictation preview card with copy/delete
-- [x] Empty state for first-time users
-- [x] Wired to get_stats(), get_history(limit=1), check_ollama() commands
-- [x] Matches Stitch designs exactly
+### Phase 10: Models Page Simplification (COMPLETE)
+- [x] Speech-model-only models page
+- [x] Download / delete / load speech model controls
+- [x] Removed LLM/Ollama/BYOK settings UI
 
-### Phase 11: History Page (COMPLETE)
-- [x] HistoryPage.tsx — scrollable card list with empty state
-- [x] HistoryCard.tsx — timestamp, word count, app badge, copy/delete
-- [x] useHistory.ts hook — pagination (20/page), optimistic delete, clear all
-- [x] formatHistoryTimestamp() — "Today, 2:34 PM" / "Yesterday" / "Mar 15" format
-- [x] Load More button for pagination (hasMore detection)
-- [x] Clear All with confirmation dialog
-- [x] Empty state with history icon, hotkey hint, Start Dictating button
-- [x] Matches Stitch designs exactly
+### Phase 11: First-Launch Wizard Simplification (COMPLETE)
+- [x] Wizard now downloads only the speech model
+- [x] Removed model-selection, Ollama, BYOK, and warning branches
 
-### Phase 12: Dictionary Pages (COMPLETE)
-- [x] DictionaryPage.tsx — Tab switching (Corrections/Training), header with Export JSON + Add Correction buttons
-- [x] CorrectionsTab.tsx — Table with Whisper Heard/Corrected To/Times Used/Actions columns, pagination footer
-- [x] Inline Add Correction form (blue-tinted row, two inputs, Save/Close)
-- [x] Corrections empty state with Start Training CTA
-- [x] TrainingTab.tsx — Paragraph display (15 paragraphs), Start/Stop Recording, progress, Previous/Next nav
-- [x] TrainingComplete.tsx — Green check, corrections learned count, Done button
-- [x] useCorrections.ts hook — pagination, add, optimistic delete, count
-- [x] training-paragraphs.ts — 15 paragraph constants from docs/training-paragraphs.md
-- [x] Backend: get_corrections_count + compute_training_diffs commands (7 total corrections commands)
-- [x] Info cards (How it works + Smart Suggestions) below both tabs
-- [x] Export JSON copies to clipboard with "Copied!" feedback
-- [x] Training paragraph index persisted in settings for cross-session resume
-- [x] All 5 Stitch screens matched (Corrections, Add Active, Empty State, Training, Voice Profile Ready)
+### Phase 12: Tray + Startup (COMPLETE)
+- [x] Tray menu for open / pause / quit
+- [x] Startup notifications for speech-model readiness
+- [x] Autostart enabled by default
 
-### Phase 13: Hotkeys Page (COMPLETE)
-- [x] hotkey/manager.rs — refactored to take AppHandle, added reload_hotkeys(), open-app registration
-- [x] commands/hotkeys.rs — update_hotkey (validates key, auto-syncs hands_free) + reset_hotkeys (defaults + reload)
-- [x] lib.rs — 2 new commands registered (38 total), setup call updated to AppHandle
-- [x] Frontend: hotkeys.ts command wrappers, useHotkeys.ts hook with optimistic updates
-- [x] HotkeysPage.tsx — 5 rows matching Stitch design, KeySelector with capture mode
-- [x] Key capture: keydown listener, Escape cancels, click outside cancels, modifier-only ignored
-- [x] Platform-aware key display (macOS symbols vs Windows text)
-- [x] Hands-free row read-only, auto-synced with Record
-- [x] Reset to Defaults button restores all 5 hotkeys
-- [x] All changes take effect immediately (reload_hotkeys on every update)
+### Phase 13: Cleanup Pass (COMPLETE)
+- [x] Removed Rust LLM modules and related dependencies
+- [x] Removed Ollama/BYOK/local-model commands
+- [x] Removed legacy frontend model flows
+- [x] Removed stale mode/app-profile command surface
 
-### Phase 14: Models Page (COMPLETE)
-- [x] ModelsPage.tsx — full page with two sections (Speech Recognition + Language Model)
-- [x] useModels.ts hook — settings load, optimistic updates, Ollama check, BYOK test
-- [x] Whisper base.en model with download/status UI
-- [x] LLM segmented control (Local Model | Ollama | BYOK) with 3 tab views
-- [x] Local tab: active model name + service status (green dot)
-- [x] Ollama tab: model dropdown from Ollama API, status with model count, URL display
-- [x] BYOK tab: provider dropdown (OpenAI/Anthropic/Groq), API key input with visibility toggle, Test Connection
-- [x] Connection result feedback (green success with latency, red error message)
-- [x] All 3 Stitch screens matched (Local, BYOK, Ollama states)
+## Verification
+- [x] `npm run lint`
+- [x] `npx tsc --noEmit`
+- [x] `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings`
 
-### Phase 15: First-Launch Wizard (COMPLETE)
-- [x] Wizard.tsx — full-screen modal wrapper, step routing via useWizard hook
-- [x] App.tsx — MainWindow extracts setup_complete check, tri-state loading/wizard/settings
-- [x] useWizard.ts — added goToWelcome navigation for ModelSelectionStep back button
-- [x] All 9 step components wired: Welcome, ModelSelection, Download, DownloadComplete, Ollama, Byok, WhisperWarning, Hotkey, Ready
-- [x] Skip setup and full flow both transition to SettingsLayout
-- [x] Verification: eslint, tsc --noEmit, cargo clippy — all zero errors
-
-### Phase 16: System Tray + Autostart (COMPLETE)
-- [x] Cargo.toml — enabled `tray-icon` feature on tauri crate
-- [x] tray/mod.rs — TrayIconBuilder with context menu (Show Window, Paste Last, Launch at Login, Quit)
-- [x] Left-click tray icon toggles main window show/hide
-- [x] Autostart toggle via tauri-plugin-autostart (ManagerExt), checkmark label updates
-- [x] Close-to-tray: main window close intercepted, hides instead of quitting
-- [x] Reuses app default icon for tray icon
-- [x] Verification: cargo clippy, eslint, tsc — all zero errors
-
-### Phase 17: Cross-Platform Polish (COMPLETE)
-- [x] Pipeline polish: LLM background loading at startup, max_tokens 1024, temperature 0, LLM timeout 15s
-- [x] Pipeline polish: audio duration in processing event, "no-speech" state, friendlier model-not-loaded errors
-- [x] Pipeline polish: standardized println! logging (PIPELINE/WHISPER/CORRECTION/LLM/INJECT/HISTORY)
-- [x] Overlay polish: processing countdown timer (estimated from audio duration, decreasing)
-- [x] Overlay polish: "injected" event no longer overrides 3s transcribed display
-- [x] Overlay polish: copy button dismisses overlay immediately (500ms checkmark flash)
-- [x] Overlay polish: "No speech detected" state shown for 2s
-- [x] UI polish: shared CopyButton component (icon variant with check animation for history/dashboard)
-- [x] UI polish: recording blocked during transcribed overlay display (3s cooldown)
-- [x] Auto-refresh: dashboard + history auto-refresh on pipeline completion via Tauri events
-- [x] Tray overhaul: new menu (Open, Mode display, Pause/Resume Dictation, Quit)
-- [x] Tray overhaul: tooltip updates on pipeline state (Recording.../Processing...)
-- [x] Startup: main window hidden by default, shown only for first-launch wizard
-- [x] Startup: autostart enabled by default
-- [x] Startup: system notifications after model loading ("LocalYapper ready" / "models not downloaded")
-- [x] Verification: cargo clippy, eslint, tsc — all zero errors
-
+## Next Work
 ### Phase 18: GitHub Release
-- [ ] CI/CD workflow, binaries for all platforms, README
+- [ ] CI/CD workflow
+- [ ] Binaries for all platforms
+- [ ] Public README refresh

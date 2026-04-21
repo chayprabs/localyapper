@@ -26,7 +26,7 @@ function MainWindow() {
     }
   }, [setupComplete]);
 
-  // Load models in the background once setup is complete
+  // Load speech model assets in the background once setup is complete
   useEffect(() => {
     if (setupComplete) {
       reloadModels().catch((e) => console.error("Auto-reload models failed:", e));

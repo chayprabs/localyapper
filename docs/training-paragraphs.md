@@ -2,7 +2,7 @@
 
 15 paragraphs for the voice training session (Dictionary > Training tab).
 Each paragraph is 4-6 sentences, ~80-120 words, designed to be read aloud in under 60 seconds.
-Word-level diff against Whisper output auto-populates the corrections dictionary.
+Word-level diff against the raw speech transcript auto-populates the corrections dictionary.
 
 ---
 
@@ -68,7 +68,7 @@ So yeah, I was gonna grab coffee with Jake but he totally bailed on me last minu
 
 ## Paragraph 11 — Technical Documentation
 
-The `AudioRecorder` module initializes a 16kHz mono input stream using the system's default audio device. When `start_recording()` is called, a ring buffer captures raw PCM samples with a 500-millisecond pre-roll window. Voice activity detection filters silent frames before passing audio data to the Whisper inference engine. Note: the `--model` flag accepts values of `tiny`, `base`, `small`, or `medium` (default: `tiny`). All audio processing occurs in memory; no temporary files are written to disk. See the architecture diagram in Section 4.2 for the complete data flow.
+The `AudioRecorder` module initializes a 16kHz mono input stream using the system's default audio device. When `start_recording()` is called, a ring buffer captures raw PCM samples with a 500-millisecond pre-roll window. Voice activity detection filters silent frames before passing audio data to the local speech engine. The app keeps one built-in speech model ready for dictation. All audio processing occurs in memory; no temporary files are written to disk. See the architecture diagram in Section 4.2 for the complete data flow.
 
 ---
 

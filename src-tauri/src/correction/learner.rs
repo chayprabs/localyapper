@@ -13,13 +13,13 @@ const PUNCT_CHARS: &[char] = &[
 /// A single word-level diff learned from the pipeline.
 #[derive(Debug, Clone)]
 pub struct LearnedCorrection {
-    /// Lowercased Whisper output token (before LLM cleanup).
+    /// Lowercased raw transcription token before correction cleanup.
     pub raw_word: String,
-    /// Lowercased final output token (after LLM cleanup).
+    /// Lowercased final output token after correction cleanup.
     pub corrected_word: String,
 }
 
-/// Compute word-level diffs between raw (Whisper) text and final (post-LLM) text.
+/// Compute word-level diffs between raw transcription and final corrected text.
 ///
 /// Uses simple positional alignment: tokenize both by whitespace, zip-walk,
 /// collect pairs where raw != final (case-insensitive to avoid learning pure-case diffs).
@@ -71,7 +71,8 @@ pub fn learn_and_refresh(
 
     for diff in diffs {
         let id = uuid::Uuid::new_v4().to_string();
-        let correction = queries::insert_correction(conn, &id, &diff.raw_word, &diff.corrected_word)?;
+        let correction =
+            queries::insert_correction(conn, &id, &diff.raw_word, &diff.corrected_word)?;
 
         let new_confidence = (correction.count as f64 * 0.1).min(1.0);
         queries::update_correction_confidence(conn, &correction.id, new_confidence)?;

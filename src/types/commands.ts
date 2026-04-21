@@ -4,7 +4,6 @@ export interface HistoryEntry {
   raw_text: string;
   final_text: string;
   app_name: string | null;
-  mode_id: string | null;
   duration_ms: number | null;
   word_count: number | null;
   created_at: string;
@@ -27,29 +26,6 @@ export interface DictionaryWord {
   added_at: string;
 }
 
-export interface Mode {
-  id: string;
-  name: string;
-  system_prompt: string;
-  skip_llm: boolean;
-  is_builtin: boolean;
-  color: string;
-  created_at: string;
-}
-
-export interface NewMode {
-  name: string;
-  system_prompt: string;
-  skip_llm: boolean;
-  color: string;
-}
-
-export interface AppProfile {
-  id: string;
-  app_name: string;
-  mode_id: string;
-}
-
 // Pipeline & model types
 
 export interface PipelineResult {
@@ -59,22 +35,11 @@ export interface PipelineResult {
   word_count: number;
 }
 
-export interface OllamaStatus {
-  running: boolean;
-  models: string[];
-}
-
 export interface DownloadProgress {
   percent: number;
   downloaded_mb: number;
   total_mb: number;
   speed_mbps: number;
-}
-
-export interface ConnectionResult {
-  success: boolean;
-  latency_ms: number;
-  error: string | null;
 }
 
 export interface Stats {
@@ -97,16 +62,10 @@ export interface ImportResult {
 }
 
 export interface ModelsStatus {
-  whisper_loaded: boolean;
-  llm_loaded: boolean;
+  speech_model_loaded: boolean;
 }
 
-export interface LlmFileStatus {
-  exists: boolean;
-  size_mb: number;
-}
-
-export interface WhisperFileStatus {
+export interface SpeechModelFileStatus {
   exists: boolean;
   size_mb: number;
   model_name: string;

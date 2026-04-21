@@ -35,7 +35,7 @@ function InlineAddForm({
           type="text"
           value={rawWord}
           onChange={(e) => setRawWord(e.target.value)}
-          placeholder="Whisper heard..."
+          placeholder="Heard as..."
           className="w-full h-9 px-3 bg-white border border-black/[0.12] rounded-lg text-[13px] placeholder:text-black/[0.35] focus:outline-none focus:border-[#0058bc] focus:ring-1 focus:ring-[#0058bc] transition-colors"
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSave();
@@ -154,7 +154,7 @@ export function CorrectionsTab({
         <thead>
           <tr className="bg-white">
             <th className="px-6 py-4 text-[10px] uppercase font-semibold text-black/[0.26] tracking-[0.06em]">
-              Whisper Heard
+              Heard As
             </th>
             <th className="px-6 py-4 text-[10px] uppercase font-semibold text-black/[0.26] tracking-[0.06em]">
               Corrected To

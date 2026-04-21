@@ -36,7 +36,9 @@ pub async fn add_correction(
     let result = queries::insert_manual_correction(&conn, &id, &raw_word, &corrected)
         .map_err(|e| e.to_string())?;
     let threshold = get_threshold(&conn);
-    state.correction_engine.refresh(&conn, threshold)
+    state
+        .correction_engine
+        .refresh(&conn, threshold)
         .map_err(|e| e.to_string())?;
     Ok(result)
 }
@@ -50,16 +52,16 @@ pub async fn delete_correction(
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     queries::delete_correction(&conn, &id).map_err(|e| e.to_string())?;
     let threshold = get_threshold(&conn);
-    state.correction_engine.refresh(&conn, threshold)
+    state
+        .correction_engine
+        .refresh(&conn, threshold)
         .map_err(|e| e.to_string())?;
     Ok(())
 }
 
 /// Exports all corrections as a JSON string.
 #[tauri::command]
-pub async fn export_dictionary(
-    state: tauri::State<'_, AppState>,
-) -> Result<String, String> {
+pub async fn export_dictionary(state: tauri::State<'_, AppState>) -> Result<String, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     queries::export_corrections(&conn).map_err(|e| e.to_string())
 }
@@ -71,24 +73,23 @@ pub async fn import_dictionary(
     json: String,
 ) -> Result<ImportResult, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let result = queries::import_corrections(&conn, &json)
-        .map_err(|e| e.to_string())?;
+    let result = queries::import_corrections(&conn, &json).map_err(|e| e.to_string())?;
     let threshold = get_threshold(&conn);
-    state.correction_engine.refresh(&conn, threshold)
+    state
+        .correction_engine
+        .refresh(&conn, threshold)
         .map_err(|e| e.to_string())?;
     Ok(result)
 }
 
 /// Returns the total count of corrections.
 #[tauri::command]
-pub async fn get_corrections_count(
-    state: tauri::State<'_, AppState>,
-) -> Result<i64, String> {
+pub async fn get_corrections_count(state: tauri::State<'_, AppState>) -> Result<i64, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     queries::count_corrections(&conn).map_err(|e| e.to_string())
 }
 
-/// Computes word-level diffs between known paragraph text and Whisper transcription,
+/// Computes word-level diffs between known paragraph text and the raw speech transcript,
 /// saves learned corrections to the database, and returns the count of new corrections.
 #[tauri::command]
 pub async fn compute_training_diffs(

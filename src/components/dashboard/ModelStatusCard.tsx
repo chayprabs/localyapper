@@ -1,43 +1,31 @@
-// Model status card -- Whisper and LLM loaded indicators
+// Model status card -- speech model loaded indicator
 import type { ModelsStatus } from "@/types/commands";
 
 interface ModelStatusCardProps {
   status: ModelsStatus | null;
-  llmMode: string;
-  llmLabel: string;
-  isLoading: boolean;
 }
 
-export function ModelStatusCard({ status, llmMode, llmLabel }: ModelStatusCardProps) {
-  const whisperReady = status?.whisper_loaded ?? false;
-  const llmReady = status?.llm_loaded ?? false;
-
-  // Determine LLM display name
-  let llmName = "Qwen2.5 1.5B";
-  if (llmMode === "ollama" && llmLabel) {
-    llmName = `Ollama: ${llmLabel}`;
-  } else if (llmMode === "byok" && llmLabel) {
-    llmName = `BYOK: ${llmLabel}`;
-  }
-
-  const whisperDot = whisperReady ? "bg-[#006b19]" : "bg-black/[0.26]";
-  const whisperText = whisperReady ? "text-[#006b19]" : "text-black/[0.26]";
-  const llmDot = llmReady ? "bg-[#006b19]" : "bg-black/[0.26]";
-  const llmText = llmReady ? "text-[#006b19]" : "text-black/[0.26]";
+export function ModelStatusCard({ status }: ModelStatusCardProps) {
+  const speechModelReady = status?.speech_model_loaded ?? false;
+  const dotClass = speechModelReady ? "bg-[#006b19]" : "bg-black/[0.26]";
+  const textClass = speechModelReady ? "text-[#006b19]" : "text-black/[0.26]";
 
   return (
     <div className="bg-white p-4 rounded-xl border border-black/[0.07] shadow-sm">
       <p className="text-[10px] font-bold text-black/[0.26] tracking-[0.06em] uppercase mb-1.5">
-        MODEL STATUS
+        SPEECH STATUS
       </p>
       <div className="flex items-center gap-2 mb-1.5">
-        <span className={`w-2 h-2 rounded-full ${whisperDot}`} />
-        <span className={`text-[13px] font-medium ${whisperText}`}>Parakeet 110M</span>
+        <span className={`w-2 h-2 rounded-full ${dotClass}`} />
+        <span className={`text-[13px] font-medium ${textClass}`}>
+          {speechModelReady ? "Engine ready" : "Engine not ready"}
+        </span>
       </div>
-      <div className="flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full ${llmDot}`} />
-        <span className={`text-[13px] font-medium ${llmText}`}>{llmName}</span>
-      </div>
+      <p className="text-[12px] text-black/[0.40]">
+        {speechModelReady
+          ? "Local speech dictation is ready to use."
+          : "Open Settings > Speech to download or reload the local speech package."}
+      </p>
     </div>
   );
 }

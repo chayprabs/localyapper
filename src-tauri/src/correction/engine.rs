@@ -8,7 +8,9 @@ use crate::db::queries;
 use crate::error::LocalYapperError;
 
 /// Characters to strip from the leading/trailing edges of tokens before lookup.
-const PUNCT_CHARS: &[char] = &['.', ',', ';', ':', '!', '?', '\'', '"', '(', ')', '-', '[', ']', '{', '}'];
+const PUNCT_CHARS: &[char] = &[
+    '.', ',', ';', ':', '!', '?', '\'', '"', '(', ')', '-', '[', ']', '{', '}',
+];
 
 /// Exact-match correction engine backed by an in-memory HashMap.
 /// Keys are lowercase; lookups are case-insensitive with case preservation on output.
@@ -51,12 +53,16 @@ impl CorrectionEngine {
 
         // Swap in the new data
         {
-            let mut corrections = self.corrections.write()
+            let mut corrections = self
+                .corrections
+                .write()
                 .map_err(|e| LocalYapperError::InvalidInput(format!("Lock poisoned: {e}")))?;
             *corrections = map;
         }
         {
-            let mut pw = self.protected_words.write()
+            let mut pw = self
+                .protected_words
+                .write()
                 .map_err(|e| LocalYapperError::InvalidInput(format!("Lock poisoned: {e}")))?;
             *pw = protected;
         }
@@ -76,9 +82,13 @@ impl CorrectionEngine {
     /// Applies exact-match word substitution to the input text.
     /// Preserves whitespace, punctuation, and case.
     pub fn apply(&self, text: &str) -> Result<String, LocalYapperError> {
-        let corrections = self.corrections.read()
+        let corrections = self
+            .corrections
+            .read()
             .map_err(|e| LocalYapperError::InvalidInput(format!("Lock poisoned: {e}")))?;
-        let protected = self.protected_words.read()
+        let protected = self
+            .protected_words
+            .read()
             .map_err(|e| LocalYapperError::InvalidInput(format!("Lock poisoned: {e}")))?;
 
         if corrections.is_empty() {
@@ -136,7 +146,10 @@ fn strip_trailing_punct(token: &str) -> (&str, &str) {
 
 /// Apply case pattern from the original word to the replacement.
 fn apply_case(original: &str, replacement: &str) -> String {
-    if original.chars().all(|c| c.is_uppercase() || !c.is_alphabetic()) {
+    if original
+        .chars()
+        .all(|c| c.is_uppercase() || !c.is_alphabetic())
+    {
         replacement.to_uppercase()
     } else if original.starts_with(|c: char| c.is_uppercase()) {
         let mut chars = replacement.chars();

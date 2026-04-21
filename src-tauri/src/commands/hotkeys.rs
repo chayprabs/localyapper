@@ -45,8 +45,7 @@ pub async fn update_hotkey(
 
     // Auto-sync hands_free when record changes
     if key == "hotkey_record" {
-        queries::set_setting(&conn, "hotkey_hands_free", &value)
-            .map_err(|e| e.to_string())?;
+        queries::set_setting(&conn, "hotkey_hands_free", &value).map_err(|e| e.to_string())?;
     }
 
     drop(conn);

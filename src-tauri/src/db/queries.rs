@@ -1,9 +1,9 @@
-// Database queries -- typed CRUD operations for all 6 tables
+// Database queries -- typed CRUD operations for the active app tables
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
 
 use crate::error::LocalYapperError;
-use crate::models::{Correction, DictionaryWord, HistoryEntry, ImportResult, Mode, NewMode, Stats};
+use crate::models::{Correction, DictionaryWord, HistoryEntry, ImportResult, Stats};
 
 // --- History ---
 
@@ -14,7 +14,7 @@ pub fn get_history(
     offset: i64,
 ) -> Result<Vec<HistoryEntry>, LocalYapperError> {
     let mut stmt = conn.prepare(
-        "SELECT id, raw_text, final_text, app_name, mode_id, duration_ms, word_count, created_at
+        "SELECT id, raw_text, final_text, app_name, duration_ms, word_count, created_at
          FROM transcription_history ORDER BY created_at DESC LIMIT ?1 OFFSET ?2",
     )?;
     let rows = stmt.query_map(params![limit, offset], |row| {
@@ -23,10 +23,9 @@ pub fn get_history(
             raw_text: row.get(1)?,
             final_text: row.get(2)?,
             app_name: row.get(3)?,
-            mode_id: row.get(4)?,
-            duration_ms: row.get(5)?,
-            word_count: row.get(6)?,
-            created_at: row.get(7)?,
+            duration_ms: row.get(4)?,
+            word_count: row.get(5)?,
+            created_at: row.get(6)?,
         })
     })?;
     let mut entries = Vec::new();
@@ -39,14 +38,13 @@ pub fn get_history(
 /// Inserts a new history entry.
 pub fn insert_history(conn: &Connection, entry: &HistoryEntry) -> Result<(), LocalYapperError> {
     conn.execute(
-        "INSERT INTO transcription_history (id, raw_text, final_text, app_name, mode_id, duration_ms, word_count, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO transcription_history (id, raw_text, final_text, app_name, duration_ms, word_count, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
             entry.id,
             entry.raw_text,
             entry.final_text,
             entry.app_name,
-            entry.mode_id,
             entry.duration_ms,
             entry.word_count,
             entry.created_at,
@@ -95,11 +93,10 @@ pub fn get_stats(conn: &Connection) -> Result<Stats, LocalYapperError> {
         |row| row.get(0),
     )?;
 
-    let total_sessions: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM transcription_history",
-        [],
-        |row| row.get(0),
-    )?;
+    let total_sessions: i64 =
+        conn.query_row("SELECT COUNT(*) FROM transcription_history", [], |row| {
+            row.get(0)
+        })?;
 
     let total_duration_ms: i64 = conn.query_row(
         "SELECT COALESCE(SUM(duration_ms), 0) FROM transcription_history",
@@ -370,127 +367,13 @@ pub fn insert_word(
 
 /// Deletes a dictionary word by ID.
 pub fn delete_word(conn: &Connection, id: &str) -> Result<(), LocalYapperError> {
-    let affected = conn.execute(
-        "DELETE FROM personal_dictionary WHERE id = ?1",
-        params![id],
-    )?;
+    let affected = conn.execute("DELETE FROM personal_dictionary WHERE id = ?1", params![id])?;
     if affected == 0 {
         return Err(LocalYapperError::NotFound(format!(
             "Dictionary word not found: {id}"
         )));
     }
     Ok(())
-}
-
-// --- Modes ---
-
-/// Returns all modes.
-pub fn get_modes(conn: &Connection) -> Result<Vec<Mode>, LocalYapperError> {
-    let mut stmt = conn.prepare(
-        "SELECT id, name, system_prompt, skip_llm, is_builtin, color, created_at FROM modes ORDER BY is_builtin DESC, name ASC",
-    )?;
-    let rows = stmt.query_map([], |row| {
-        Ok(Mode {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            system_prompt: row.get(2)?,
-            skip_llm: row.get::<_, i32>(3)? != 0,
-            is_builtin: row.get::<_, i32>(4)? != 0,
-            color: row.get(5)?,
-            created_at: row.get(6)?,
-        })
-    })?;
-    let mut modes = Vec::new();
-    for row in rows {
-        modes.push(row?);
-    }
-    Ok(modes)
-}
-
-/// Returns a single mode by ID.
-pub fn get_mode_by_id(conn: &Connection, id: &str) -> Result<Mode, LocalYapperError> {
-    conn.query_row(
-        "SELECT id, name, system_prompt, skip_llm, is_builtin, color, created_at FROM modes WHERE id = ?1",
-        params![id],
-        |row| {
-            Ok(Mode {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                system_prompt: row.get(2)?,
-                skip_llm: row.get::<_, i32>(3)? != 0,
-                is_builtin: row.get::<_, i32>(4)? != 0,
-                color: row.get(5)?,
-                created_at: row.get(6)?,
-            })
-        },
-    )
-    .map_err(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => {
-            LocalYapperError::NotFound(format!("Mode not found: {id}"))
-        }
-        other => LocalYapperError::DatabaseError(other),
-    })
-}
-
-/// Inserts a new user-created mode.
-pub fn insert_mode(conn: &Connection, id: &str, mode: &NewMode) -> Result<Mode, LocalYapperError> {
-    conn.execute(
-        "INSERT INTO modes (id, name, system_prompt, skip_llm, is_builtin, color, created_at)
-         VALUES (?1, ?2, ?3, ?4, 0, ?5, datetime('now'))",
-        params![id, mode.name, mode.system_prompt, mode.skip_llm as i32, mode.color],
-    )?;
-    get_mode_by_id(conn, id)
-}
-
-/// Updates an existing mode.
-pub fn update_mode(conn: &Connection, mode: &Mode) -> Result<(), LocalYapperError> {
-    let affected = conn.execute(
-        "UPDATE modes SET name = ?2, system_prompt = ?3, skip_llm = ?4, color = ?5 WHERE id = ?1",
-        params![mode.id, mode.name, mode.system_prompt, mode.skip_llm as i32, mode.color],
-    )?;
-    if affected == 0 {
-        return Err(LocalYapperError::NotFound(format!(
-            "Mode not found: {}",
-            mode.id
-        )));
-    }
-    Ok(())
-}
-
-/// Deletes a mode by ID. Built-in modes cannot be deleted.
-pub fn delete_mode(conn: &Connection, id: &str) -> Result<(), LocalYapperError> {
-    let is_builtin: bool = conn
-        .query_row(
-            "SELECT is_builtin FROM modes WHERE id = ?1",
-            params![id],
-            |row| row.get::<_, i32>(0),
-        )
-        .map(|v| v != 0)
-        .map_err(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => {
-                LocalYapperError::NotFound(format!("Mode not found: {id}"))
-            }
-            other => LocalYapperError::DatabaseError(other),
-        })?;
-
-    if is_builtin {
-        return Err(LocalYapperError::InvalidInput(
-            "Cannot delete built-in modes".to_string(),
-        ));
-    }
-
-    conn.execute("DELETE FROM modes WHERE id = ?1", params![id])?;
-    Ok(())
-}
-
-/// Returns the currently active mode.
-pub fn get_active_mode(conn: &Connection) -> Result<Mode, LocalYapperError> {
-    let active_id: String = conn.query_row(
-        "SELECT value FROM settings WHERE key = 'active_mode_id'",
-        [],
-        |row| row.get(0),
-    )?;
-    get_mode_by_id(conn, &active_id)
 }
 
 // --- Settings ---

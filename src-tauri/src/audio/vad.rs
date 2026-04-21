@@ -215,16 +215,13 @@ pub fn apply_energy_vad(audio: &[f32]) -> VadResult {
 
     // Find first and last speech frame
     let first_speech = smoothed.iter().position(|&f| f).unwrap_or(0);
-    let last_speech = smoothed.len()
-        - 1
-        - smoothed.iter().rev().position(|&f| f).unwrap_or(0);
+    let last_speech = smoothed.len() - 1 - smoothed.iter().rev().position(|&f| f).unwrap_or(0);
 
     let start_sample = first_speech * config.frame_size;
     let end_sample = ((last_speech + 1) * config.frame_size).min(audio.len());
 
     let trimmed_audio = audio[start_sample..end_sample].to_vec();
-    let speech_duration_ms =
-        (trimmed_audio.len() as u64 * 1000) / 16_000;
+    let speech_duration_ms = (trimmed_audio.len() as u64 * 1000) / 16_000;
 
     VadResult {
         trimmed_audio,
@@ -288,9 +285,7 @@ mod tests {
     #[test]
     fn energy_vad_on_speech_returns_speech() {
         let mut audio = vec![0.0f32; 8_000];
-        let speech: Vec<f32> = (0..16_000)
-            .map(|i| (i as f32 * 0.05).sin() * 0.5)
-            .collect();
+        let speech: Vec<f32> = (0..16_000).map(|i| (i as f32 * 0.05).sin() * 0.5).collect();
         audio.extend_from_slice(&speech);
         audio.extend_from_slice(&vec![0.0f32; 8_000]);
 
@@ -314,9 +309,7 @@ mod tests {
         let silence = vec![0.0f32; 16_000];
         assert!(!has_speech(&silence));
 
-        let signal: Vec<f32> = (0..16_000)
-            .map(|i| (i as f32 * 0.05).sin() * 0.5)
-            .collect();
+        let signal: Vec<f32> = (0..16_000).map(|i| (i as f32 * 0.05).sin() * 0.5).collect();
         assert!(has_speech(&signal));
     }
 

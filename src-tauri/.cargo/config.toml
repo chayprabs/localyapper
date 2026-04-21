@@ -1,2 +1,4 @@
-# No special linker flags needed — llama-cpp-2 is disabled,
-# so there are no duplicate ggml symbols.
+# Force static CRT globally on Windows MSVC.
+# sherpa-onnx-sys needs the same CRT as the rest of the app.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

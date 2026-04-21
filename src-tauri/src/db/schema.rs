@@ -3,7 +3,7 @@ use rusqlite::Connection;
 
 use crate::error::LocalYapperError;
 
-/// Creates all 6 tables and seeds default data in a single transaction.
+/// Creates the application tables and seeds default data in a single transaction.
 pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
     conn.execute_batch(
         "
@@ -12,7 +12,6 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
             raw_text     TEXT NOT NULL,
             final_text   TEXT NOT NULL,
             app_name     TEXT,
-            mode_id      TEXT,
             duration_ms  INTEGER,
             word_count   INTEGER,
             created_at   DATETIME DEFAULT (datetime('now'))
@@ -36,23 +35,6 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
             added_at  DATETIME DEFAULT (datetime('now'))
         );
 
-        CREATE TABLE IF NOT EXISTS modes (
-            id             TEXT PRIMARY KEY,
-            name           TEXT NOT NULL,
-            system_prompt  TEXT NOT NULL,
-            skip_llm       INTEGER DEFAULT 0,
-            is_builtin     INTEGER DEFAULT 0,
-            color          TEXT DEFAULT 'purple',
-            created_at     DATETIME DEFAULT (datetime('now'))
-        );
-
-        CREATE TABLE IF NOT EXISTS app_profiles (
-            id        TEXT PRIMARY KEY,
-            app_name  TEXT NOT NULL UNIQUE,
-            mode_id   TEXT NOT NULL,
-            FOREIGN KEY (mode_id) REFERENCES modes(id)
-        );
-
         CREATE TABLE IF NOT EXISTS settings (
             key         TEXT PRIMARY KEY,
             value       TEXT NOT NULL,
@@ -62,17 +44,13 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
     )?;
 
     seed_settings(conn)?;
-    seed_modes(conn)?;
     migrate_hotkey_defaults(conn)?;
-    migrate_whisper_model_default(conn)?;
-    migrate_stt_to_parakeet(conn)?;
-    migrate_casual_skip_llm(conn)?;
-    migrate_prompts_for_parakeet(conn)?;
+    migrate_legacy_speech_model_settings(conn)?;
 
     Ok(())
 }
 
-/// Inserts default settings (22 rows). Uses INSERT OR IGNORE for idempotency.
+/// Inserts default settings (17 rows). Uses INSERT OR IGNORE for idempotency.
 fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     let seeds = [
         ("hotkey_record", "Ctrl+Shift+Space"),
@@ -80,12 +58,7 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
         ("hotkey_cancel", "Escape"),
         ("hotkey_paste_last", "Alt+Shift+V"),
         ("hotkey_open_app", "Alt+L"),
-        ("whisper_model", "parakeet-110m"),
-        ("llm_mode", "local"),
-        ("ollama_model", "qwen2.5:0.5b"),
-        ("byok_provider", "openai"),
-        ("byok_api_key", ""),
-        ("active_mode_id", "builtin_casual"),
+        ("speech_model", "parakeet-110m"),
         ("auto_start", "true"),
         ("sound_effects", "true"),
         ("mute_media", "true"),
@@ -95,7 +68,6 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
         ("overlay_x", "100"),
         ("overlay_y", "100"),
         ("setup_complete", "false"),
-        ("model_path", ""),
         ("max_recording_seconds", "120"),
         ("auto_inject_delay_ms", "10000"),
     ];
@@ -112,18 +84,8 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     Ok(())
 }
 
-/// Migrate whisper_model from old default "tiny.en" to "base.en".
-/// Safe to run repeatedly — only updates if value is still "tiny.en".
-fn migrate_whisper_model_default(conn: &Connection) -> Result<(), LocalYapperError> {
-    conn.execute(
-        "UPDATE settings SET value = 'base.en', updated_at = datetime('now') WHERE key = 'whisper_model' AND value = 'tiny.en'",
-        [],
-    )?;
-    Ok(())
-}
-
 /// Migrate hotkey_record from conflicting defaults (Alt+Space, Ctrl+Space) to Ctrl+Shift+Space.
-/// Safe to run repeatedly — only updates if value matches a known conflicting default.
+/// Safe to run repeatedly - only updates if value matches a known conflicting default.
 fn migrate_hotkey_defaults(conn: &Connection) -> Result<(), LocalYapperError> {
     let conflicting = ["Alt+Space", "Ctrl+Space", "Alt+Alt+Space"];
     for old_val in &conflicting {
@@ -139,98 +101,34 @@ fn migrate_hotkey_defaults(conn: &Connection) -> Result<(), LocalYapperError> {
     Ok(())
 }
 
-/// Migrate whisper_model setting from old Whisper models to Parakeet.
-/// Safe to run repeatedly — only updates known old values.
-fn migrate_stt_to_parakeet(conn: &Connection) -> Result<(), LocalYapperError> {
-    let old_values = ["tiny.en", "base.en", "small.en", "medium.en"];
-    for old_val in &old_values {
-        conn.execute(
-            "UPDATE settings SET value = 'parakeet-110m', updated_at = datetime('now') WHERE key = 'whisper_model' AND value = ?1",
-            rusqlite::params![old_val],
-        )?;
-    }
-    Ok(())
-}
-
-/// Migrate Casual mode to skip LLM — Parakeet's punctuated output is sufficient.
-/// Safe to run repeatedly — only updates if skip_llm is still 0.
-fn migrate_casual_skip_llm(conn: &Connection) -> Result<(), LocalYapperError> {
+/// Migrate the old `whisper_model` key to the current `speech_model` key.
+/// Safe to run repeatedly - it preserves any existing `speech_model` value.
+fn migrate_legacy_speech_model_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     conn.execute(
-        "UPDATE modes SET skip_llm = 1 WHERE id = 'builtin_casual' AND skip_llm = 0",
-        [],
-    )?;
-    Ok(())
-}
-
-/// Simplify mode prompts for Parakeet's clean output (punctuated + capitalized).
-/// Formal prompt no longer needs to fix basic punctuation/caps.
-fn migrate_prompts_for_parakeet(conn: &Connection) -> Result<(), LocalYapperError> {
-    // Update Formal prompt — Parakeet handles punct/caps, LLM only needs to formalize tone
-    conn.execute(
-        "UPDATE modes SET system_prompt = ?1 WHERE id = 'builtin_formal'",
-        rusqlite::params![
-            "You are a voice dictation cleanup assistant. The input is already punctuated and capitalized. Your job is to improve formality: remove casual language, write in complete professional sentences, ensure proper grammar. Preserve the meaning exactly. Output ONLY the cleaned text, nothing else."
-        ],
-    )?;
-
-    // Update Casual — now skips LLM, clear the prompt
-    conn.execute(
-        "UPDATE modes SET system_prompt = '' WHERE id = 'builtin_casual' AND skip_llm = 1",
+        "
+        INSERT OR IGNORE INTO settings (key, value, updated_at)
+        SELECT 'speech_model',
+               CASE
+                   WHEN value IN ('tiny.en', 'base.en', 'small.en', 'medium.en') THEN 'parakeet-110m'
+                   ELSE value
+               END,
+               datetime('now')
+        FROM settings
+        WHERE key = 'whisper_model'
+        ",
         [],
     )?;
 
-    Ok(())
-}
-
-/// Inserts 5 built-in modes with unique system prompts for different dictation styles.
-/// Uses INSERT OR IGNORE so existing user modifications to mode prompts are preserved.
-fn seed_modes(conn: &Connection) -> Result<(), LocalYapperError> {
-    let modes = [
-        (
-            "builtin_casual",
-            "Casual",
-            "",
-            1,
-            "blue",
-        ),
-        (
-            "builtin_formal",
-            "Formal",
-            "You are a voice dictation cleanup assistant. Remove filler words. Write in complete, professional sentences. Fix grammar. Ensure proper punctuation and capitalization. Maintain a formal, professional tone throughout. Output ONLY the cleaned text, nothing else.",
-            0,
-            "purple",
-        ),
-        (
-            "builtin_code",
-            "Code",
-            "You are a voice dictation cleanup assistant for a developer. Preserve all technical terms, variable names, function names, and programming concepts exactly as spoken. Minimal cleanup only — fix obvious pronunciation errors but never change technical vocabulary. Output ONLY the cleaned text, nothing else.",
-            0,
-            "green",
-        ),
-        (
-            "builtin_braindump",
-            "Brain dump",
-            "",
-            1,
-            "gray",
-        ),
-        (
-            "builtin_translate",
-            "Translate → EN",
-            "You are a voice dictation assistant. The user may speak in any language. Detect the language and translate the content to English. Clean up the translation — remove fillers, fix grammar. Output ONLY the English translation, nothing else.",
-            0,
-            "orange",
-        ),
-    ];
-
-    let tx = conn.unchecked_transaction()?;
-    for (id, name, prompt, skip_llm, color) in &modes {
-        tx.execute(
-            "INSERT OR IGNORE INTO modes (id, name, system_prompt, skip_llm, is_builtin, color, created_at) VALUES (?1, ?2, ?3, ?4, 1, ?5, datetime('now'))",
-            rusqlite::params![id, name, prompt, skip_llm, color],
-        )?;
-    }
-    tx.commit()?;
+    conn.execute(
+        "
+        UPDATE settings
+        SET value = 'parakeet-110m',
+            updated_at = datetime('now')
+        WHERE key = 'speech_model'
+          AND value IN ('tiny.en', 'base.en', 'small.en', 'medium.en')
+        ",
+        [],
+    )?;
 
     Ok(())
 }

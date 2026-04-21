@@ -17,10 +17,10 @@ export function DownloadCompleteStep({
         Download Complete
       </h2>
       <p className="text-[13px] text-black/50 mb-2">
-        Qwen2.5 1.5B is ready to use.
+        Your local speech package is ready to use.
       </p>
       <p className="text-[12px] text-black/[0.30] mb-8">
-        qwen2.5-1.5b-instruct-q4_k_m.gguf (~1.0GB)
+        Stored on-device (~458MB)
       </p>
 
       <button

@@ -15,7 +15,7 @@ const navItems: NavItem[] = [
   { id: "history", label: "History", icon: "history" },
   { id: "dictionary", label: "Dictionary", icon: "book_2" },
   { id: "hotkeys", label: "Hotkeys", icon: "keyboard" },
-  { id: "models", label: "Models", icon: "neurology" },
+  { id: "models", label: "Speech", icon: "graphic_eq" },
 ];
 
 export function Sidebar() {
