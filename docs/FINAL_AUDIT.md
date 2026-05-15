@@ -73,7 +73,7 @@ but it does not justify adding LLM features back into this release.
 | No TypeScript `any` | ESLint rule rejects explicit `any`; search did not find TS `any` usage. | Pass |
 | No `unwrap()`/`expect()` in production paths | Startup `.expect()` calls were replaced with logged error handling. Search is clean for `unwrap(` and `expect(` in `src-tauri/src`. | Pass |
 | No dead code suppressions | Global dead-code suppression was removed and clippy passes with `-D warnings`. | Pass |
-| Permission commands | `check_permissions` returns false and settings-open commands are stubs. | Release risk if surfaced |
+| Permission commands | `check_permissions` uses microphone/input capability checks and settings-open commands route to OS settings where supported. | Pass |
 | Build docs | `docs/BUILD.md` added for Windows, macOS, and Linux build paths. | Done |
 | Release notes | `docs/RELEASE_NOTES_v0.1.0.md` added for the current release candidate. | Done |
 | Verification | lint, typecheck, fmt check, clippy, tests, and frontend build passed after fixes. | Pass |
@@ -127,11 +127,14 @@ to tracked public docs and live code instead.
 Remediation: README now points to `README.md`, `DESIGN_SYSTEM.md`,
 `docs/FINAL_AUDIT.md`, and the live source tree.
 
-### P2: Permission commands are placeholders
+### P2: Permission commands are placeholders - Fixed
 
-`check_permissions`, `open_accessibility_settings`, and `open_mic_settings` are
-registered IPC commands but are not implemented. They are not currently exposed
-in the simplified UI, so this is not blocking unless the UI starts calling them.
+`check_permissions`, `open_accessibility_settings`, and `open_mic_settings` were
+registered IPC commands but returned hardcoded placeholder values.
+
+Remediation: permission checks now report microphone availability and
+accessibility/injection readiness using platform-specific checks, and the
+settings commands open OS settings panels where supported.
 
 ### P2: Overlay timer authority is split
 

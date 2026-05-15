@@ -32,6 +32,8 @@ disk.
 - Clipboard-based cross-platform text injection.
 - Paste-failure recovery: if text injection fails after a successful
   transcription, the overlay keeps the transcript visible and copyable.
+- Best-effort system permission checks and OS settings shortcuts for microphone
+  and accessibility/injection setup.
 - SQLite-backed history and settings.
 - Dashboard, History, Hotkeys, and Speech model pages.
 - System tray with open, pause/resume dictation, and quit actions.
@@ -97,8 +99,6 @@ Runtime injection dependencies on Linux:
 
 ## Known Limitations
 
-- Permission status commands are registered but currently return placeholder
-  values and are not surfaced by the simplified UI.
 - The overlay uses frontend timers for display countdowns and auto-hide while
   backend events drive major pipeline state transitions.
 - First launch is tracked with the `setup_complete` setting, not a separate
