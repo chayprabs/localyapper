@@ -70,6 +70,13 @@ export function useModels() {
           settings["speech_model"] ?? DEFAULT_SPEECH_MODEL;
         setSpeechModel(nextModel);
       } catch (error) {
+        setSpeechModelError(
+          error instanceof Error
+            ? error.message
+            : typeof error === "string"
+              ? error
+              : "Failed to load model settings",
+        );
         console.error("Failed to load model settings:", error);
       }
 

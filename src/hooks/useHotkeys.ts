@@ -72,8 +72,18 @@ export function useHotkeys() {
           hotkeySettings[def.key] = settings[def.key] ?? def.defaultValue;
         }
         setHotkeys(hotkeySettings);
+        setError(null);
       })
-      .catch((e) => console.error("Failed to load hotkeys:", e))
+      .catch((e) => {
+        console.error("Failed to load hotkeys:", e);
+        setError(
+          e instanceof Error
+            ? e.message
+            : typeof e === "string"
+              ? e
+              : "Failed to load hotkeys",
+        );
+      })
       .finally(() => setIsLoading(false));
   }, []);
 
