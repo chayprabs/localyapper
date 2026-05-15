@@ -79,18 +79,22 @@ jobs:
             platform: macos-latest
             rust_targets: aarch64-apple-darwin
             args: --target aarch64-apple-darwin
+            artifact: macos-aarch64
           - name: macOS Intel
             platform: macos-latest
             rust_targets: x86_64-apple-darwin
             args: --target x86_64-apple-darwin
+            artifact: macos-x64
           - name: Linux
             platform: ubuntu-22.04
             rust_targets: ""
             args: ""
+            artifact: linux-x64
           - name: Windows
             platform: windows-latest
             rust_targets: ""
             args: ""
+            artifact: windows-x64
 
     steps:
       - name: Checkout
@@ -133,12 +137,12 @@ jobs:
         run: npm ci
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v1
+        id: build-tauri
+        uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.args }}
-          uploadWorkflowArtifacts: true
           tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
           releaseName: ${{ startsWith(github.ref, 'refs/tags/v') && format('LocalYapper {0}', github.ref_name) || '' }}
           releaseBody: |
@@ -147,3 +151,24 @@ jobs:
             See docs/RELEASE_NOTES_v0.1.0.md for release notes.
           releaseDraft: true
           prerelease: false
+
+      - name: Prepare artifact paths
+        id: artifact-paths
+        if: steps.build-tauri.outputs.artifactPaths != '[]'
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const paths = JSON.parse(process.env.ARTIFACT_PATHS ?? '[]');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `paths<<EOF\n${paths.join('\n')}\nEOF\n`);
+          NODE
+        env:
+          ARTIFACT_PATHS: ${{ steps.build-tauri.outputs.artifactPaths }}
+
+      - name: Upload workflow artifacts
+        if: steps.artifact-paths.outputs.paths != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: localyapper-${{ matrix.artifact }}
+          path: ${{ steps.artifact-paths.outputs.paths }}
+          if-no-files-found: error
