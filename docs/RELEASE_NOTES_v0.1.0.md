@@ -97,6 +97,8 @@ Results:
   `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection_smoke -- --ignored --nocapture`.
 - Ignored microphone transcription smoke: added for manual execution with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_microphone_transcription_smoke -- --ignored --nocapture`.
+  It supports configurable timing and an optional Windows TTS prompt for
+  speaker-to-microphone setups.
 - Frontend production build: passed.
 - Tauri release build on Windows: passed.
 - Windows artifact produced:

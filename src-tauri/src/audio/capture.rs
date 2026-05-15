@@ -296,11 +296,13 @@ mod tests {
 #[cfg(test)]
 mod manual_tests {
     use super::*;
-    use crate::audio::vad::{apply_vad, SileroVad};
+    use crate::audio::vad::{apply_vad, compute_rms, SileroVad};
     use crate::stt::whisper::{
         stt_model_dir_name, WhisperEngine, DEFAULT_STT_MODEL, SILERO_VAD_FILENAME,
     };
     use std::path::PathBuf;
+    #[cfg(target_os = "windows")]
+    use std::process::Command;
     use std::thread;
     use std::time::Duration;
 
@@ -350,6 +352,46 @@ mod manual_tests {
         }
     }
 
+    #[cfg(target_os = "windows")]
+    fn play_optional_speech_prompt() -> Result<bool, String> {
+        let text = match std::env::var("LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT") {
+            Ok(value) if !value.trim().is_empty() => value,
+            _ => return Ok(false),
+        };
+
+        let script = "Add-Type -AssemblyName System.Speech; \
+            $speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer; \
+            $speaker.Rate = 0; \
+            $speaker.Speak($env:LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT)";
+        let status = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                script,
+            ])
+            .env("LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT", &text)
+            .status()
+            .map_err(|e| format!("Failed to run Windows speech prompt: {e}"))?;
+
+        if status.success() {
+            Ok(true)
+        } else {
+            Err(format!("Windows speech prompt exited with status {status}"))
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn play_optional_speech_prompt() -> Result<bool, String> {
+        match std::env::var("LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT") {
+            Ok(value) if !value.trim().is_empty() => Err(
+                "LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT is only supported on Windows".to_string(),
+            ),
+            _ => Ok(false),
+        }
+    }
+
     #[test]
     #[ignore = "requires an interactive desktop, a microphone, installed speech model files, and spoken audio"]
     fn manual_microphone_transcription_smoke() -> Result<(), String> {
@@ -376,9 +418,17 @@ mod manual_tests {
         let recorder = AudioRecorder::new();
         recorder.start().map_err(|e| e.to_string())?;
         println!("Recording now.");
+        if play_optional_speech_prompt()? {
+            println!("Windows speech prompt completed.");
+        }
         thread::sleep(Duration::from_secs(record_secs));
         let audio = recorder.stop().map_err(|e| e.to_string())?;
         println!("Captured {} samples at 16 kHz.", audio.len());
+        let rms = compute_rms(&audio);
+        let peak = audio
+            .iter()
+            .fold(0.0_f32, |max, sample| max.max(sample.abs()));
+        println!("Captured audio RMS: {rms:.6}, peak: {peak:.6}");
 
         if audio.len() < SAMPLE_RATE as usize {
             return Err(format!(
@@ -394,9 +444,9 @@ mod manual_tests {
         };
         let vad_result = apply_vad(&audio, silero.as_ref());
         if !vad_result.has_speech {
-            return Err(
-                "No speech detected; rerun and speak during the recording window".to_string(),
-            );
+            return Err(format!(
+                "No speech detected; rerun and speak during the recording window. Captured RMS: {rms:.6}, peak: {peak:.6}"
+            ));
         }
 
         let engine = WhisperEngine::new(&speech_model_dir).map_err(|e| e.to_string())?;

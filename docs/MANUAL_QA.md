@@ -116,6 +116,9 @@ Optional environment variables:
 - `LOCALYAPPER_MIC_SMOKE_RECORD_SECS`: recording duration in seconds.
 - `LOCALYAPPER_APP_DATA_DIR`: app data directory containing the `models` folder
   if it is not in the platform default location.
+- `LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT`: Windows-only optional spoken prompt
+  played through the system speaker during recording. Use this only when speaker
+  audio can be heard by the default microphone.
 
 ## Hotkey Pass
 

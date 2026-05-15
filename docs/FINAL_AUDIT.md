@@ -94,7 +94,7 @@ but it does not justify adding LLM features back into this release.
 | Git ignore policy | `.gitignore` excludes local agent files, ignored progress/PRD/source docs, cloud state, secrets, databases, models, build output, and release artifacts; no tracked file currently matches ignore rules. | Pass |
 | Manual desktop QA | `docs/MANUAL_QA.md` defines the remaining real microphone, overlay, hotkey, model, and external-app injection validation steps. | Checklist ready; not yet executed |
 | Windows external-app injection smoke | Ignored test `manual_windows_notepad_injection_smoke` launches Notepad, uses the real injector, verifies saved pasted text, and checks clipboard restoration. | Passed locally on Windows |
-| Microphone transcription smoke | Ignored test `manual_microphone_transcription_smoke` records from the default microphone after a configurable countdown, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Added; requires human speaker to execute |
+| Microphone transcription smoke | Ignored test `manual_microphone_transcription_smoke` records from the default microphone after a configurable countdown, can optionally play a Windows speech prompt, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Added; requires human speaker or speaker-to-mic setup to execute |
 
 ## Findings To Fix Before Release
 
@@ -305,8 +305,9 @@ speech-only release unless product direction changes.
 21. Add a manual desktop QA checklist for real microphone and external-app injection validation.
 22. Add and run an ignored Windows Notepad injection smoke test for clipboard save -> paste -> restore.
 23. Add an ignored microphone transcription smoke test for default mic -> VAD -> STT validation.
+24. Add optional Windows TTS prompting and RMS/peak diagnostics to the microphone transcription smoke.
 
-Completed in this run: items 1 through 23. Windows NSIS and Linux AppImage
+Completed in this run: items 1 through 24. Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25931329886` completed
 successfully for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs, and uploaded all four platform artifacts. Later source
@@ -317,4 +318,7 @@ Remaining manual validation gap: a real microphone recording injected into an
 external target application still needs hands-on end-to-end QA on a desktop
 session using `docs/MANUAL_QA.md`. The ignored Windows Notepad smoke test
 verifies the injector against an external app, but it does not prove the real
-microphone capture plus speech recognition path by itself.
+microphone capture plus speech recognition path by itself. A local attempt to
+run the microphone smoke with the optional Windows TTS prompt captured audio but
+did not pass VAD, so the real mic plus STT path still needs a hands-on spoken
+pass.
