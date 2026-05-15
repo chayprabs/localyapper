@@ -6,7 +6,8 @@ import { ModelStatusCard } from "./ModelStatusCard";
 import { LastDictationCard } from "./LastDictationCard";
 
 export function DashboardPage() {
-  const { stats, lastDictation, modelStatus, deleteLastDictation } = useDashboard();
+  const { stats, lastDictation, modelStatus, error, deleteLastDictation } =
+    useDashboard();
 
   const isEmpty = !stats || stats.total_sessions === 0;
 
@@ -19,6 +20,11 @@ export function DashboardPage() {
       {/* Header */}
       <header className="mb-5">
         <h1 className="text-[24px] font-bold text-[#1C1C1E]">Dashboard</h1>
+        {error && (
+          <p className="mt-3 max-w-[520px] rounded-lg border border-[#ba1a1a]/15 bg-[#ba1a1a]/[0.06] px-3 py-2 text-[12px] font-medium text-[#ba1a1a]">
+            {error}
+          </p>
+        )}
       </header>
 
       {/* Stat Cards Row */}

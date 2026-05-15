@@ -14,8 +14,17 @@ interface DashboardData {
   lastDictation: HistoryEntry | null;
   modelStatus: ModelsStatus | null;
   isLoading: boolean;
+  error: string | null;
   refresh: () => void;
   deleteLastDictation: (id: string) => Promise<void>;
+}
+
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error
+    ? error.message
+    : typeof error === "string"
+      ? error
+      : fallback;
 }
 
 export function useDashboard(): DashboardData {
@@ -23,6 +32,7 @@ export function useDashboard(): DashboardData {
   const [lastDictation, setLastDictation] = useState<HistoryEntry | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelsStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true);
@@ -41,6 +51,14 @@ export function useDashboard(): DashboardData {
     if (modelsResult.status === "fulfilled") {
       setModelStatus(modelsResult.value);
     }
+    const failed = [statsResult, historyResult, modelsResult].find(
+      (result) => result.status === "rejected",
+    );
+    setError(
+      failed?.status === "rejected"
+        ? toErrorMessage(failed.reason, "Failed to load dashboard")
+        : null,
+    );
 
     setIsLoading(false);
   }, []);
@@ -63,8 +81,15 @@ export function useDashboard(): DashboardData {
 
   const deleteLastDictation = useCallback(
     async (id: string) => {
-      await deleteHistoryEntry(id);
-      void fetchAll();
+      setError(null);
+      try {
+        await deleteHistoryEntry(id);
+        void fetchAll();
+      } catch (deleteError) {
+        setError(
+          toErrorMessage(deleteError, "Failed to delete last dictation"),
+        );
+      }
     },
     [fetchAll],
   );
@@ -74,6 +99,7 @@ export function useDashboard(): DashboardData {
     lastDictation,
     modelStatus,
     isLoading,
+    error,
     refresh: fetchAll,
     deleteLastDictation,
   };

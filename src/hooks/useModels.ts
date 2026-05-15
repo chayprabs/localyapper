@@ -193,6 +193,13 @@ export function useModels() {
       setSpeechModelLoaded(false);
       updateStatusCache(nextFileStatus, false);
     } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "Remove failed";
+      setSpeechModelError(message);
       console.error("Speech model delete failed:", error);
     }
   }, [speechModel, updateStatusCache]);
