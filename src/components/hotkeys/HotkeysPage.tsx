@@ -161,6 +161,7 @@ export function HotkeysPage() {
     entries,
     isLoading,
     editingKey,
+    error,
     updateHotkey,
     resetToDefaults,
     startEditing,
@@ -192,6 +193,11 @@ export function HotkeysPage() {
           <p className="mt-2 text-[13px] text-black/[0.45]">
             Choose the shortcuts you want to use across the app.
           </p>
+          {error && (
+            <p className="mt-3 max-w-[520px] rounded-lg border border-[#ba1a1a]/15 bg-[#ba1a1a]/[0.06] px-3 py-2 text-[12px] font-medium text-[#ba1a1a]">
+              {error}
+            </p>
+          )}
         </div>
 
         {showResetConfirm ? (

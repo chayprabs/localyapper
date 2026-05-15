@@ -62,6 +62,7 @@ export function useHotkeys() {
   const [hotkeys, setHotkeys] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getAllSettings()
@@ -79,6 +80,7 @@ export function useHotkeys() {
   const updateHotkey = useCallback(
     async (key: string, value: string) => {
       const previous = hotkeys[key];
+      setError(null);
       // Optimistic update
       setHotkeys((prev) => ({ ...prev, [key]: value }));
       setEditingKey(null);
@@ -88,6 +90,13 @@ export function useHotkeys() {
       } catch (e) {
         // Rollback on error
         console.error("Failed to update hotkey:", e);
+        setError(
+          e instanceof Error
+            ? e.message
+            : typeof e === "string"
+              ? e
+              : "Failed to update hotkey",
+        );
         setHotkeys((prev) => ({ ...prev, [key]: previous ?? "" }));
       }
     },
@@ -95,16 +104,25 @@ export function useHotkeys() {
   );
 
   const resetToDefaults = useCallback(async () => {
+    setError(null);
     try {
       const defaults = await resetHotkeysCmd();
       setHotkeys(defaults);
       setEditingKey(null);
     } catch (e) {
       console.error("Failed to reset hotkeys:", e);
+      setError(
+        e instanceof Error
+          ? e.message
+          : typeof e === "string"
+            ? e
+            : "Failed to reset hotkeys",
+      );
     }
   }, []);
 
   const startEditing = useCallback((key: string) => {
+    setError(null);
     setEditingKey(key);
   }, []);
 
@@ -124,6 +142,7 @@ export function useHotkeys() {
     entries,
     isLoading,
     editingKey,
+    error,
     updateHotkey,
     resetToDefaults,
     startEditing,
