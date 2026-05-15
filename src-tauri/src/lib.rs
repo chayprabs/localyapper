@@ -27,11 +27,12 @@ pub(crate) fn speech_model_candidates(app: &tauri::AppHandle, model_setting: &st
         Ok(d) => d.join("models"),
         Err(_) => return vec![],
     };
+    let model_setting = stt::whisper::normalize_stt_model_name(model_setting);
 
     let primary = models_dir.join(stt::whisper::stt_model_dir_name(model_setting));
-    let fallback = if model_setting != stt::whisper::DEFAULT_WHISPER_MODEL {
+    let fallback = if model_setting != stt::whisper::DEFAULT_STT_MODEL {
         Some(models_dir.join(stt::whisper::stt_model_dir_name(
-            stt::whisper::DEFAULT_WHISPER_MODEL,
+            stt::whisper::DEFAULT_STT_MODEL,
         )))
     } else {
         None
@@ -64,6 +65,7 @@ pub(crate) fn load_speech_model_from_setting(
     model_setting: &str,
 ) -> Result<Arc<WhisperEngine>, String> {
     let candidate = resolve_speech_model_dir(app, model_setting).ok_or_else(|| {
+        let model_setting = stt::whisper::normalize_stt_model_name(model_setting);
         format!(
             "Speech model files not found for {}. Open Settings > Speech to download them.",
             stt::whisper::stt_model_dir_name(model_setting)
@@ -112,7 +114,7 @@ pub fn run() {
                 Box::new(e) as Box<dyn std::error::Error>
             })?;
             let speech_model_setting = db::queries::get_setting(&conn, "speech_model")
-                .unwrap_or_else(|_| stt::whisper::DEFAULT_WHISPER_MODEL.to_string());
+                .unwrap_or_else(|_| stt::whisper::DEFAULT_STT_MODEL.to_string());
             let auto_start_enabled = db::queries::get_setting(&conn, "auto_start")
                 .map(|value| value.eq_ignore_ascii_case("true"))
                 .unwrap_or(true);

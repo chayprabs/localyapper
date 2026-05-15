@@ -9,12 +9,14 @@ use crate::state::AppState;
 use crate::stt::whisper::WhisperEngine;
 
 fn selected_speech_model_name(state: &AppState) -> String {
-    state
+    let model = state
         .db
         .lock()
         .ok()
         .and_then(|db| crate::db::queries::get_setting(&db, "speech_model").ok())
-        .unwrap_or_else(|| crate::stt::whisper::DEFAULT_WHISPER_MODEL.to_string())
+        .unwrap_or_else(|| crate::stt::whisper::DEFAULT_STT_MODEL.to_string());
+
+    crate::stt::whisper::normalize_stt_model_name(&model).to_string()
 }
 
 pub(crate) async fn ensure_speech_model_loaded(

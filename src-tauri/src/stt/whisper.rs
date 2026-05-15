@@ -14,15 +14,23 @@ const MIN_AUDIO_SAMPLES: usize = 3_200;
 const MAX_STT_THREADS: usize = 4;
 
 /// Default STT model variant for new installs.
-pub const DEFAULT_WHISPER_MODEL: &str = "parakeet-110m";
+pub const DEFAULT_STT_MODEL: &str = "parakeet-110m";
+
+/// Return a supported current speech model setting, falling back from removed
+/// legacy model settings to the current default.
+pub fn normalize_stt_model_name(model: &str) -> &'static str {
+    match model {
+        "parakeet-110m" => "parakeet-110m",
+        "parakeet-0.6b" => "parakeet-0.6b",
+        _ => DEFAULT_STT_MODEL,
+    }
+}
 
 /// Map a model setting string to the directory name where ONNX files are stored.
 pub fn stt_model_dir_name(model: &str) -> String {
     match model {
         "parakeet-110m" => "parakeet-tdt-ctc-110m".to_string(),
         "parakeet-0.6b" => "parakeet-tdt-0.6b-v2".to_string(),
-        // Legacy Whisper support — map old settings to a directory name
-        "tiny.en" | "base.en" | "small.en" | "medium.en" => format!("whisper-{model}"),
         _ => model.to_string(),
     }
 }
@@ -185,14 +193,20 @@ mod tests {
 
     #[test]
     fn default_model_is_parakeet() {
-        assert_eq!(DEFAULT_WHISPER_MODEL, "parakeet-110m");
+        assert_eq!(DEFAULT_STT_MODEL, "parakeet-110m");
+    }
+
+    #[test]
+    fn removed_model_settings_normalize_to_default() {
+        assert_eq!(normalize_stt_model_name("base.en"), DEFAULT_STT_MODEL);
+        assert_eq!(normalize_stt_model_name("tiny.en"), DEFAULT_STT_MODEL);
+        assert_eq!(normalize_stt_model_name("unknown"), DEFAULT_STT_MODEL);
     }
 
     #[test]
     fn model_dir_names_are_correct() {
         assert_eq!(stt_model_dir_name("parakeet-110m"), "parakeet-tdt-ctc-110m");
         assert_eq!(stt_model_dir_name("parakeet-0.6b"), "parakeet-tdt-0.6b-v2");
-        assert_eq!(stt_model_dir_name("base.en"), "whisper-base.en");
     }
 
     #[test]

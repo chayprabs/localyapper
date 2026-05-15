@@ -67,9 +67,7 @@ export function useModels() {
       try {
         const settings = await getAllSettings();
         nextModel =
-          settings["speech_model"] ??
-          settings["whisper_model"] ??
-          DEFAULT_SPEECH_MODEL;
+          settings["speech_model"] ?? DEFAULT_SPEECH_MODEL;
         setSpeechModel(nextModel);
       } catch (error) {
         console.error("Failed to load model settings:", error);
