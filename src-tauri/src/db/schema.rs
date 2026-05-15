@@ -33,7 +33,7 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
     Ok(())
 }
 
-/// Inserts default settings (14 rows). Uses INSERT OR IGNORE for idempotency.
+/// Inserts default settings (10 rows). Uses INSERT OR IGNORE for idempotency.
 fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     let seeds = [
         ("hotkey_record", "F8"),
@@ -43,13 +43,9 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
         ("hotkey_open_app", "Ctrl+Alt+O"),
         ("speech_model", "parakeet-110m"),
         ("auto_start", "true"),
-        ("sound_effects", "true"),
-        ("mute_media", "true"),
-        ("language", "en"),
         ("overlay_x", "100"),
         ("overlay_y", "100"),
         ("setup_complete", "false"),
-        ("max_recording_seconds", "120"),
     ];
 
     let tx = conn.unchecked_transaction()?;
@@ -69,7 +65,7 @@ fn migrate_removed_features(conn: &Connection) -> Result<(), LocalYapperError> {
     conn.execute("DROP TABLE IF EXISTS corrections", [])?;
     conn.execute("DROP TABLE IF EXISTS personal_dictionary", [])?;
     conn.execute(
-        "DELETE FROM settings WHERE key IN ('confidence_threshold', 'correction_decay_days', 'training_paragraph_index', 'auto_inject_delay_ms')",
+        "DELETE FROM settings WHERE key IN ('confidence_threshold', 'correction_decay_days', 'training_paragraph_index', 'auto_inject_delay_ms', 'sound_effects', 'mute_media', 'language', 'max_recording_seconds')",
         [],
     )?;
     Ok(())

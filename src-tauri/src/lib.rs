@@ -113,6 +113,9 @@ pub fn run() {
             })?;
             let speech_model_setting = db::queries::get_setting(&conn, "speech_model")
                 .unwrap_or_else(|_| stt::whisper::DEFAULT_WHISPER_MODEL.to_string());
+            let auto_start_enabled = db::queries::get_setting(&conn, "auto_start")
+                .map(|value| value.eq_ignore_ascii_case("true"))
+                .unwrap_or(true);
             let speech_model_installed =
                 resolve_speech_model_dir(app.handle(), &speech_model_setting).is_some();
             let speech_engine = if speech_model_installed {
@@ -212,11 +215,18 @@ pub fn run() {
             {
                 use tauri_plugin_autostart::ManagerExt;
                 let manager = app.autolaunch();
-                if !manager.is_enabled().unwrap_or(false) {
+                let is_enabled = manager.is_enabled().unwrap_or(false);
+                if auto_start_enabled && !is_enabled {
                     if let Err(e) = manager.enable() {
                         log::warn!("Failed to enable autostart: {e}");
                     } else {
                         log::info!("Autostart enabled by default");
+                    }
+                } else if !auto_start_enabled && is_enabled {
+                    if let Err(e) = manager.disable() {
+                        log::warn!("Failed to disable autostart: {e}");
+                    } else {
+                        log::info!("Autostart disabled by setting");
                     }
                 }
             }
