@@ -7,15 +7,56 @@ src-tauri/target/
 *.tsbuildinfo
 vite.config.d.ts
 
+# Release artifacts
+*.msi
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+
 # Models (large binary files)
 *.bin
 *.gguf
 *.onnx
+*.download
+
+# Local app data / databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
 
 # Environment files
 .env
 .env.*
 !.env.example
+
+# Local agent and assistant state
+.claude/
+.codex/
+.agents/
+AGENTS.md
+CLAUDE.md
+**/AGENTS.md
+**/CLAUDE.md
+
+# Internal planning docs
+docs/PROGRESS.md
+docs/**/PROGRESS.md
+docs/**/progress.md
+PRD*.md
+prd*.md
+SOURCE*.md
+source*.md
+docs/**/PRD*.md
+docs/**/*PRD*.md
+docs/**/prd*.md
+docs/**/*prd*.md
+docs/**/SOURCE*.md
+docs/**/*SOURCE*.md
+docs/**/source*.md
+docs/**/*source*.md
 
 # IDE
 .vscode/
@@ -30,3 +71,9 @@ Thumbs.db
 
 # Tauri
 src-tauri/gen/
+
+# Local browser/testing artifacts
+.playwright-mcp/
+playwright-report/
+test-results/
+*.log
