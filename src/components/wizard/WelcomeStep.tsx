@@ -2,9 +2,11 @@
 export function WelcomeStep({
   onGetStarted,
   onSkip,
+  error,
 }: {
   onGetStarted: () => void;
   onSkip: () => void;
+  error: string | null;
 }) {
   return (
     <div className="flex flex-col items-center text-center">
@@ -36,6 +38,12 @@ export function WelcomeStep({
       >
         Skip setup
       </button>
+
+      {error && (
+        <p className="mt-4 w-full rounded-lg border border-[#ba1a1a]/15 bg-[#ba1a1a]/[0.06] px-3 py-2 text-[12px] font-medium text-[#ba1a1a]">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@ export function useWizard(onComplete: () => void) {
   const [downloadProgress, setDownloadProgress] =
     useState<DownloadProgress | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [setupError, setSetupError] = useState<string | null>(null);
   const [hotkey, setHotkey] = useState("F8");
 
   const goToDownload = useCallback(() => {
@@ -67,21 +68,37 @@ export function useWizard(onComplete: () => void) {
   }, []);
 
   const finishWizard = useCallback(async () => {
+    setSetupError(null);
     try {
       await reloadModels();
       await updateHotkey("hotkey_record", hotkey);
       await setSetting("setup_complete", "true");
       onComplete();
     } catch (error) {
+      const message =
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+            ? error.message
+            : "Failed to finish setup";
+      setSetupError(message);
       console.error("Failed to finish wizard:", error);
     }
   }, [hotkey, onComplete]);
 
   const skipSetup = useCallback(async () => {
+    setSetupError(null);
     try {
       await setSetting("setup_complete", "true");
       onComplete();
     } catch (error) {
+      const message =
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+            ? error.message
+            : "Failed to skip setup";
+      setSetupError(message);
       console.error("Failed to skip setup:", error);
     }
   }, [onComplete]);
@@ -90,6 +107,7 @@ export function useWizard(onComplete: () => void) {
     step,
     downloadProgress,
     downloadError,
+    setupError,
     hotkey,
     setHotkey,
     goToDownload,

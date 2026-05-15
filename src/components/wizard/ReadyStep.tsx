@@ -29,9 +29,11 @@ function parseHotkeyParts(hotkey: string): string[] {
 export function ReadyStep({
   hotkey,
   onFinish,
+  error,
 }: {
   hotkey: string;
   onFinish: () => void;
+  error: string | null;
 }) {
   const parts = parseHotkeyParts(hotkey);
 
@@ -69,6 +71,12 @@ export function ReadyStep({
       >
         Start Yapping
       </button>
+
+      {error && (
+        <p className="mt-4 w-full rounded-lg border border-[#ba1a1a]/15 bg-[#ba1a1a]/[0.06] px-3 py-2 text-[12px] font-medium text-[#ba1a1a]">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

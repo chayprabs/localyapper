@@ -24,6 +24,7 @@ export function Wizard() {
           <WelcomeStep
             onGetStarted={wizard.goToDownload}
             onSkip={wizard.skipSetup}
+            error={wizard.setupError}
           />
         );
       case "downloading":
@@ -47,7 +48,13 @@ export function Wizard() {
           />
         );
       case "ready":
-        return <ReadyStep hotkey={wizard.hotkey} onFinish={wizard.finishWizard} />;
+        return (
+          <ReadyStep
+            hotkey={wizard.hotkey}
+            onFinish={wizard.finishWizard}
+            error={wizard.setupError}
+          />
+        );
     }
   }
 
