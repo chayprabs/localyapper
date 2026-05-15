@@ -66,43 +66,59 @@ but it does not justify adding LLM features back into this release.
 | Database tables | Current active tables are `transcription_history` and `settings`; legacy corrections/dictionary tables are dropped. | Current product pass |
 | Typed IPC wrappers | Commands have wrappers under `src/lib/commands` and types in `src/types/commands.ts`. | Pass |
 | No TypeScript `any` | ESLint rule rejects explicit `any`; search did not find TS `any` usage. | Pass |
-| No `unwrap()`/`expect()` in production paths | `lib.rs` still has startup `.expect()` calls. | Fail |
-| No dead code suppressions | `lib.rs` has `#![allow(clippy::duplicate_mod, dead_code)]`. | Fail |
+| No `unwrap()`/`expect()` in production paths | Startup `.expect()` calls were replaced with logged error handling. Search is clean for `unwrap(` and `expect(` in `src-tauri/src`. | Pass |
+| No dead code suppressions | Global dead-code suppression was removed and clippy passes with `-D warnings`. | Pass |
 | Permission commands | `check_permissions` returns false and settings-open commands are stubs. | Release risk if surfaced |
-| Build docs | `docs/BUILD.md` does not exist. | Missing |
-| Release notes | `docs/RELEASE_NOTES_v0.1.0.md` does not exist. | Missing |
-| Verification | Previous run passed lint, typecheck, clippy, tests, and frontend build. Need rerun after fixes. | Pending |
-| Tauri build | Not yet verified in this run. | Pending |
+| Build docs | `docs/BUILD.md` added for Windows, macOS, and Linux build paths. | Done |
+| Release notes | `docs/RELEASE_NOTES_v0.1.0.md` added for the current release candidate. | Done |
+| Verification | lint, typecheck, fmt check, clippy, tests, and frontend build passed after fixes. | Pass |
+| Tauri build | `npm run tauri build` passed on Windows and produced `src-tauri/target/release/localyapper.exe`. | Windows pass |
 
 ## Findings To Fix Before Release
 
-### P0: Production startup panics remain in `lib.rs`
+### P0: Production startup panics remain in `lib.rs` - Fixed
 
 `src-tauri/src/lib.rs` still uses `.expect()` for app data directory lookup,
 database initialization, and final Tauri run. The app should log and return
 setup errors instead of crashing without context where Tauri allows it.
 
-### P1: Clippy/dead-code suppressions hide real release quality issues
+Remediation: startup setup errors are now logged and returned through Tauri
+setup, final Tauri runtime errors are logged, and the production source search
+is clean for `unwrap(` and `expect(`.
+
+### P1: Clippy/dead-code suppressions hide real release quality issues - Fixed
 
 `src-tauri/src/lib.rs` allows `dead_code` globally. This should be removed if
 possible, and any resulting warnings should be fixed or scoped narrowly.
 
-### P1: Injection failures lose the transcribed text
+Remediation: the global allow was removed, unused items were cleaned up or
+scoped to tests, and clippy passes with `-D warnings`.
+
+### P1: Injection failures lose the transcribed text - Fixed
 
 If paste injection fails, the backend emits `error` without preserving the text
 for the overlay. For a dictation app, losing the visible transcript after a
 successful transcription is a serious user-facing failure mode.
 
-### P1: Build and release documentation are missing
+Remediation: injection failure events now include the transcript, and the
+overlay keeps it visible and copyable with a paste-failed indicator.
+
+### P1: Build and release documentation are missing - Fixed
 
 `docs/BUILD.md` and `docs/RELEASE_NOTES_v0.1.0.md` need to be written for the
 current speech-only release.
 
-### P2: README source-of-truth section references ignored local docs
+Remediation: both documents were added for the current speech-only release
+candidate.
+
+### P2: README source-of-truth section references ignored local docs - Fixed
 
 The repo now ignores local agent files and `docs/PROGRESS.md`, but `README.md`
 still lists them as source-of-truth references. The public README should point
 to tracked public docs and live code instead.
+
+Remediation: README now points to `README.md`, `DESIGN_SYSTEM.md`,
+`docs/FINAL_AUDIT.md`, and the live source tree.
 
 ### P2: Permission commands are placeholders
 
@@ -128,3 +144,5 @@ speech-only release unless product direction changes.
 5. Add build and release notes docs.
 6. Rerun lint, typecheck, clippy, tests, frontend build, and Tauri build.
 
+Completed in this run: items 1 through 6. Windows build was verified locally.
+macOS and Linux packaging still need native hosts or CI runners.
