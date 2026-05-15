@@ -26,8 +26,14 @@ function isInteractiveTarget(target: EventTarget | null) {
 }
 
 export function Overlay() {
-  const { overlayData, elapsedSeconds, remainingSeconds, autoInjectProgress, processingCountdown, dismissOverlay } =
-    useOverlayState();
+  const {
+    overlayData,
+    elapsedSeconds,
+    remainingSeconds,
+    transcribedDisplayProgress,
+    processingCountdown,
+    dismissOverlay,
+  } = useOverlayState();
   const { visualState, text, durationMs, error } = overlayData;
 
   if (visualState === "hidden") {
@@ -180,7 +186,7 @@ export function Overlay() {
               <div className="absolute bottom-0 left-0 w-full h-[2px] bg-black/[0.05]">
                 <div
                   className="h-full bg-primary transition-none"
-                  style={{ width: `${autoInjectProgress * 100}%` }}
+                  style={{ width: `${transcribedDisplayProgress * 100}%` }}
                 />
               </div>
             )}

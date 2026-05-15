@@ -7,7 +7,7 @@ export type OverlayVisualState =
   | "stopping-soon" // Last 15s of recording, red countdown
   | "processing"    // Pipeline running after recording stops
   | "long-recording"// Processing a recording > 30s, shows minute counter
-  | "transcribed"   // Final text displayed, auto-inject countdown running
+  | "transcribed"   // Final text displayed, dismiss progress running
   | "no-speech";    // VAD found no speech, auto-hides after 2s
 
 export interface PipelineEvent {

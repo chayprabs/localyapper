@@ -16,19 +16,19 @@ const WARNING_THRESHOLD_SECONDS = 105;
 /** Recordings longer than 30s show the "long-recording" processing spinner. */
 const LONG_RECORDING_THRESHOLD_MS = 30_000;
 /** Milliseconds the transcribed text stays visible before auto-hiding. */
-const AUTO_INJECT_DISPLAY_MS = 3000;
+const TRANSCRIBED_DISPLAY_MS = 3000;
 
 export function useOverlayState() {
   const [overlayData, setOverlayData] = useAtom(overlayDataAtom);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [autoInjectProgress, setAutoInjectProgress] = useState(0);
+  const [transcribedDisplayProgress, setTranscribedDisplayProgress] = useState(0);
   const [processingCountdown, setProcessingCountdown] = useState<number | null>(null);
 
   const generationRef = useRef(0);
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const injectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const injectAnimRef = useRef<number | null>(null);
+  const displayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const displayAnimRef = useRef<number | null>(null);
   const recordingStartRef = useRef<number | null>(null);
   const overlayDataRef = useRef(overlayData);
   overlayDataRef.current = overlayData;
@@ -42,13 +42,13 @@ export function useOverlayState() {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
     }
-    if (injectTimeoutRef.current) {
-      clearTimeout(injectTimeoutRef.current);
-      injectTimeoutRef.current = null;
+    if (displayTimeoutRef.current) {
+      clearTimeout(displayTimeoutRef.current);
+      displayTimeoutRef.current = null;
     }
-    if (injectAnimRef.current) {
-      cancelAnimationFrame(injectAnimRef.current);
-      injectAnimRef.current = null;
+    if (displayAnimRef.current) {
+      cancelAnimationFrame(displayAnimRef.current);
+      displayAnimRef.current = null;
     }
   }, []);
 
@@ -135,28 +135,28 @@ export function useOverlayState() {
     [transition],
   );
 
-  const startAutoInjectCountdown = useCallback(
+  const startTranscribedDisplayCountdown = useCallback(
     (gen: number) => {
       const startTime = Date.now();
-      setAutoInjectProgress(0);
+      setTranscribedDisplayProgress(0);
 
       const animate = () => {
         if (generationRef.current !== gen) return;
         const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / AUTO_INJECT_DISPLAY_MS, 1);
-        setAutoInjectProgress(progress);
+        const progress = Math.min(elapsed / TRANSCRIBED_DISPLAY_MS, 1);
+        setTranscribedDisplayProgress(progress);
 
         if (progress < 1) {
-          injectAnimRef.current = requestAnimationFrame(animate);
+          displayAnimRef.current = requestAnimationFrame(animate);
         }
       };
-      injectAnimRef.current = requestAnimationFrame(animate);
+      displayAnimRef.current = requestAnimationFrame(animate);
 
-      injectTimeoutRef.current = setTimeout(() => {
+      displayTimeoutRef.current = setTimeout(() => {
         if (generationRef.current !== gen) return;
         transition("hidden");
         hideOverlay();
-      }, AUTO_INJECT_DISPLAY_MS);
+      }, TRANSCRIBED_DISPLAY_MS);
     },
     [transition, hideOverlay],
   );
@@ -176,7 +176,7 @@ export function useOverlayState() {
       switch (state) {
         case "listening": {
           setElapsedSeconds(0);
-          setAutoInjectProgress(0);
+          setTranscribedDisplayProgress(0);
           setProcessingCountdown(null);
           transition("listening", {
             text: null,
@@ -191,7 +191,7 @@ export function useOverlayState() {
         }
 
         case "stopping-soon": {
-          setAutoInjectProgress(0);
+          setTranscribedDisplayProgress(0);
           transition("stopping-soon", {
             text: null,
             durationMs: null,
@@ -246,7 +246,7 @@ export function useOverlayState() {
             durationMs: duration_ms,
             wordCount: word_count,
           });
-          startAutoInjectCountdown(gen);
+          startTranscribedDisplayCountdown(gen);
           break;
         }
 
@@ -283,7 +283,7 @@ export function useOverlayState() {
         case "error": {
           if (text) {
             setProcessingCountdown(null);
-            setAutoInjectProgress(0);
+            setTranscribedDisplayProgress(0);
             transition("transcribed", {
               text,
               durationMs: duration_ms,
@@ -314,7 +314,7 @@ export function useOverlayState() {
     showOverlay,
     hideOverlay,
     startElapsedTimer,
-    startAutoInjectCountdown,
+    startTranscribedDisplayCountdown,
   ]);
 
   const recordingElapsed = elapsedSeconds;
@@ -325,7 +325,7 @@ export function useOverlayState() {
     elapsedSeconds,
     recordingElapsed,
     remainingSeconds,
-    autoInjectProgress,
+    transcribedDisplayProgress,
     processingCountdown,
     dismissOverlay,
   };

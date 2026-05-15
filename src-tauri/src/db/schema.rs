@@ -26,14 +26,14 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
     )?;
 
     seed_settings(conn)?;
-    migrate_removed_dictionary_feature(conn)?;
+    migrate_removed_features(conn)?;
     migrate_hotkey_defaults(conn)?;
     migrate_legacy_speech_model_settings(conn)?;
 
     Ok(())
 }
 
-/// Inserts default settings (15 rows). Uses INSERT OR IGNORE for idempotency.
+/// Inserts default settings (14 rows). Uses INSERT OR IGNORE for idempotency.
 fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     let seeds = [
         ("hotkey_record", "F8"),
@@ -50,7 +50,6 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
         ("overlay_y", "100"),
         ("setup_complete", "false"),
         ("max_recording_seconds", "120"),
-        ("auto_inject_delay_ms", "10000"),
     ];
 
     let tx = conn.unchecked_transaction()?;
@@ -65,12 +64,12 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     Ok(())
 }
 
-/// Drop legacy dictionary/correction tables and stale settings from older builds.
-fn migrate_removed_dictionary_feature(conn: &Connection) -> Result<(), LocalYapperError> {
+/// Drop removed feature tables and stale settings from older builds.
+fn migrate_removed_features(conn: &Connection) -> Result<(), LocalYapperError> {
     conn.execute("DROP TABLE IF EXISTS corrections", [])?;
     conn.execute("DROP TABLE IF EXISTS personal_dictionary", [])?;
     conn.execute(
-        "DELETE FROM settings WHERE key IN ('confidence_threshold', 'correction_decay_days', 'training_paragraph_index')",
+        "DELETE FROM settings WHERE key IN ('confidence_threshold', 'correction_decay_days', 'training_paragraph_index', 'auto_inject_delay_ms')",
         [],
     )?;
     Ok(())
