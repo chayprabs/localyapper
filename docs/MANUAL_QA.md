@@ -120,6 +120,23 @@ Optional environment variables:
   played through the system speaker during recording. Use this only when speaker
   audio can be heard by the default microphone.
 
+## Optional Windows Synthetic Speech STT Smoke
+
+This ignored Windows-only test generates a 16 kHz mono WAV with Windows SAPI,
+runs it through VAD and the installed speech model, and asserts that STT returns
+a non-empty transcript:
+
+```powershell
+cargo test --manifest-path src-tauri/Cargo.toml manual_windows_tts_file_transcription_smoke -- --ignored --nocapture
+```
+
+Optional environment variable:
+
+- `LOCALYAPPER_TTS_FILE_SMOKE_TEXT`: phrase to synthesize into the temporary WAV.
+
+This validates VAD plus local STT with generated speech audio, but it does not
+replace the real microphone capture pass.
+
 ## Hotkey Pass
 
 1. Open Settings > Hotkeys.

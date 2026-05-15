@@ -222,3 +222,183 @@ mod tests {
         assert!(stt_model_files("nonexistent-model").is_empty());
     }
 }
+
+#[cfg(all(test, target_os = "windows"))]
+mod manual_tests {
+    use super::*;
+    use crate::audio::vad::{apply_vad, compute_rms};
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+
+    fn default_app_data_dir() -> Result<PathBuf, String> {
+        if let Ok(path) = std::env::var("LOCALYAPPER_APP_DATA_DIR") {
+            return Ok(PathBuf::from(path));
+        }
+
+        let app_data = std::env::var("APPDATA")
+            .map_err(|_| "APPDATA is not set; set LOCALYAPPER_APP_DATA_DIR".to_string())?;
+        Ok(PathBuf::from(app_data).join("com.localyapper.desktop"))
+    }
+
+    fn read_u16_le(bytes: &[u8], offset: usize) -> Result<u16, String> {
+        let slice = bytes
+            .get(offset..offset + 2)
+            .ok_or_else(|| format!("WAV ended before u16 at offset {offset}"))?;
+        Ok(u16::from_le_bytes([slice[0], slice[1]]))
+    }
+
+    fn read_u32_le(bytes: &[u8], offset: usize) -> Result<u32, String> {
+        let slice = bytes
+            .get(offset..offset + 4)
+            .ok_or_else(|| format!("WAV ended before u32 at offset {offset}"))?;
+        Ok(u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]))
+    }
+
+    fn read_pcm16_mono_16khz_wav(path: &Path) -> Result<Vec<f32>, String> {
+        let bytes = fs::read(path).map_err(|e| format!("Failed to read WAV: {e}"))?;
+        if bytes.get(0..4) != Some(b"RIFF") || bytes.get(8..12) != Some(b"WAVE") {
+            return Err("WAV is not RIFF/WAVE".to_string());
+        }
+
+        let mut audio_format = None;
+        let mut channels = None;
+        let mut sample_rate = None;
+        let mut bits_per_sample = None;
+        let mut data_range = None;
+        let mut offset = 12usize;
+
+        while offset + 8 <= bytes.len() {
+            let chunk_id = bytes
+                .get(offset..offset + 4)
+                .ok_or_else(|| "Missing WAV chunk id".to_string())?;
+            let chunk_size = read_u32_le(&bytes, offset + 4)? as usize;
+            let chunk_start = offset + 8;
+            let chunk_end = chunk_start
+                .checked_add(chunk_size)
+                .ok_or_else(|| "WAV chunk size overflow".to_string())?;
+            if chunk_end > bytes.len() {
+                return Err("WAV chunk extends past end of file".to_string());
+            }
+
+            match chunk_id {
+                b"fmt " => {
+                    audio_format = Some(read_u16_le(&bytes, chunk_start)?);
+                    channels = Some(read_u16_le(&bytes, chunk_start + 2)?);
+                    sample_rate = Some(read_u32_le(&bytes, chunk_start + 4)?);
+                    bits_per_sample = Some(read_u16_le(&bytes, chunk_start + 14)?);
+                }
+                b"data" => data_range = Some(chunk_start..chunk_end),
+                _ => {}
+            }
+
+            offset = chunk_end + (chunk_size % 2);
+        }
+
+        if audio_format != Some(1) {
+            return Err(format!("Expected PCM WAV format 1, got {audio_format:?}"));
+        }
+        if channels != Some(1) {
+            return Err(format!("Expected mono WAV, got {channels:?} channels"));
+        }
+        if sample_rate != Some(16_000) {
+            return Err(format!("Expected 16 kHz WAV, got {sample_rate:?}"));
+        }
+        if bits_per_sample != Some(16) {
+            return Err(format!(
+                "Expected 16-bit WAV samples, got {bits_per_sample:?}"
+            ));
+        }
+
+        let data_range = data_range.ok_or_else(|| "WAV has no data chunk".to_string())?;
+        let data = &bytes[data_range];
+        if data.len() % 2 != 0 {
+            return Err("PCM16 data chunk has an odd byte length".to_string());
+        }
+
+        Ok(data
+            .chunks_exact(2)
+            .map(|chunk| i16::from_le_bytes([chunk[0], chunk[1]]) as f32 / 32768.0)
+            .collect())
+    }
+
+    fn generate_windows_tts_wav(path: &Path, text: &str) -> Result<(), String> {
+        let script = "Add-Type -AssemblyName System.Speech; \
+            $format = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, [System.Speech.AudioFormat.AudioChannel]::Mono); \
+            $speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer; \
+            $speaker.SetOutputToWaveFile($env:LOCALYAPPER_TTS_WAV_PATH, $format); \
+            $speaker.Speak($env:LOCALYAPPER_TTS_TEXT); \
+            $speaker.Dispose()";
+        let status = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                script,
+            ])
+            .env("LOCALYAPPER_TTS_WAV_PATH", path)
+            .env("LOCALYAPPER_TTS_TEXT", text)
+            .status()
+            .map_err(|e| format!("Failed to generate Windows TTS WAV: {e}"))?;
+
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!("Windows TTS WAV generation exited with {status}"))
+        }
+    }
+
+    #[test]
+    #[ignore = "requires Windows SAPI and installed speech model files"]
+    fn manual_windows_tts_file_transcription_smoke() -> Result<(), String> {
+        let text = std::env::var("LOCALYAPPER_TTS_FILE_SMOKE_TEXT").unwrap_or_else(|_| {
+            "LocalYapper synthetic speech transcription smoke test.".to_string()
+        });
+        let wav_path = std::env::temp_dir().join(format!(
+            "localyapper-tts-file-smoke-{}.wav",
+            std::process::id()
+        ));
+        generate_windows_tts_wav(&wav_path, &text)?;
+
+        let audio = match read_pcm16_mono_16khz_wav(&wav_path) {
+            Ok(audio) => audio,
+            Err(e) => {
+                let _ = fs::remove_file(&wav_path);
+                return Err(e);
+            }
+        };
+        let _ = fs::remove_file(&wav_path);
+
+        let rms = compute_rms(&audio);
+        let peak = audio
+            .iter()
+            .fold(0.0_f32, |max, sample| max.max(sample.abs()));
+        println!(
+            "Generated TTS WAV: {} samples, RMS {rms:.6}, peak {peak:.6}",
+            audio.len()
+        );
+
+        let vad_result = apply_vad(&audio, None);
+        if !vad_result.has_speech {
+            return Err(format!(
+                "Generated TTS audio did not pass VAD. RMS {rms:.6}, peak {peak:.6}"
+            ));
+        }
+
+        let speech_model_dir = default_app_data_dir()?
+            .join("models")
+            .join(stt_model_dir_name(DEFAULT_STT_MODEL));
+        let engine = WhisperEngine::new(&speech_model_dir).map_err(|e| e.to_string())?;
+        let transcript = engine
+            .transcribe(&vad_result.trimmed_audio)
+            .map_err(|e| e.to_string())?;
+
+        println!("Transcript: {transcript}");
+        if transcript.trim().is_empty() {
+            return Err("STT returned an empty transcript for generated speech".to_string());
+        }
+
+        Ok(())
+    }
+}

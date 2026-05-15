@@ -55,6 +55,8 @@ disk.
   injector against an external app and verify clipboard restoration.
 - An ignored microphone transcription smoke test can exercise default mic
   capture, VAD, and local STT with a human speaker.
+- An ignored Windows synthetic speech-file smoke test can exercise VAD and local
+  STT against a generated 16 kHz mono speech WAV.
 - SQLite-backed history and settings.
 - Dashboard, History, Hotkeys, and Speech model pages.
 - System tray with open, pause/resume dictation, and quit actions.
@@ -92,13 +94,15 @@ Results:
 - TypeScript strict check: passed.
 - Rust formatting check: passed.
 - Rust clippy with `-D warnings`: passed.
-- Rust tests: 25 passed, 0 failed, 2 ignored manual desktop smokes.
+- Rust tests: 25 passed, 0 failed, 3 ignored manual desktop smokes.
 - Ignored Windows Notepad injection smoke: passed locally with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection_smoke -- --ignored --nocapture`.
 - Ignored microphone transcription smoke: added for manual execution with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_microphone_transcription_smoke -- --ignored --nocapture`.
   It supports configurable timing and an optional Windows TTS prompt for
   speaker-to-microphone setups.
+- Ignored Windows synthetic speech-file smoke: passed locally with
+  `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_tts_file_transcription_smoke -- --ignored --nocapture`.
 - Frontend production build: passed.
 - Tauri release build on Windows: passed.
 - Windows artifact produced:

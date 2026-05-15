@@ -95,6 +95,7 @@ but it does not justify adding LLM features back into this release.
 | Manual desktop QA | `docs/MANUAL_QA.md` defines the remaining real microphone, overlay, hotkey, model, and external-app injection validation steps. | Checklist ready; not yet executed |
 | Windows external-app injection smoke | Ignored test `manual_windows_notepad_injection_smoke` launches Notepad, uses the real injector, verifies saved pasted text, and checks clipboard restoration. | Passed locally on Windows |
 | Microphone transcription smoke | Ignored test `manual_microphone_transcription_smoke` records from the default microphone after a configurable countdown, can optionally play a Windows speech prompt, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Added; requires human speaker or speaker-to-mic setup to execute |
+| Windows synthetic speech STT smoke | Ignored test `manual_windows_tts_file_transcription_smoke` generates a Windows SAPI WAV, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Passed locally on Windows |
 
 ## Findings To Fix Before Release
 
@@ -306,8 +307,9 @@ speech-only release unless product direction changes.
 22. Add and run an ignored Windows Notepad injection smoke test for clipboard save -> paste -> restore.
 23. Add an ignored microphone transcription smoke test for default mic -> VAD -> STT validation.
 24. Add optional Windows TTS prompting and RMS/peak diagnostics to the microphone transcription smoke.
+25. Add and run an ignored Windows synthetic speech-file smoke test for VAD -> STT validation.
 
-Completed in this run: items 1 through 24. Windows NSIS and Linux AppImage
+Completed in this run: items 1 through 25. Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25931329886` completed
 successfully for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs, and uploaded all four platform artifacts. Later source
@@ -321,4 +323,5 @@ verifies the injector against an external app, but it does not prove the real
 microphone capture plus speech recognition path by itself. A local attempt to
 run the microphone smoke with the optional Windows TTS prompt captured audio but
 did not pass VAD, so the real mic plus STT path still needs a hands-on spoken
-pass.
+pass. The synthetic Windows speech-file smoke validates VAD plus STT against
+generated spoken audio, but it does not validate OS microphone capture.
