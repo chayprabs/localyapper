@@ -1,4 +1,4 @@
-// Navigation sidebar -- 5 pages with Material Symbols icons
+// Navigation sidebar -- main app pages with Material Symbols icons
 import { useAtomValue, useSetAtom } from "jotai";
 import { activePageAtom, sidebarCollapsedAtom, type PageId } from "@/stores/appStore";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,6 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
   { id: "history", label: "History", icon: "history" },
-  { id: "dictionary", label: "Dictionary", icon: "book_2" },
   { id: "hotkeys", label: "Hotkeys", icon: "keyboard" },
   { id: "models", label: "Speech", icon: "graphic_eq" },
 ];

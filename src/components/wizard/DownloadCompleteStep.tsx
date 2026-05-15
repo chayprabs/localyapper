@@ -17,7 +17,7 @@ export function DownloadCompleteStep({
         Download Complete
       </h2>
       <p className="text-[13px] text-black/50 mb-2">
-        Your local speech package is ready to use.
+        Your speech files are ready to use.
       </p>
       <p className="text-[12px] text-black/[0.30] mb-8">
         Stored on-device (~458MB)

@@ -9,23 +9,6 @@ export interface HistoryEntry {
   created_at: string;
 }
 
-export interface Correction {
-  id: string;
-  raw_word: string;
-  corrected: string;
-  count: number;
-  confidence: number;
-  last_used_at: string | null;
-  created_at: string;
-}
-
-export interface DictionaryWord {
-  id: string;
-  word: string;
-  count: number;
-  added_at: string;
-}
-
 // Pipeline & model types
 
 export interface PipelineResult {
@@ -53,12 +36,6 @@ export interface Stats {
 export interface PermissionsStatus {
   microphone: boolean;
   accessibility: boolean;
-}
-
-export interface ImportResult {
-  imported: number;
-  skipped: number;
-  errors: string[];
 }
 
 export interface ModelsStatus {

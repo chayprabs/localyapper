@@ -8,7 +8,6 @@
 - `src/models/` — shared IPC structs
 - `src/audio/` — audio capture and VAD
 - `src/stt/` — Parakeet speech recognition wrapper
-- `src/correction/` — correction lookup and learner
 - `src/context/` — focused window helpers
 - `src/injection/` — clipboard-based text injection
 - `src/hotkey/` — global shortcut registration and state machine
@@ -17,11 +16,11 @@
 - `src/error.rs` — custom error types via `thiserror`
 
 ## Current backend shape
-- Speech recognition only: capture -> VAD -> STT -> correction -> injection
+- Speech recognition only: capture -> VAD -> STT -> injection
 - No LLM engine
 - No Ollama commands
 - No BYOK/API-key commands
-- Active persistent tables: `transcription_history`, `corrections`, `personal_dictionary`, `settings`
+- Active persistent tables: `transcription_history`, `settings`
 
 ## Coding rules
 - All public functions need doc comments

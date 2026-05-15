@@ -6,9 +6,9 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HistoryEntry {
     pub id: String,
-    /// Raw speech-to-text transcription before corrections.
+    /// Raw speech-to-text transcription from the local engine.
     pub raw_text: String,
-    /// Final text after correction engine cleanup.
+    /// Final text saved to history and injected into the focused app.
     pub final_text: String,
     /// Focused app at recording time (None if detection failed).
     pub app_name: Option<String>,
@@ -17,31 +17,6 @@ pub struct HistoryEntry {
     /// Whitespace-separated word count of raw text.
     pub word_count: Option<i64>,
     pub created_at: String,
-}
-
-/// A learned correction mapping stored in the corrections table.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Correction {
-    pub id: String,
-    /// Original transcription token that was corrected.
-    pub raw_word: String,
-    /// The replacement text learned from the final corrected output.
-    pub corrected: String,
-    /// Number of times this correction has been observed.
-    pub count: i64,
-    /// Computed as min(1.0, count * 0.1) — threshold for auto-apply.
-    pub confidence: f64,
-    pub last_used_at: Option<String>,
-    pub created_at: String,
-}
-
-/// A personal dictionary word.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DictionaryWord {
-    pub id: String,
-    pub word: String,
-    pub count: i64,
-    pub added_at: String,
 }
 
 /// Result from the voice dictation pipeline.
@@ -85,14 +60,6 @@ pub struct Stats {
 pub struct PermissionsStatus {
     pub microphone: bool,
     pub accessibility: bool,
-}
-
-/// Result of importing a dictionary.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ImportResult {
-    pub imported: i64,
-    pub skipped: i64,
-    pub errors: Vec<String>,
 }
 
 /// Pipeline state event emitted to frontend for overlay state transitions.

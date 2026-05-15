@@ -8,26 +8,15 @@ interface LastDictationCardProps {
   onDelete: (id: string) => void;
 }
 
-function KeyBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="bg-[rgba(0,0,0,0.05)] border border-[rgba(0,0,0,0.1)] rounded px-1 py-px text-[11px] font-medium">
-      {children}
-    </span>
-  );
-}
-
 function EmptyState() {
-  const isMac = navigator.userAgent.includes("Mac");
   return (
     <div className="flex flex-col items-center text-center">
       <span className="material-symbols-outlined text-[40px] text-[rgba(0,0,0,0.15)] mb-4">
         mic
       </span>
       <p className="text-[14px] font-medium text-black/85 mb-1">No dictations yet</p>
-      <p className="text-[12px] text-black/[0.26] flex items-center gap-1.5">
-        Hold <KeyBadge>{isMac ? "⌥" : "Ctrl"}</KeyBadge>{" "}
-        {!isMac && <><KeyBadge>Shift</KeyBadge>{" "}</>}
-        <KeyBadge>Space</KeyBadge> to start your first dictation.
+      <p className="text-[12px] text-black/[0.26]">
+        Use your record hotkey to start your first dictation.
       </p>
     </div>
   );
@@ -44,7 +33,6 @@ export function LastDictationCard({ entry, onDelete }: LastDictationCardProps) {
 
   return (
     <div className="bg-white p-6 rounded-xl border border-black/[0.07] shadow-sm">
-      {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-baseline gap-4">
           <h3 className="text-[10px] font-bold text-black/[0.26] tracking-[0.06em] uppercase">
@@ -67,14 +55,12 @@ export function LastDictationCard({ entry, onDelete }: LastDictationCardProps) {
         />
       </div>
 
-      {/* Body */}
       <div className="mb-4">
         <p className="text-[15px] font-medium italic leading-relaxed text-black/85">
           &ldquo;{entry.final_text}&rdquo;
         </p>
       </div>
 
-      {/* Footer */}
       <div className="flex items-center justify-between pt-4 border-t border-black/[0.07]">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-black/50 text-[18px]">

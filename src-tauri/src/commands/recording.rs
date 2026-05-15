@@ -1,22 +1,19 @@
 // IPC command handlers -- recording pipeline and text injection
 use std::time::Instant;
 
-use tauri::Manager;
-
 use crate::audio::vad;
 use crate::context::detector;
-use crate::correction::learner;
 use crate::db::queries;
 use crate::models::PipelineResult;
 use crate::state::AppState;
 
-/// Run the full voice pipeline: VAD -> STT -> Correction.
+/// Run the full voice pipeline: VAD -> STT.
 /// Does NOT inject or save to history — caller decides.
-/// Optional `app_handle` enables friendlier error messages (file-exists check).
+/// Uses the preloaded speech engine when available and falls back to on-demand load.
 pub(crate) async fn execute_pipeline(
     raw_audio: Vec<f32>,
     state: &AppState,
-    app_handle: Option<&tauri::AppHandle>,
+    app_handle: &tauri::AppHandle,
 ) -> Result<PipelineResult, String> {
     // Run VAD synchronously — extract Silero ref briefly, then drop the lock
     let vad_result = {
@@ -36,34 +33,11 @@ pub(crate) async fn execute_pipeline(
         });
     }
 
-    let whisper = state
-        .whisper
-        .lock()
-        .map_err(|e| format!("STT lock error: {e}"))?
-        .as_ref()
-        .ok_or_else(|| {
-            // Check if model directory exists on disk to give a friendlier error
-            if let Some(handle) = app_handle {
-                if let Ok(data_dir) = handle.path().app_data_dir() {
-                    let models_dir = data_dir.join("models");
-                    if std::fs::read_dir(&models_dir)
-                        .map(|entries| {
-                            entries.filter_map(|e| e.ok()).any(|e| {
-                                e.path().is_dir()
-                                    && e.file_name().to_string_lossy().starts_with("parakeet")
-                            })
-                        })
-                        .unwrap_or(false)
-                    {
-                        return "STT model is still loading, please try again shortly".to_string();
-                    }
-                }
-            }
-            "STT model not downloaded. Use Settings > Models to download it".to_string()
-        })?
-        .clone();
-
     let trimmed_audio = vad_result.trimmed_audio;
+    let duration_ms = vad_result.speech_duration_ms as i64;
+    drop(raw_audio);
+
+    let whisper = crate::commands::models::ensure_speech_model_loaded(app_handle, state).await?;
 
     println!("STT: Transcribing...");
     let stt_start = Instant::now();
@@ -83,27 +57,18 @@ pub(crate) async fn execute_pipeline(
         raw_text.split_whitespace().count() as i64
     };
 
-    let corrected_text = state
-        .correction_engine
-        .apply(&raw_text)
-        .unwrap_or_else(|_| raw_text.clone());
-    println!(
-        "CORRECTION: Applied corrections, result: [{}]",
-        corrected_text
-    );
-
-    let final_text = corrected_text;
+    let final_text = raw_text.clone();
 
     Ok(PipelineResult {
         final_text,
         raw_text,
-        duration_ms: vad_result.speech_duration_ms as i64,
+        duration_ms,
         word_count,
     })
 }
 
-/// Save a pipeline result to history and run the correction learner asynchronously.
-pub(crate) fn save_history_and_learn(state: &AppState, result: &PipelineResult, app_name: &str) {
+/// Save a pipeline result to history.
+pub(crate) fn save_history_entry(state: &AppState, result: &PipelineResult, app_name: &str) {
     if result.final_text.is_empty() {
         return;
     }
@@ -123,17 +88,6 @@ pub(crate) fn save_history_and_learn(state: &AppState, result: &PipelineResult, 
             log::warn!("Failed to save history: {e}");
         }
     }
-
-    // Run correction learner
-    let diffs = learner::compute_diffs(&result.raw_text, &result.final_text);
-    if !diffs.is_empty() {
-        if let Ok(conn) = state.db.lock() {
-            match learner::learn_and_refresh(&conn, &diffs, &state.correction_engine) {
-                Ok(count) => log::info!("Learned {count} corrections from pipeline"),
-                Err(e) => log::warn!("Correction learning failed: {e}"),
-            }
-        }
-    }
 }
 
 /// Start audio capture from the default microphone.
@@ -149,11 +103,11 @@ pub async fn stop_recording(
     _app_handle: tauri::AppHandle,
 ) -> Result<PipelineResult, String> {
     let raw_audio = state.recorder.stop().map_err(|e| e.to_string())?;
-    let result = execute_pipeline(raw_audio, state.inner(), Some(&_app_handle)).await?;
+    let result = execute_pipeline(raw_audio, state.inner(), &_app_handle).await?;
 
     if !result.final_text.is_empty() {
         let app_name = detector::get_focused_window_name();
-        save_history_and_learn(state.inner(), &result, &app_name);
+        save_history_entry(state.inner(), &result, &app_name);
     }
 
     Ok(result)
@@ -164,8 +118,9 @@ pub async fn stop_recording(
 pub async fn run_pipeline(
     audio: Vec<f32>,
     state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<PipelineResult, String> {
-    execute_pipeline(audio, state.inner(), None).await
+    execute_pipeline(audio, state.inner(), &app_handle).await
 }
 
 /// Inject text into the currently focused application.

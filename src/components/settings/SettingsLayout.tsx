@@ -6,7 +6,6 @@ import { getSetting, setSetting } from "@/lib/commands/settings";
 import { Sidebar } from "./Sidebar";
 import { DashboardPage } from "@/components/dashboard/DashboardPage";
 import { HistoryPage } from "@/components/history/HistoryPage";
-import { DictionaryPage } from "@/components/dictionary/DictionaryPage";
 import { HotkeysPage } from "@/components/hotkeys/HotkeysPage";
 import { ModelsPage } from "@/components/models/ModelsPage";
 
@@ -14,7 +13,6 @@ import { ModelsPage } from "@/components/models/ModelsPage";
 const pages = {
   dashboard: DashboardPage,
   history: HistoryPage,
-  dictionary: DictionaryPage,
   hotkeys: HotkeysPage,
   models: ModelsPage,
 } as const;

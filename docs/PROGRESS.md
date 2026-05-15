@@ -7,10 +7,12 @@ The live app is now:
 - audio capture
 - VAD
 - Parakeet speech recognition
-- correction engine
 - text injection
 
 Removed from the current codebase:
+- dictionary page
+- correction engine
+- training flow
 - local LLM cleanup
 - Ollama integration
 - BYOK/API-key cleanup
@@ -38,21 +40,20 @@ Removed from the current codebase:
 - [x] Cross-platform injection path
 - [x] Clipboard save -> paste -> restore behavior
 
-### Phase 5: Correction Engine (COMPLETE)
-- [x] Dictionary-based correction lookup
-- [x] Learner refresh after successful dictations
+### Phase 5: Pipeline Simplification (COMPLETE)
+- [x] Direct speech-to-text output
+- [x] Removed dictionary-based post-processing
 
 ### Phase 6: Overlay UI (COMPLETE)
 - [x] Overlay states wired to pipeline events
 - [x] Listening / processing / transcribed / no-speech feedback
 
 ### Phase 7: Settings UI (COMPLETE)
-- [x] Dashboard, History, Dictionary, Hotkeys, Models pages
+- [x] Dashboard, History, Hotkeys, and Models pages
 - [x] Typed frontend command wrappers
 
-### Phase 8: History + Dictionary (COMPLETE)
+### Phase 8: History (COMPLETE)
 - [x] History browsing and deletion
-- [x] Correction management and training flow
 
 ### Phase 9: Hotkeys (COMPLETE)
 - [x] Configurable record / cancel / paste-last / open-app shortcuts

@@ -3,7 +3,6 @@
 mod audio;
 mod commands;
 mod context;
-mod correction;
 mod db;
 mod error;
 mod hotkey;
@@ -15,8 +14,8 @@ mod tray;
 
 use audio::capture::AudioRecorder;
 use audio::vad::SileroVad;
-use correction::engine::CorrectionEngine;
 use state::AppState;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use stt::whisper::WhisperEngine;
@@ -25,10 +24,7 @@ use tauri::Manager;
 /// Candidate directories where the STT model might be found.
 ///
 /// Checks for the selected model first, then falls back to the default Parakeet model.
-pub(crate) fn speech_model_candidates(
-    app: &tauri::AppHandle,
-    model_setting: &str,
-) -> Vec<std::path::PathBuf> {
+pub(crate) fn speech_model_candidates(app: &tauri::AppHandle, model_setting: &str) -> Vec<PathBuf> {
     let models_dir = match app.path().app_data_dir() {
         Ok(d) => d.join("models"),
         Err(_) => return vec![],
@@ -50,56 +46,36 @@ pub(crate) fn speech_model_candidates(
     candidates
 }
 
-/// Attempt to load the STT model by scanning candidate directories.
-/// Reads the `speech_model` setting from DB to determine which model to load.
-/// Returns `None` with a warning log if the model is not found or fails to load.
-fn load_speech_model(app: &tauri::App, conn: &rusqlite::Connection) -> Option<Arc<WhisperEngine>> {
-    let model_setting = db::queries::get_setting(conn, "speech_model")
-        .unwrap_or_else(|_| stt::whisper::DEFAULT_WHISPER_MODEL.to_string());
+fn is_valid_speech_model_dir(dir: &Path) -> bool {
+    dir.is_dir()
+        && (dir.join("model.int8.onnx").exists() || dir.join("model.onnx").exists())
+        && dir.join("tokens.txt").exists()
+}
 
-    let candidates = speech_model_candidates(app.handle(), &model_setting);
-    println!(
-        "STT: Startup load - model setting='{}', candidates: {:?}",
-        model_setting,
-        candidates
-            .iter()
-            .map(|p| p.display().to_string())
-            .collect::<Vec<_>>()
-    );
+pub(crate) fn resolve_speech_model_dir(
+    app: &tauri::AppHandle,
+    model_setting: &str,
+) -> Option<PathBuf> {
+    speech_model_candidates(app, model_setting)
+        .into_iter()
+        .find(|candidate| is_valid_speech_model_dir(candidate))
+}
 
-    for candidate in &candidates {
-        if candidate.exists() && candidate.is_dir() {
-            println!(
-                "STT: Found model dir at {}, loading...",
-                candidate.display()
-            );
-            log::info!("Found STT model at {}", candidate.display());
-            match WhisperEngine::new(candidate) {
-                Ok(engine) => {
-                    println!("STT: Engine loaded successfully");
-                    log::info!("STT engine loaded successfully");
-                    return Some(Arc::new(engine));
-                }
-                Err(e) => {
-                    println!("STT: Load FAILED from {}: {}", candidate.display(), e);
-                    log::warn!(
-                        "Failed to load STT model from {}: {}",
-                        candidate.display(),
-                        e
-                    );
-                }
-            }
-        } else {
-            println!("STT: Directory not found at {}", candidate.display());
-        }
-    }
+pub(crate) fn load_speech_model_from_setting(
+    app: &tauri::AppHandle,
+    model_setting: &str,
+) -> Result<Arc<WhisperEngine>, String> {
+    let candidate = resolve_speech_model_dir(app, model_setting).ok_or_else(|| {
+        format!(
+            "Speech model files not found for {}. Open Settings > Speech to download them.",
+            stt::whisper::stt_model_dir_name(model_setting)
+        )
+    })?;
 
-    println!("STT: No model loaded - STT unavailable until downloaded");
-    log::warn!(
-        "STT model ({}) not found. STT will be unavailable until the model is downloaded.",
-        stt::whisper::stt_model_dir_name(&model_setting)
-    );
-    None
+    println!("STT: Loading engine from {}", candidate.display());
+    WhisperEngine::new(&candidate)
+        .map(Arc::new)
+        .map_err(|e| format!("Failed to load STT from {}: {e}", candidate.display()))
 }
 
 /// Send a system notification via tauri-plugin-notification.
@@ -136,21 +112,36 @@ pub fn run() {
                 .expect("Failed to resolve app data directory");
 
             let conn = db::open_database(&app_data_dir).expect("Failed to initialize database");
-
-            let whisper = load_speech_model(app, &conn);
-            if whisper.is_some() {
-                log::info!("STT model loaded at startup");
+            let speech_model_setting = db::queries::get_setting(&conn, "speech_model")
+                .unwrap_or_else(|_| stt::whisper::DEFAULT_WHISPER_MODEL.to_string());
+            let speech_model_installed =
+                resolve_speech_model_dir(app.handle(), &speech_model_setting).is_some();
+            let speech_engine = if speech_model_installed {
+                match load_speech_model_from_setting(app.handle(), &speech_model_setting) {
+                    Ok(engine) => {
+                        log::info!("Speech engine preloaded at startup");
+                        Some(engine)
+                    }
+                    Err(e) => {
+                        log::warn!("Speech model files found, but preload failed: {e}");
+                        None
+                    }
+                }
             } else {
-                log::warn!("STT model not found at startup - STT unavailable until downloaded");
-            }
+                None
+            };
+            let speech_engine_ready = speech_engine.is_some();
 
-            let correction_engine = Arc::new(CorrectionEngine::new());
-            let threshold: f64 = db::queries::get_setting(&conn, "confidence_threshold")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0.6);
-            if let Err(e) = correction_engine.load(&conn, threshold) {
-                log::warn!("Failed to load correction engine: {e}");
+            if speech_model_installed {
+                if speech_engine_ready {
+                    log::info!("Speech model files found at startup; engine is ready");
+                } else {
+                    log::warn!("Speech model files found at startup, but engine is not ready");
+                }
+            } else {
+                log::warn!(
+                    "Speech model files not found at startup - STT unavailable until downloaded"
+                );
             }
 
             let silero_vad = {
@@ -181,26 +172,28 @@ pub fn run() {
             app.manage(AppState {
                 db: Arc::new(Mutex::new(conn)),
                 recorder: Arc::new(AudioRecorder::new()),
-                whisper: Arc::new(Mutex::new(whisper)),
+                // Preload the recognizer at startup when speech files are installed.
+                whisper: Arc::new(Mutex::new(speech_engine)),
                 vad: Arc::new(Mutex::new(silero_vad)),
                 last_injection: Arc::new(Mutex::new(None)),
-                correction_engine,
                 download_cancel: Arc::new(AtomicBool::new(false)),
                 paused: Arc::new(AtomicBool::new(false)),
             });
 
-            let speech_model_loaded = app
-                .state::<AppState>()
-                .whisper
-                .lock()
-                .map(|g| g.is_some())
-                .unwrap_or(false);
-            if speech_model_loaded {
-                send_notification(
-                    app.handle(),
-                    "LocalYapper",
-                    "Ready - voice dictation is active",
-                );
+            if speech_model_installed {
+                if speech_engine_ready {
+                    send_notification(
+                        app.handle(),
+                        "LocalYapper",
+                        "Speech engine loaded and ready for dictation",
+                    );
+                } else {
+                    send_notification(
+                        app.handle(),
+                        "LocalYapper",
+                        "Speech files are installed, but the engine needs attention",
+                    );
+                }
             } else {
                 send_notification(
                     app.handle(),
@@ -254,13 +247,6 @@ pub fn run() {
             commands::models::check_models_status,
             commands::models::check_speech_model_file_exists,
             commands::models::delete_speech_model,
-            commands::corrections::get_corrections,
-            commands::corrections::add_correction,
-            commands::corrections::delete_correction,
-            commands::corrections::export_dictionary,
-            commands::corrections::import_dictionary,
-            commands::corrections::get_corrections_count,
-            commands::corrections::compute_training_diffs,
             commands::history::get_history,
             commands::history::delete_history_entry,
             commands::history::clear_history,

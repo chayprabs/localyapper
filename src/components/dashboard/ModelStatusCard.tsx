@@ -24,7 +24,7 @@ export function ModelStatusCard({ status }: ModelStatusCardProps) {
       <p className="text-[12px] text-black/[0.40]">
         {speechModelReady
           ? "Local speech dictation is ready to use."
-          : "Open Settings > Speech to download or reload the local speech package."}
+          : "Open Settings > Speech to install the speech files or start the engine again if needed."}
       </p>
     </div>
   );

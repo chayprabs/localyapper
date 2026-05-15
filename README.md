@@ -19,10 +19,9 @@ Press a global hotkey, speak, and the app will:
 - capture microphone audio locally
 - remove silence with VAD
 - transcribe speech with a local speech model
-- apply learned corrections from your dictionary
 - paste the result into the focused app
 
-The current app is speech-only by design. There is no Ollama integration, no BYOK providers, and no local LLM cleanup step in the pipeline.
+The current app is speech-only by design. There is no dictionary training flow, no Ollama integration, no BYOK providers, and no local LLM cleanup step in the pipeline.
 
 ## Current Features
 
@@ -31,16 +30,14 @@ The current app is speech-only by design. There is no Ollama integration, no BYO
 - Floating overlay with listening, processing, transcribed, and no-speech states
 - Global hotkeys for record, cancel, paste last, and open app
 - History page for previous dictations
-- Dictionary page for learned corrections and manual correction entries
-- Voice training flow that helps build up correction data
 - Models page for downloading, deleting, and reloading the local speech model
 - Tray app with open, pause dictation, and quit actions
-- Local SQLite storage for settings, history, and corrections
+- Local SQLite storage for settings and history
 - Clipboard-based text injection across platforms
 
 ## Current Pipeline
 
-`hotkey -> audio capture -> VAD -> local speech recognition -> correction engine -> text injection`
+`hotkey -> audio capture -> VAD -> local speech recognition -> text injection`
 
 Notes:
 
@@ -48,10 +45,11 @@ Notes:
 - Silero VAD is used when available, with an energy-based fallback
 - The default speech model is Parakeet 110M, downloaded on first launch
 - The current download size is about 458 MB
-- Correction learning improves substitutions over time from accepted dictations
 
 ## What Is Not In The App Anymore
 
+- Dictionary page and training flow
+- learned correction cleanup
 - Ollama integration
 - local LLM cleanup
 - API-key cleanup providers
@@ -70,10 +68,11 @@ If the speech model is not present yet, the app will prompt you to open Settings
 
 ## Default Hotkeys
 
-- Record: `Ctrl+Shift+Space`
+- Record: `F8`
+- Hands-free: `Ctrl+F8`
 - Cancel: `Escape`
-- Paste last dictation: `Alt+Shift+V`
-- Open app: `Alt+L`
+- Paste last dictation: `Ctrl+Alt+J`
+- Open app: `Ctrl+Alt+O`
 
 These can be changed in the Hotkeys page.
 
@@ -106,7 +105,6 @@ src-tauri/
     audio/
     commands/
     context/
-    correction/
     db/
     hotkey/
     injection/

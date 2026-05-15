@@ -20,7 +20,7 @@ export function useWizard(onComplete: () => void) {
   const [downloadProgress, setDownloadProgress] =
     useState<DownloadProgress | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [hotkey, setHotkey] = useState("Ctrl+Shift+Space");
+  const [hotkey, setHotkey] = useState("F8");
 
   const goToDownload = useCallback(() => {
     setStep("downloading");

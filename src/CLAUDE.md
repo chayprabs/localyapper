@@ -8,7 +8,6 @@
 - components/wizard/ — First-launch wizard screens (10 steps)
 - components/dashboard/ — Dashboard page components
 - components/history/ — History page components
-- components/dictionary/ — Dictionary + Training page components
 - components/hotkeys/ — Hotkey remapping components
 - components/models/ — Model settings components
 - hooks/ — Custom React hooks (useInvoke, useSettings, useOverlayState, etc.)
@@ -52,12 +51,11 @@ All invoke() calls go through lib/commands/ wrappers — components never call i
 - Font: font-['Inter'] — weights 400 and 600 only
 - Light mode only. No dark mode.
 
-## 26 screens total
+## Current screen groups
 - 10 wizard screens (onboarding flow)
 - 5 overlay states (listening, stopping-soon, processing, long-recording, transcribed)
-- 6 main app pages (Dashboard, History, Dictionary/Corrections, Dictionary/Training, Hotkeys, Models)
-- 3 empty states (Dashboard empty, History empty, Dictionary empty)
-- 2 training completion screens
+- 4 main app pages (Dashboard, History, Hotkeys, Models)
+- 2 empty states (Dashboard empty, History empty)
 
 ## Overlay pill specs
 - Width: 280px, border-radius: 999px (full pill)

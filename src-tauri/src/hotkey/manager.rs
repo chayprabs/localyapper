@@ -5,9 +5,8 @@ use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
-use tokio::sync::Mutex as TokioMutex;
 
-use crate::commands::recording::{execute_pipeline, save_history_and_learn};
+use crate::commands::recording::{execute_pipeline, save_history_entry};
 use crate::context::detector;
 use crate::db::queries;
 use crate::models::PipelineEvent;
@@ -17,20 +16,25 @@ use crate::state::AppState;
 const MODE_IDLE: u8 = 0;
 /// State machine mode: key is held down, recording in progress.
 const MODE_HOLD_RECORDING: u8 = 1;
-/// State machine mode: double-tap toggled, recording hands-free.
+/// State machine mode: hands-free toggle recording is active.
 const MODE_HANDS_FREE: u8 = 2;
 /// State machine mode: recording stopped, pipeline is running.
 const MODE_PROCESSING: u8 = 3;
 
-/// Double-tap detection window in milliseconds.
-const DOUBLE_TAP_MS: u128 = 300;
-
-/// Shared hotkey state machine tracking recording mode and double-tap timing.
+/// Shared hotkey state machine tracking recording mode.
 struct HotkeyState {
     /// Current mode: idle, hold-recording, hands-free, or processing.
     mode: AtomicU8,
-    /// Timestamp of last key press for double-tap detection within DOUBLE_TAP_MS.
-    last_press_time: TokioMutex<Option<Instant>>,
+}
+
+fn get_hotkey_setting(app: &AppHandle, key: &str, default: &str) -> String {
+    let state = app.state::<AppState>();
+    let conn = match state.db.lock() {
+        Ok(conn) => conn,
+        Err(_) => return default.to_string(),
+    };
+
+    queries::get_setting(&conn, key).unwrap_or_else(|_| default.to_string())
 }
 
 /// Initialize global hotkeys. Must be called from Tauri setup() after AppState is managed.
@@ -39,36 +43,20 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
 
     let hotkey_state = Arc::new(HotkeyState {
         mode: AtomicU8::new(MODE_IDLE),
-        last_press_time: TokioMutex::new(None),
     });
 
     // Read hotkey bindings from DB
-    let record_hotkey = {
-        let state = app.state::<AppState>();
-        let conn = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
-        queries::get_setting(&conn, "hotkey_record")
-            .unwrap_or_else(|_| "Ctrl+Shift+Space".to_string())
-    };
-
-    let paste_last_hotkey = {
-        let state = app.state::<AppState>();
-        let conn = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
-        queries::get_setting(&conn, "hotkey_paste_last")
-            .unwrap_or_else(|_| "Alt+Shift+V".to_string())
-    };
-
-    let open_app_hotkey = {
-        let state = app.state::<AppState>();
-        let conn = state.db.lock().map_err(|e| format!("DB lock error: {e}"))?;
-        queries::get_setting(&conn, "hotkey_open_app").unwrap_or_else(|_| "Alt+L".to_string())
-    };
+    let record_hotkey = get_hotkey_setting(app, "hotkey_record", "F8");
+    let hands_free_hotkey = get_hotkey_setting(app, "hotkey_hands_free", "Ctrl+F8");
+    let paste_last_hotkey = get_hotkey_setting(app, "hotkey_paste_last", "Ctrl+Alt+J");
+    let open_app_hotkey = get_hotkey_setting(app, "hotkey_open_app", "Ctrl+Alt+O");
 
     println!(
-        "HOTKEY: record='{}', paste_last='{}', open_app='{}'",
-        record_hotkey, paste_last_hotkey, open_app_hotkey
+        "HOTKEY: record='{}', hands_free='{}', paste_last='{}', open_app='{}'",
+        record_hotkey, hands_free_hotkey, paste_last_hotkey, open_app_hotkey
     );
 
-    // Register the record hotkey (hold-to-talk + double-tap hands-free)
+    // Register the record hotkey (hold-to-talk only)
     let state_clone = hotkey_state.clone();
     let app_handle = app.clone();
     match app.global_shortcut().on_shortcut(
@@ -95,6 +83,32 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
             "HOTKEY: FAILED to register record hotkey '{}': {}",
             record_hotkey, e
         ),
+    }
+
+    // Register the hands-free hotkey (toggle on press)
+    if hands_free_hotkey == record_hotkey {
+        println!("HOTKEY: Skipping hands-free registration because it matches the record hotkey");
+    } else {
+        let state_clone = hotkey_state.clone();
+        let app_handle = app.clone();
+        match app.global_shortcut().on_shortcut(
+            hands_free_hotkey.as_str(),
+            move |_app, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    let state = state_clone.clone();
+                    let handle = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        handle_hands_free_pressed(handle, state).await;
+                    });
+                }
+            },
+        ) {
+            Ok(()) => println!("HOTKEY: Hands-free hotkey registered: {hands_free_hotkey}"),
+            Err(e) => println!(
+                "HOTKEY: FAILED to register hands-free hotkey '{}': {}",
+                hands_free_hotkey, e
+            ),
+        }
     }
 
     // Register paste-last hotkey
@@ -139,8 +153,8 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
         ),
     }
 
-    // NOTE: Escape is registered dynamically when recording starts to avoid
-    // capturing all Escape keypresses system-wide.
+    // NOTE: the cancel hotkey is registered dynamically when recording starts
+    // so we do not capture it system-wide while idle.
 
     println!("HOTKEY: Registration complete");
     Ok(())
@@ -154,9 +168,39 @@ pub fn reload_hotkeys(app: &AppHandle) -> Result<(), String> {
     register_hotkeys(app)
 }
 
-/// Handle record hotkey pressed — start recording or stop hands-free.
+async fn start_recording_session(
+    app: &AppHandle,
+    state: &Arc<HotkeyState>,
+    active_mode: u8,
+    log_message: &str,
+) {
+    if state
+        .mode
+        .compare_exchange(MODE_IDLE, active_mode, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
+    println!("OVERLAY: Showing listening state");
+    emit_pipeline_event(app, "listening", None, None, None, None);
+
+    let app_state = app.state::<AppState>();
+    if let Err(e) = app_state.recorder.start() {
+        log::error!("Failed to start recording: {e}");
+        let _ = app_state.recorder.cancel();
+        emit_pipeline_event(app, "error", None, None, None, Some(&e.to_string()));
+        state.mode.store(MODE_IDLE, Ordering::SeqCst);
+        return;
+    }
+
+    println!("AUDIO: Capture started");
+    log::info!("{log_message}");
+    register_cancel_hotkey(app, state.clone());
+}
+
+/// Handle record hotkey pressed - start hold-to-talk recording.
 async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
-    // Check if dictation is paused via tray menu
     {
         let app_state = app.state::<AppState>();
         if app_state.paused.load(Ordering::SeqCst) {
@@ -164,63 +208,39 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
         }
     }
 
-    let current_mode = state.mode.load(Ordering::SeqCst);
+    if state.mode.load(Ordering::SeqCst) == MODE_IDLE {
+        println!("HOTKEY: Press detected");
+        start_recording_session(
+            &app,
+            &state,
+            MODE_HOLD_RECORDING,
+            "Hold-to-talk recording started",
+        )
+        .await;
+    }
+}
 
-    match current_mode {
+/// Handle the hands-free hotkey pressed - start or stop toggle recording.
+async fn handle_hands_free_pressed(app: AppHandle, state: Arc<HotkeyState>) {
+    {
+        let app_state = app.state::<AppState>();
+        if app_state.paused.load(Ordering::SeqCst) {
+            return;
+        }
+    }
+
+    match state.mode.load(Ordering::SeqCst) {
         MODE_IDLE => {
-            println!("HOTKEY: Press detected");
-            // Atomically claim the transition from IDLE — only one press wins
-            if state
-                .mode
-                .compare_exchange(
-                    MODE_IDLE,
-                    MODE_HOLD_RECORDING,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_err()
-            {
-                return; // Another press already transitioned
-            }
-
-            // Check for double-tap
-            let is_double_tap = {
-                let mut last_press = state.last_press_time.lock().await;
-                let double = last_press
-                    .map(|t| t.elapsed().as_millis() < DOUBLE_TAP_MS)
-                    .unwrap_or(false);
-                *last_press = Some(Instant::now());
-                double
-            };
-
-            // Show overlay IMMEDIATELY — before audio init (which can take 100-300ms)
-            println!("OVERLAY: Showing listening state");
-            emit_pipeline_event(&app, "listening", None, None, None, None);
-
-            // Start recording (cpal stream init may take 100-300ms on Windows)
-            let app_state = app.state::<AppState>();
-            if let Err(e) = app_state.recorder.start() {
-                log::error!("Failed to start recording: {e}");
-                // Try to cancel any stuck recorder state before reporting error
-                let _ = app_state.recorder.cancel();
-                emit_pipeline_event(&app, "error", None, None, None, Some(&e.to_string()));
-                state.mode.store(MODE_IDLE, Ordering::SeqCst);
-                return;
-            }
-            println!("AUDIO: Capture started");
-
-            if is_double_tap {
-                state.mode.store(MODE_HANDS_FREE, Ordering::SeqCst);
-                log::info!("Hands-free recording started (double-tap)");
-            } else {
-                log::info!("Hold-to-talk recording started");
-            }
-
-            // Register Escape as cancel while recording
-            register_cancel_hotkey(&app, state.clone());
+            println!("HOTKEY: Hands-free toggle on");
+            start_recording_session(
+                &app,
+                &state,
+                MODE_HANDS_FREE,
+                "Hands-free recording started",
+            )
+            .await;
         }
         MODE_HANDS_FREE => {
-            // Atomically transition from hands-free to processing
             if state
                 .mode
                 .compare_exchange(
@@ -233,18 +253,20 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
             {
                 return;
             }
+
+            println!("HOTKEY: Hands-free toggle off");
             unregister_cancel_hotkey(&app);
             run_pipeline_and_inject(app, state).await;
         }
         _ => {
-            // Ignore presses in other states (processing, hold-recording)
+            // Ignore while another recording or pipeline run is active.
         }
     }
 }
 
-/// Handle record hotkey released — stop hold-to-talk recording.
+/// Handle record hotkey released - stop hold-to-talk recording.
 async fn handle_record_released(app: AppHandle, state: Arc<HotkeyState>) {
-    // Atomically transition from hold-recording to processing — only one release wins
+    // Atomically transition from hold-recording to processing - only one release wins
     if state
         .mode
         .compare_exchange(
@@ -262,7 +284,7 @@ async fn handle_record_released(app: AppHandle, state: Arc<HotkeyState>) {
     // In hands-free or other modes, release is a no-op
 }
 
-/// Run the full pipeline: stop recording -> VAD -> whisper -> correction -> inject.
+/// Run the full pipeline: stop recording -> VAD -> speech recognition -> inject.
 async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>) {
     let pipeline_start = Instant::now();
     log::info!("run_pipeline_and_inject: starting");
@@ -301,11 +323,11 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
         None,
     );
 
-    // 3. Run pipeline (VAD -> whisper -> correction) with 30s safety timeout
-    log::info!("Running pipeline (VAD -> whisper -> correction)...");
+    // 3. Run pipeline (VAD -> speech recognition) with 30s safety timeout
+    log::info!("Running pipeline (VAD -> speech recognition)...");
     let result = match tokio::time::timeout(
         Duration::from_secs(30),
-        execute_pipeline(raw_audio, app_state.inner(), Some(&app)),
+        execute_pipeline(raw_audio, app_state.inner(), &app),
     )
     .await
     {
@@ -368,9 +390,9 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
         *last = Some(result.final_text.clone());
     }
 
-    // 7. Save to history and run learner
+    // 7. Save to history
     let app_name = detector::get_focused_window_name();
-    save_history_and_learn(app_state.inner(), &result, &app_name);
+    save_history_entry(app_state.inner(), &result, &app_name);
     println!("HISTORY: Saved entry");
 
     // 8. Inject text into focused app
@@ -430,7 +452,7 @@ async fn handle_cancel(app: AppHandle, hotkey_state: Arc<HotkeyState>) {
         unregister_cancel_hotkey(&app);
         emit_pipeline_event(&app, "cancelled", None, None, None, None);
         hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
-        log::info!("Recording cancelled via Escape");
+        log::info!("Recording cancelled via hotkey");
     }
 }
 
@@ -455,29 +477,31 @@ async fn handle_paste_last(app: AppHandle) {
     }
 }
 
-/// Dynamically register Escape as cancel hotkey (only while recording).
+/// Dynamically register the configured cancel hotkey (only while recording).
 fn register_cancel_hotkey(app: &AppHandle, hotkey_state: Arc<HotkeyState>) {
+    let cancel_hotkey = get_hotkey_setting(app, "hotkey_cancel", "Escape");
     let handle = app.clone();
-    if let Err(e) = app
-        .global_shortcut()
-        .on_shortcut("Escape", move |_app, _shortcut, event| {
-            if event.state == ShortcutState::Pressed {
-                let h = handle.clone();
-                let s = hotkey_state.clone();
-                tauri::async_runtime::spawn(async move {
-                    handle_cancel(h, s).await;
-                });
-            }
-        })
+    if let Err(e) =
+        app.global_shortcut()
+            .on_shortcut(cancel_hotkey.as_str(), move |_app, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    let h = handle.clone();
+                    let s = hotkey_state.clone();
+                    tauri::async_runtime::spawn(async move {
+                        handle_cancel(h, s).await;
+                    });
+                }
+            })
     {
-        log::warn!("Failed to register Escape cancel hotkey: {e}");
+        log::warn!("Failed to register cancel hotkey '{cancel_hotkey}': {e}");
     }
 }
 
-/// Unregister the Escape cancel hotkey.
+/// Unregister the configured cancel hotkey.
 fn unregister_cancel_hotkey(app: &AppHandle) {
-    if let Err(e) = app.global_shortcut().unregister("Escape") {
-        log::warn!("Failed to unregister Escape hotkey: {e}");
+    let cancel_hotkey = get_hotkey_setting(app, "hotkey_cancel", "Escape");
+    if let Err(e) = app.global_shortcut().unregister(cancel_hotkey.as_str()) {
+        log::warn!("Failed to unregister cancel hotkey '{cancel_hotkey}': {e}");
     }
 }
 

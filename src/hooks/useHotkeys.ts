@@ -25,15 +25,15 @@ const HOTKEY_DEFINITIONS: {
     key: "hotkey_record",
     label: "Record",
     description: "Hold to dictate",
-    defaultValue: "Ctrl+Shift+Space",
+    defaultValue: "F8",
     readOnly: false,
   },
   {
     key: "hotkey_hands_free",
     label: "Hands-free",
-    description: "Double-tap to toggle",
-    defaultValue: "Ctrl+Shift+Space",
-    readOnly: true,
+    description: "Toggle dictation on or off",
+    defaultValue: "Ctrl+F8",
+    readOnly: false,
   },
   {
     key: "hotkey_cancel",
@@ -46,14 +46,14 @@ const HOTKEY_DEFINITIONS: {
     key: "hotkey_paste_last",
     label: "Paste Last",
     description: "Re-inject last dictation",
-    defaultValue: "Alt+Shift+V",
+    defaultValue: "Ctrl+Alt+J",
     readOnly: false,
   },
   {
     key: "hotkey_open_app",
     label: "Open App",
     description: "Show LocalYapper window",
-    defaultValue: "Alt+L",
+    defaultValue: "Ctrl+Alt+O",
     readOnly: false,
   },
 ];
@@ -80,14 +80,7 @@ export function useHotkeys() {
     async (key: string, value: string) => {
       const previous = hotkeys[key];
       // Optimistic update
-      setHotkeys((prev) => {
-        const next = { ...prev, [key]: value };
-        // Auto-sync hands_free with record
-        if (key === "hotkey_record") {
-          next["hotkey_hands_free"] = value;
-        }
-        return next;
-      });
+      setHotkeys((prev) => ({ ...prev, [key]: value }));
       setEditingKey(null);
 
       try {
@@ -95,13 +88,7 @@ export function useHotkeys() {
       } catch (e) {
         // Rollback on error
         console.error("Failed to update hotkey:", e);
-        setHotkeys((prev) => {
-          const next = { ...prev, [key]: previous ?? "" };
-          if (key === "hotkey_record") {
-            next["hotkey_hands_free"] = previous ?? "";
-          }
-          return next;
-        });
+        setHotkeys((prev) => ({ ...prev, [key]: previous ?? "" }));
       }
     },
     [hotkeys],

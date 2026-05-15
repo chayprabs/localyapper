@@ -8,7 +8,6 @@ import { TitleBar } from "@/components/settings/TitleBar";
 import { Wizard } from "@/components/wizard/Wizard";
 import { setupCompleteAtom } from "@/stores/wizardStore";
 import { getSetting } from "@/lib/commands/settings";
-import { reloadModels } from "@/lib/commands/models";
 
 function MainWindow() {
   const [setupComplete, setSetupComplete] = useAtom(setupCompleteAtom);
@@ -23,13 +22,6 @@ function MainWindow() {
   useEffect(() => {
     if (setupComplete === false) {
       getCurrentWindow().show().catch(() => {});
-    }
-  }, [setupComplete]);
-
-  // Load speech model assets in the background once setup is complete
-  useEffect(() => {
-    if (setupComplete) {
-      reloadModels().catch((e) => console.error("Auto-reload models failed:", e));
     }
   }, [setupComplete]);
 

@@ -2,8 +2,8 @@
 import { atom } from "jotai";
 import type { SpeechModelFileStatus } from "@/types/commands";
 
-/** Five-page navigation enum — order matches sidebar nav items. */
-export type PageId = "dashboard" | "history" | "dictionary" | "hotkeys" | "models";
+/** Main settings pages — order matches sidebar nav items. */
+export type PageId = "dashboard" | "history" | "hotkeys" | "models";
 
 /** Currently active page in the settings window sidebar. */
 export const activePageAtom = atom<PageId>("dashboard");

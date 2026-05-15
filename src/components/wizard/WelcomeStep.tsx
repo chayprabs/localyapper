@@ -20,7 +20,7 @@ export function WelcomeStep({
       </h1>
       <p className="text-[14px] text-black/50 mb-8 max-w-[340px] leading-relaxed">
         Voice dictation that runs entirely on your device. We will download the
-        local speech package, set your hotkey, and keep everything local.
+        speech files, set your hotkey, and keep everything local.
       </p>
 
       <button

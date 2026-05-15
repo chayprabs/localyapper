@@ -6,6 +6,7 @@ use tauri::{Emitter, Manager};
 
 use crate::models::{DownloadProgress, ModelsStatus, SpeechModelFileStatus};
 use crate::state::AppState;
+use crate::stt::whisper::WhisperEngine;
 
 fn selected_speech_model_name(state: &AppState) -> String {
     state
@@ -14,6 +15,35 @@ fn selected_speech_model_name(state: &AppState) -> String {
         .ok()
         .and_then(|db| crate::db::queries::get_setting(&db, "speech_model").ok())
         .unwrap_or_else(|| crate::stt::whisper::DEFAULT_WHISPER_MODEL.to_string())
+}
+
+pub(crate) async fn ensure_speech_model_loaded(
+    app_handle: &tauri::AppHandle,
+    state: &AppState,
+) -> Result<std::sync::Arc<WhisperEngine>, String> {
+    if let Ok(guard) = state.whisper.lock() {
+        if let Some(engine) = guard.as_ref() {
+            return Ok(engine.clone());
+        }
+    }
+
+    let model_name = selected_speech_model_name(state);
+    let app_handle = app_handle.clone();
+    let loaded_engine = tokio::task::spawn_blocking(move || {
+        crate::load_speech_model_from_setting(&app_handle, &model_name)
+    })
+    .await
+    .map_err(|e| format!("STT load task panicked: {e}"))??;
+
+    let mut guard = state
+        .whisper
+        .lock()
+        .map_err(|e| format!("STT lock failed: {e}"))?;
+    if guard.is_none() {
+        *guard = Some(loaded_engine.clone());
+    }
+
+    Ok(guard.as_ref().cloned().unwrap_or(loaded_engine))
 }
 
 /// Cancel an in-progress model download.
@@ -282,6 +312,9 @@ pub async fn delete_speech_model(
     if let Ok(mut g) = state.whisper.lock() {
         *g = None;
     }
+    if let Ok(mut g) = state.vad.lock() {
+        *g = None;
+    }
 
     let dir_name = crate::stt::whisper::stt_model_dir_name(&model);
     let models_dir = app_handle
@@ -294,6 +327,24 @@ pub async fn delete_speech_model(
     if model_dir.is_dir() {
         std::fs::remove_dir_all(&model_dir)
             .map_err(|e| format!("Failed to delete STT model directory: {e}"))?;
+    }
+
+    let has_other_models = std::fs::read_dir(&models_dir)
+        .map(|entries| {
+            entries.filter_map(|entry| entry.ok()).any(|entry| {
+                let path = entry.path();
+                path.is_dir()
+                    && (path.join("model.int8.onnx").exists() || path.join("model.onnx").exists())
+            })
+        })
+        .unwrap_or(false);
+
+    if !has_other_models {
+        let vad_path = models_dir.join(crate::stt::whisper::SILERO_VAD_FILENAME);
+        if vad_path.is_file() {
+            std::fs::remove_file(&vad_path)
+                .map_err(|e| format!("Failed to delete Silero VAD model: {e}"))?;
+        }
     }
 
     log::info!("STT model ({}) deleted", model);
@@ -312,61 +363,7 @@ pub async fn reload_models(
     println!("RELOAD: STT currently loaded: {speech_model_loaded}");
 
     if !speech_model_loaded {
-        let model_setting = {
-            let db = state
-                .db
-                .lock()
-                .map_err(|e| format!("DB lock failed: {e}"))?;
-            crate::db::queries::get_setting(&db, "speech_model")
-                .unwrap_or_else(|_| crate::stt::whisper::DEFAULT_WHISPER_MODEL.to_string())
-        };
-        let candidates = crate::speech_model_candidates(&app_handle, &model_setting);
-        println!(
-            "RELOAD: STT model setting='{}', candidates: {:?}",
-            model_setting,
-            candidates
-                .iter()
-                .map(|p| p.display().to_string())
-                .collect::<Vec<_>>()
-        );
-
-        let whisper_mutex = state.whisper.clone();
-
-        let whisper_result = tokio::task::spawn_blocking(move || {
-            for candidate in &candidates {
-                if candidate.exists() && candidate.is_dir() {
-                    println!("RELOAD: Trying STT at {}", candidate.display());
-                    match crate::stt::whisper::WhisperEngine::new(candidate) {
-                        Ok(engine) => {
-                            println!(
-                                "RELOAD: STT loaded successfully from {}",
-                                candidate.display()
-                            );
-                            log::info!("Hot-loaded STT engine from {}", candidate.display());
-                            if let Ok(mut g) = whisper_mutex.lock() {
-                                *g = Some(std::sync::Arc::new(engine));
-                            }
-                            return Ok(());
-                        }
-                        Err(e) => {
-                            println!("RELOAD: STT load FAILED from {}: {e}", candidate.display());
-                            log::warn!("Failed to load STT from {}: {e}", candidate.display());
-                            return Err(format!(
-                                "Failed to load STT from {}: {e}",
-                                candidate.display()
-                            ));
-                        }
-                    }
-                } else {
-                    println!("RELOAD: Directory not found at {}", candidate.display());
-                }
-            }
-            Err("No STT model directory found at any candidate path".to_string())
-        })
-        .await
-        .map_err(|e| format!("STT load task panicked: {e}"))?;
-
-        if let Err(e) = whisper_result {
+        if let Err(e) = ensure_speech_model_loaded(&app_handle, state.inner()).await {
             errors.push(e);
         }
     }

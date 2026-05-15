@@ -10,8 +10,6 @@ use crate::error::LocalYapperError;
 pub const SAMPLE_RATE: u32 = 16_000;
 /// Mono channel.
 pub const CHANNELS: u16 = 1;
-/// Pre-roll buffer size: 0.5 seconds at 16kHz.
-pub const PRE_ROLL_SAMPLES: usize = 8_000;
 /// Maximum recording: 120 seconds at 16kHz.
 pub const MAX_RECORDING_SAMPLES: usize = 1_920_000;
 
@@ -33,58 +31,10 @@ struct StreamHandle(Option<cpal::Stream>);
 unsafe impl Send for StreamHandle {}
 unsafe impl Sync for StreamHandle {}
 
-/// Fixed-capacity ring buffer for pre-roll audio.
-pub struct RingBuffer {
-    data: Vec<f32>,
-    capacity: usize,
-    write_pos: usize,
-    is_full: bool,
-}
-
-impl RingBuffer {
-    /// Create a new ring buffer with the given capacity.
-    pub fn new(capacity: usize) -> Self {
-        Self {
-            data: vec![0.0; capacity],
-            capacity,
-            write_pos: 0,
-            is_full: false,
-        }
-    }
-
-    /// Push a slice of samples into the ring buffer.
-    pub fn push_slice(&mut self, samples: &[f32]) {
-        for &sample in samples {
-            self.data[self.write_pos] = sample;
-            self.write_pos += 1;
-            if self.write_pos >= self.capacity {
-                self.write_pos = 0;
-                self.is_full = true;
-            }
-        }
-    }
-
-    /// Drain all samples in chronological order and reset the buffer.
-    pub fn drain_ordered(&mut self) -> Vec<f32> {
-        let result = if self.is_full {
-            let mut out = Vec::with_capacity(self.capacity);
-            out.extend_from_slice(&self.data[self.write_pos..]);
-            out.extend_from_slice(&self.data[..self.write_pos]);
-            out
-        } else {
-            self.data[..self.write_pos].to_vec()
-        };
-        self.write_pos = 0;
-        self.is_full = false;
-        result
-    }
-}
-
 /// Audio recorder that captures microphone input via cpal.
 pub struct AudioRecorder {
     state: Arc<AtomicU8>,
     buffer: Arc<Mutex<Vec<f32>>>,
-    pre_roll: Arc<Mutex<RingBuffer>>,
     stop_signal: Arc<AtomicBool>,
     stream: Arc<Mutex<StreamHandle>>,
     started_at: Arc<Mutex<Option<Instant>>>,
@@ -96,7 +46,6 @@ impl AudioRecorder {
         Self {
             state: Arc::new(AtomicU8::new(STATE_IDLE)),
             buffer: Arc::new(Mutex::new(Vec::new())),
-            pre_roll: Arc::new(Mutex::new(RingBuffer::new(PRE_ROLL_SAMPLES))),
             stop_signal: Arc::new(AtomicBool::new(false)),
             stream: Arc::new(Mutex::new(StreamHandle(None))),
             started_at: Arc::new(Mutex::new(None)),
@@ -117,9 +66,6 @@ impl AudioRecorder {
         // Clear previous buffer
         if let Ok(mut buf) = self.buffer.lock() {
             buf.clear();
-        }
-        if let Ok(mut pr) = self.pre_roll.lock() {
-            *pr = RingBuffer::new(PRE_ROLL_SAMPLES);
         }
 
         let host = cpal::default_host();
@@ -292,7 +238,7 @@ impl AudioRecorder {
             s.0 = None;
         }
         if let Ok(mut buf) = self.buffer.lock() {
-            buf.clear();
+            *buf = Vec::new();
         }
         if let Ok(mut t) = self.started_at.lock() {
             *t = None;
@@ -324,47 +270,6 @@ impl AudioRecorder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn ring_buffer_empty_drain() {
-        let mut rb = RingBuffer::new(10);
-        let result = rb.drain_ordered();
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn ring_buffer_partial_fill() {
-        let mut rb = RingBuffer::new(10);
-        rb.push_slice(&[1.0, 2.0, 3.0]);
-        let result = rb.drain_ordered();
-        assert_eq!(result, vec![1.0, 2.0, 3.0]);
-    }
-
-    #[test]
-    fn ring_buffer_exact_fill() {
-        let mut rb = RingBuffer::new(4);
-        rb.push_slice(&[1.0, 2.0, 3.0, 4.0]);
-        let result = rb.drain_ordered();
-        assert_eq!(result, vec![1.0, 2.0, 3.0, 4.0]);
-    }
-
-    #[test]
-    fn ring_buffer_wrap_around() {
-        let mut rb = RingBuffer::new(4);
-        rb.push_slice(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-        let result = rb.drain_ordered();
-        // Should contain last 4 samples in order
-        assert_eq!(result, vec![3.0, 4.0, 5.0, 6.0]);
-    }
-
-    #[test]
-    fn ring_buffer_drain_resets() {
-        let mut rb = RingBuffer::new(4);
-        rb.push_slice(&[1.0, 2.0, 3.0]);
-        let _ = rb.drain_ordered();
-        let result = rb.drain_ordered();
-        assert!(result.is_empty());
-    }
 
     #[test]
     fn recorder_new_is_idle() {

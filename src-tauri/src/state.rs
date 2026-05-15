@@ -1,7 +1,6 @@
 // Application state -- shared Tauri state container
 use crate::audio::capture::AudioRecorder;
 use crate::audio::vad::SileroVad;
-use crate::correction::engine::CorrectionEngine;
 use crate::stt::whisper::WhisperEngine;
 use rusqlite::Connection;
 use std::sync::atomic::AtomicBool;
@@ -19,8 +18,6 @@ pub struct AppState {
     pub vad: Arc<Mutex<Option<SileroVad>>>,
     /// Most recent injected text, used by paste_last command.
     pub last_injection: Arc<Mutex<Option<String>>>,
-    /// In-memory correction lookup, refreshed after learner writes.
-    pub correction_engine: Arc<CorrectionEngine>,
     /// Signal flag to abort an in-progress model download.
     pub download_cancel: Arc<AtomicBool>,
     /// When true, hotkeys are disabled (dictation paused via tray menu).

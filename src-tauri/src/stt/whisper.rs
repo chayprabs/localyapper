@@ -10,6 +10,8 @@ use crate::error::LocalYapperError;
 /// Minimum audio length in samples (0.2s at 16kHz) below which transcription is skipped.
 /// Lowered from 0.5s to support single-word utterances like "hi", "yes", "no".
 const MIN_AUDIO_SAMPLES: usize = 3_200;
+/// Clamp ONNX worker threads to keep the engine from over-allocating on high-core CPUs.
+const MAX_STT_THREADS: usize = 4;
 
 /// Default STT model variant for new installs.
 pub const DEFAULT_WHISPER_MODEL: &str = "parakeet-110m";
@@ -103,7 +105,7 @@ impl WhisperEngine {
         }
 
         let n_threads = std::thread::available_parallelism()
-            .map(|p| (p.get().saturating_sub(2)).max(1) as i32)
+            .map(|p| p.get().clamp(1, MAX_STT_THREADS) as i32)
             .unwrap_or(2);
 
         let config = OfflineRecognizerConfig {

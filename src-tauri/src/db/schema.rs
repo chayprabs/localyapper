@@ -17,24 +17,6 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
             created_at   DATETIME DEFAULT (datetime('now'))
         );
 
-        CREATE TABLE IF NOT EXISTS corrections (
-            id            TEXT PRIMARY KEY,
-            raw_word      TEXT NOT NULL,
-            corrected     TEXT NOT NULL,
-            count         INTEGER DEFAULT 1,
-            confidence    REAL DEFAULT 0.0,
-            last_used_at  DATETIME,
-            created_at    DATETIME DEFAULT (datetime('now')),
-            UNIQUE(raw_word, corrected)
-        );
-
-        CREATE TABLE IF NOT EXISTS personal_dictionary (
-            id        TEXT PRIMARY KEY,
-            word      TEXT NOT NULL UNIQUE,
-            count     INTEGER DEFAULT 1,
-            added_at  DATETIME DEFAULT (datetime('now'))
-        );
-
         CREATE TABLE IF NOT EXISTS settings (
             key         TEXT PRIMARY KEY,
             value       TEXT NOT NULL,
@@ -44,26 +26,25 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
     )?;
 
     seed_settings(conn)?;
+    migrate_removed_dictionary_feature(conn)?;
     migrate_hotkey_defaults(conn)?;
     migrate_legacy_speech_model_settings(conn)?;
 
     Ok(())
 }
 
-/// Inserts default settings (17 rows). Uses INSERT OR IGNORE for idempotency.
+/// Inserts default settings (15 rows). Uses INSERT OR IGNORE for idempotency.
 fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     let seeds = [
-        ("hotkey_record", "Ctrl+Shift+Space"),
-        ("hotkey_hands_free", "Ctrl+Shift+Space"),
+        ("hotkey_record", "F8"),
+        ("hotkey_hands_free", "Ctrl+F8"),
         ("hotkey_cancel", "Escape"),
-        ("hotkey_paste_last", "Alt+Shift+V"),
-        ("hotkey_open_app", "Alt+L"),
+        ("hotkey_paste_last", "Ctrl+Alt+J"),
+        ("hotkey_open_app", "Ctrl+Alt+O"),
         ("speech_model", "parakeet-110m"),
         ("auto_start", "true"),
         ("sound_effects", "true"),
         ("mute_media", "true"),
-        ("confidence_threshold", "0.6"),
-        ("correction_decay_days", "30"),
         ("language", "en"),
         ("overlay_x", "100"),
         ("overlay_y", "100"),
@@ -84,20 +65,49 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     Ok(())
 }
 
-/// Migrate hotkey_record from conflicting defaults (Alt+Space, Ctrl+Space) to Ctrl+Shift+Space.
-/// Safe to run repeatedly - only updates if value matches a known conflicting default.
+/// Drop legacy dictionary/correction tables and stale settings from older builds.
+fn migrate_removed_dictionary_feature(conn: &Connection) -> Result<(), LocalYapperError> {
+    conn.execute("DROP TABLE IF EXISTS corrections", [])?;
+    conn.execute("DROP TABLE IF EXISTS personal_dictionary", [])?;
+    conn.execute(
+        "DELETE FROM settings WHERE key IN ('confidence_threshold', 'correction_decay_days', 'training_paragraph_index')",
+        [],
+    )?;
+    Ok(())
+}
+
+/// Migrate legacy default hotkeys to the current safer defaults.
+/// Safe to run repeatedly - only updates known historical defaults.
 fn migrate_hotkey_defaults(conn: &Connection) -> Result<(), LocalYapperError> {
-    let conflicting = ["Alt+Space", "Ctrl+Space", "Alt+Alt+Space"];
-    for old_val in &conflicting {
+    let legacy_record_values = [
+        "Alt+Space",
+        "Ctrl+Space",
+        "Alt+Alt+Space",
+        "Ctrl+Shift+Space",
+        "Ctrl+Alt+D",
+        "Ctrl+Alt+X",
+        "Ctrl+Alt+H",
+    ];
+    for old_val in &legacy_record_values {
         conn.execute(
-            "UPDATE settings SET value = 'Ctrl+Shift+Space', updated_at = datetime('now') WHERE key = 'hotkey_record' AND value = ?1",
+            "UPDATE settings SET value = 'F8', updated_at = datetime('now') WHERE key = 'hotkey_record' AND value = ?1",
             rusqlite::params![old_val],
         )?;
         conn.execute(
-            "UPDATE settings SET value = 'Ctrl+Shift+Space', updated_at = datetime('now') WHERE key = 'hotkey_hands_free' AND value = ?1",
+            "UPDATE settings SET value = 'Ctrl+F8', updated_at = datetime('now') WHERE key = 'hotkey_hands_free' AND value = ?1",
             rusqlite::params![old_val],
         )?;
     }
+
+    conn.execute(
+        "UPDATE settings SET value = 'Ctrl+Alt+J', updated_at = datetime('now') WHERE key = 'hotkey_paste_last' AND value = 'Alt+Shift+V'",
+        [],
+    )?;
+    conn.execute(
+        "UPDATE settings SET value = 'Ctrl+Alt+O', updated_at = datetime('now') WHERE key = 'hotkey_open_app' AND value = 'Alt+L'",
+        [],
+    )?;
+
     Ok(())
 }
 

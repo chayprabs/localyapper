@@ -1,4 +1,6 @@
 // Floating overlay pill -- displays recording, processing, and transcription states
+import type { PointerEvent as ReactPointerEvent } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useOverlayState } from "@/hooks/useOverlayState";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Waveform } from "./Waveform";
@@ -18,6 +20,11 @@ function Spinner({ slow }: { slow?: boolean }) {
   );
 }
 
+function isInteractiveTarget(target: EventTarget | null) {
+  return target instanceof Element
+    && target.closest("button, a, input, textarea, select, [role='button'], [data-overlay-no-drag='true']") !== null;
+}
+
 export function Overlay() {
   const { overlayData, elapsedSeconds, remainingSeconds, autoInjectProgress, processingCountdown, dismissOverlay } =
     useOverlayState();
@@ -35,10 +42,23 @@ export function Overlay() {
   const pillHeight = isTranscribed || visualState === "long-recording" ? "h-[72px]" : "h-[64px]";
   const pillRadius = isTranscribed ? "rounded-[36px]" : "rounded-full";
 
+  const handlePointerDown = async (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || isInteractiveTarget(event.target)) {
+      return;
+    }
+
+    try {
+      await getCurrentWindow().startDragging();
+    } catch (error) {
+      console.error("[overlay] Failed to start dragging:", error);
+    }
+  };
+
   return (
-    <div data-tauri-drag-region className="h-screen w-screen flex items-center justify-center bg-transparent">
+    <div className="h-screen w-screen flex items-center justify-center bg-transparent">
       <div
-        className={`w-[320px] ${pillHeight} ${pillRadius} ${pillBase} relative overflow-hidden`}
+        onPointerDown={handlePointerDown}
+        className={`w-[320px] ${pillHeight} ${pillRadius} ${pillBase} relative overflow-hidden cursor-grab active:cursor-grabbing select-none`}
       >
         {visualState === "listening" && (
           <div className="flex items-center justify-between h-full">

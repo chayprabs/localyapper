@@ -27,17 +27,14 @@ function formatKey(key: string): string {
   return key;
 }
 
-/** Parse "Alt+Shift+V" into displayable badge tokens. */
+/** Parse a shortcut string into displayable badge tokens. */
 function parseHotkeyParts(hotkey: string): string[] {
   return hotkey.split("+").map(formatKey);
 }
 
 /** Convert a keyboard event into a Tauri-style shortcut string. */
 function eventToShortcut(e: KeyboardEvent): string | null {
-  // Ignore bare modifier presses
-  if (
-    ["Alt", "Control", "Shift", "Meta", "AltGraph"].includes(e.key)
-  ) {
+  if (["Alt", "Control", "Shift", "Meta", "AltGraph"].includes(e.key)) {
     return null;
   }
 
@@ -47,7 +44,6 @@ function eventToShortcut(e: KeyboardEvent): string | null {
   if (e.shiftKey) parts.push("Shift");
   if (e.metaKey) parts.push("Meta");
 
-  // Normalize the key name
   let keyName = e.key;
   if (keyName === " ") keyName = "Space";
   else if (keyName.length === 1) keyName = keyName.toUpperCase();
@@ -58,7 +54,7 @@ function eventToShortcut(e: KeyboardEvent): string | null {
 
 function KeyBadge({ label }: { label: string }) {
   return (
-    <span className="px-2 h-6 flex items-center bg-[rgba(0,0,0,0.06)] rounded-[6px] text-[12px] font-medium font-mono text-[#1C1C1E]">
+    <span className="inline-flex h-7 max-w-full items-center rounded-[7px] border border-black/[0.06] bg-[rgba(0,0,0,0.04)] px-2.5 text-[12px] font-medium font-mono text-[#1C1C1E] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
       {label}
     </span>
   );
@@ -68,7 +64,6 @@ function KeySelector({
   value,
   isEditing,
   readOnly,
-  isDoubleTap,
   onStartEdit,
   onCapture,
   onCancel,
@@ -76,7 +71,6 @@ function KeySelector({
   value: string;
   isEditing: boolean;
   readOnly: boolean;
-  isDoubleTap?: boolean;
   onStartEdit: () => void;
   onCapture: (shortcut: string) => void;
   onCancel: () => void;
@@ -94,7 +88,6 @@ function KeySelector({
       e.preventDefault();
       e.stopPropagation();
 
-      // Escape cancels capture
       if (e.key === "Escape") {
         onCancel();
         return;
@@ -128,34 +121,34 @@ function KeySelector({
   const displayValue = pendingKeys ?? value;
   const parts = parseHotkeyParts(displayValue);
 
-  // For double-tap display: duplicate modifier keys (e.g., Ctrl → Ctrl Ctrl)
-  const displayParts = isDoubleTap
-    ? [...parts.slice(0, -1), ...parts.slice(0, -1), ...parts.slice(-1)]
-    : parts;
-
   return (
     <div
       ref={containerRef}
       onClick={readOnly ? undefined : onStartEdit}
-      className={`w-[200px] h-[36px] bg-white border rounded-[8px] shadow-sm px-2 flex items-center justify-between ${
+      className={`w-full max-w-[320px] min-h-[46px] rounded-[10px] border bg-white px-3 py-2 shadow-sm transition-colors ${
         readOnly
-          ? "cursor-default opacity-60"
+          ? "cursor-default border-black/[0.08] bg-black/[0.015]"
           : "cursor-pointer hover:border-black/20"
-      } ${isEditing ? "border-[#0058bc]" : "border-black/10"}`}
+      } ${isEditing ? "border-[#0058bc] ring-2 ring-[#0058bc]/10" : "border-black/10"}`}
     >
       {isEditing ? (
-        <span className="text-[12px] text-black/30 select-none">
-          Press keys...
-        </span>
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+          <span className="text-[12px] text-black/30 select-none">
+            Press shortcut...
+          </span>
+          <span className="text-[11px] text-black/[0.26] select-none">
+            Esc to cancel
+          </span>
+        </div>
       ) : (
-        <div className="flex items-center gap-[6px]">
-          {displayParts.map((part, i) => (
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {parts.map((part, i) => (
             <KeyBadge key={i} label={part} />
           ))}
         </div>
       )}
       {!readOnly && (
-        <span className="material-symbols-outlined text-[12px] text-[rgba(0,0,0,0.30)] mr-1">
+        <span className="material-symbols-outlined ml-3 shrink-0 text-[14px] text-[rgba(0,0,0,0.30)]">
           expand_more
         </span>
       )}
@@ -193,21 +186,31 @@ export function HotkeysPage() {
 
   return (
     <div className="px-12 py-10">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-[26px] font-semibold text-black/85">Hotkeys</h1>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[26px] font-semibold text-black/85">Hotkeys</h1>
+          <p className="mt-2 text-[13px] text-black/[0.45]">
+            Choose the shortcuts you want to use across the app.
+          </p>
+        </div>
+
         {showResetConfirm ? (
-          <div className="flex items-center gap-3">
-            <span className="text-[13px] text-black/50">Reset all hotkeys?</span>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="text-[13px] text-black/50">
+              Reset all hotkeys?
+            </span>
             <button
               onClick={() => setShowResetConfirm(false)}
-              className="bg-white border border-black/[0.15] px-3 h-8 rounded-lg text-[13px] font-medium shadow-sm hover:bg-black/[0.02] transition-colors"
+              className="h-8 rounded-lg border border-black/[0.15] bg-white px-3 text-[13px] font-medium shadow-sm transition-colors hover:bg-black/[0.02]"
             >
               Cancel
             </button>
             <button
-              onClick={() => { resetToDefaults(); setShowResetConfirm(false); }}
-              className="bg-[#ba1a1a] text-white px-3 h-8 rounded-lg text-[13px] font-medium shadow-sm hover:bg-[#a01616] transition-colors"
+              onClick={() => {
+                resetToDefaults();
+                setShowResetConfirm(false);
+              }}
+              className="h-8 rounded-lg bg-[#ba1a1a] px-3 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-[#a01616]"
             >
               Reset
             </button>
@@ -215,42 +218,40 @@ export function HotkeysPage() {
         ) : (
           <button
             onClick={() => setShowResetConfirm(true)}
-            className="bg-white border border-black/[0.15] px-4 h-8 rounded-lg text-[13px] font-medium shadow-sm hover:bg-black/[0.02] active:bg-black/[0.04] transition-colors"
+            className="h-8 rounded-lg border border-black/[0.15] bg-white px-4 text-[13px] font-medium shadow-sm transition-colors hover:bg-black/[0.02] active:bg-black/[0.04]"
           >
             Reset to Defaults
           </button>
         )}
       </div>
 
-      {/* Card */}
-      <div className="bg-white rounded-[10px] border border-black/[0.07] shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-sm">
         {entries.map((entry, index) => (
           <div
             key={entry.key}
-            className={`h-[52px] px-5 flex items-center justify-between ${
+            className={`grid gap-4 px-5 py-4 md:grid-cols-[minmax(0,1fr)_minmax(240px,320px)] md:items-center ${
               index < entries.length - 1 ? "border-b border-black/[0.07]" : ""
             }`}
           >
-            {/* Left: label + description */}
-            <div className="flex flex-col">
+            <div className="min-w-0">
               <span className="text-[13px] font-semibold text-black/85">
                 {entry.label}
               </span>
-              <span className="text-[12px] text-black/[0.40]">
+              <span className="mt-1 block text-[12px] text-black/[0.40]">
                 {entry.description}
               </span>
             </div>
 
-            {/* Right: key selector */}
-            <KeySelector
-              value={entry.value}
-              isEditing={editingKey === entry.key}
-              readOnly={entry.readOnly}
-              isDoubleTap={entry.key === "hotkey_hands_free"}
-              onStartEdit={() => startEditing(entry.key)}
-              onCapture={(shortcut) => handleCapture(entry.key, shortcut)}
-              onCancel={stopEditing}
-            />
+            <div className="w-full md:justify-self-end">
+              <KeySelector
+                value={entry.value}
+                isEditing={editingKey === entry.key}
+                readOnly={entry.readOnly}
+                onStartEdit={() => startEditing(entry.key)}
+                onCapture={(shortcut) => handleCapture(entry.key, shortcut)}
+                onCancel={stopEditing}
+              />
+            </div>
           </div>
         ))}
       </div>

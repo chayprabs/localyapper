@@ -2,16 +2,7 @@
 import { useHistory } from "@/hooks/useHistory";
 import { HistoryCard } from "./HistoryCard";
 
-function KeyBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="bg-[rgba(0,0,0,0.07)] border border-[rgba(0,0,0,0.1)] rounded-[6px] px-1.5 py-px text-[11px] font-medium inline-flex items-center justify-center min-w-[1.5em]">
-      {children}
-    </span>
-  );
-}
-
 function EmptyState() {
-  const isMac = navigator.userAgent.includes("Mac");
   return (
     <div className="flex-1 flex flex-col items-center justify-center -mt-16">
       <div className="w-[56px] h-[56px] rounded-full bg-[rgba(0,0,0,0.05)] flex items-center justify-center mb-4">
@@ -22,10 +13,8 @@ function EmptyState() {
       <p className="text-[14px] font-medium text-[#1C1C1E] mb-1">
         No dictations yet
       </p>
-      <p className="text-[12px] text-black/[0.26] flex items-center gap-1.5 mb-6">
-        Hold <KeyBadge>{isMac ? "⌥" : "Ctrl"}</KeyBadge>{" "}
-        {!isMac && <><KeyBadge>Shift</KeyBadge>{" "}</>}
-        <KeyBadge>Space</KeyBadge> to start your first dictation.
+      <p className="text-[12px] text-black/[0.26] text-center mb-6">
+        Use your record hotkey to start your first dictation.
       </p>
       <button className="w-[140px] h-[36px] bg-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:bg-[#004ea8] transition-colors shadow-sm">
         Start Dictating
@@ -52,7 +41,6 @@ export function HistoryPage() {
 
   return (
     <div className="flex flex-col h-full px-12 py-10">
-      {/* Header */}
       <header className="mb-10 flex justify-between items-baseline shrink-0">
         <h1 className="text-[26px] font-semibold text-[#1C1C1E]">History</h1>
         <button
@@ -68,7 +56,6 @@ export function HistoryPage() {
         </button>
       </header>
 
-      {/* Content */}
       {isEmpty ? (
         <EmptyState />
       ) : (
@@ -81,7 +68,6 @@ export function HistoryPage() {
             />
           ))}
 
-          {/* Load More */}
           {hasMore && (
             <div className="flex justify-center mt-6 mb-10 shrink-0">
               <button

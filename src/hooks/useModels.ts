@@ -216,7 +216,7 @@ export function useModels() {
 
       if (!status.speech_model_loaded) {
         setSpeechModelError(
-          "The speech engine did not start. Try deleting the local speech package and downloading it again.",
+          "The speech engine did not start. Try removing the local speech files and downloading them again.",
         );
       }
     } catch (error) {
