@@ -11,6 +11,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   verify:
     name: Verify
@@ -78,22 +81,22 @@ jobs:
           - name: macOS Apple Silicon
             platform: macos-latest
             rust_targets: aarch64-apple-darwin
-            args: --target aarch64-apple-darwin
+            args: --target aarch64-apple-darwin --bundles dmg
             artifact: macos-aarch64
           - name: macOS Intel
             platform: macos-latest
             rust_targets: x86_64-apple-darwin
-            args: --target x86_64-apple-darwin
+            args: --target x86_64-apple-darwin --bundles dmg
             artifact: macos-x64
           - name: Linux
             platform: ubuntu-22.04
             rust_targets: ""
-            args: ""
+            args: --bundles deb,appimage
             artifact: linux-x64
           - name: Windows
             platform: windows-latest
             rust_targets: ""
-            args: ""
+            args: --bundles nsis
             artifact: windows-x64
 
     steps:
@@ -126,6 +129,7 @@ jobs:
             file \
             libasound2-dev \
             libayatana-appindicator3-dev \
+            libfuse2 \
             librsvg2-dev \
             libssl-dev \
             libwebkit2gtk-4.1-dev \
@@ -154,19 +158,22 @@ jobs:
 
       - name: Prepare artifact paths
         id: artifact-paths
-        if: steps.build-tauri.outputs.artifactPaths != '[]'
+        if: ${{ steps.build-tauri.outputs.artifactPaths != '' && steps.build-tauri.outputs.artifactPaths != '[]' }}
         shell: bash
         run: |
           node <<'NODE'
           const fs = require('fs');
-          const paths = JSON.parse(process.env.ARTIFACT_PATHS ?? '[]');
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `paths<<EOF\n${paths.join('\n')}\nEOF\n`);
+          const raw = (process.env.ARTIFACT_PATHS || '').trim();
+          const paths = raw ? JSON.parse(raw) : [];
+          if (paths.length > 0) {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `paths<<EOF\n${paths.join('\n')}\nEOF\n`);
+          }
           NODE
         env:
           ARTIFACT_PATHS: ${{ steps.build-tauri.outputs.artifactPaths }}
 
       - name: Upload workflow artifacts
-        if: steps.artifact-paths.outputs.paths != ''
+        if: ${{ steps.artifact-paths.outputs.paths != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: localyapper-${{ matrix.artifact }}
