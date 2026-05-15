@@ -153,3 +153,62 @@ pub async fn reset_hotkeys(
 
     Ok(result)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::schema;
+
+    fn test_connection() -> Connection {
+        let conn = Connection::open_in_memory().expect("in-memory db");
+        schema::initialize_database(&conn).expect("schema initialization");
+        conn
+    }
+
+    #[test]
+    fn hotkey_uniqueness_is_case_insensitive() {
+        let conn = test_connection();
+
+        let result = ensure_hotkey_is_unique(&conn, "hotkey_record", "ctrl+f8");
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().as_deref(),
+            Some("Hands-free is already using ctrl+f8")
+        );
+    }
+
+    #[test]
+    fn current_hotkey_settings_reads_seeded_defaults() {
+        let conn = test_connection();
+
+        let settings = current_hotkey_settings(&conn);
+
+        assert_eq!(
+            settings.get("hotkey_record").map(String::as_str),
+            Some("F8")
+        );
+        assert_eq!(
+            settings.get("hotkey_hands_free").map(String::as_str),
+            Some("Ctrl+F8")
+        );
+        assert_eq!(
+            settings.get("hotkey_cancel").map(String::as_str),
+            Some("Escape")
+        );
+    }
+
+    #[test]
+    fn restore_hotkey_settings_writes_previous_values() {
+        let conn = test_connection();
+        let previous = current_hotkey_settings(&conn);
+        queries::set_setting(&conn, "hotkey_record", "F9").expect("set hotkey");
+
+        restore_hotkey_settings(&conn, &previous);
+
+        assert_eq!(
+            queries::get_setting(&conn, "hotkey_record").expect("hotkey_record"),
+            "F8"
+        );
+    }
+}
