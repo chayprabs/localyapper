@@ -3,7 +3,8 @@
 Date: 2026-05-15
 Branch: main
 
-Latest verified GitHub Actions run: `25919031482`
+Latest verified GitHub Actions run: `25920211912`
+Verified commit: `a310c22`
 Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
 
@@ -151,6 +152,6 @@ speech-only release unless product direction changes.
 6. Rerun lint, typecheck, clippy, tests, frontend build, and Tauri build.
 
 Completed in this run: items 1 through 6. Windows NSIS and Linux AppImage
-bundling were verified locally. GitHub Actions run `25919031482` completed
+bundling were verified locally. GitHub Actions run `25920211912` completed
 successfully for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs, and uploaded all four platform artifacts.
