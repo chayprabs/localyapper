@@ -10,8 +10,6 @@ use crate::error::LocalYapperError;
 pub struct VadResult {
     /// Audio trimmed of leading/trailing silence.
     pub trimmed_audio: Vec<f32>,
-    /// Number of frames classified as speech.
-    pub speech_frame_count: usize,
     /// Duration of speech in milliseconds.
     pub speech_duration_ms: u64,
     /// Whether meaningful speech was detected.
@@ -68,7 +66,6 @@ impl SileroVad {
         if audio.is_empty() {
             return VadResult {
                 trimmed_audio: Vec::new(),
-                speech_frame_count: 0,
                 speech_duration_ms: 0,
                 has_speech: false,
             };
@@ -102,12 +99,10 @@ impl SileroVad {
 
         // Collect speech segments
         let mut speech_samples: Vec<f32> = Vec::new();
-        let mut segment_count = 0;
 
         while !detector.is_empty() {
             if let Some(segment) = detector.front() {
                 speech_samples.extend_from_slice(segment.samples());
-                segment_count += 1;
             }
             detector.pop();
         }
@@ -115,7 +110,6 @@ impl SileroVad {
         if speech_samples.is_empty() {
             return VadResult {
                 trimmed_audio: Vec::new(),
-                speech_frame_count: 0,
                 speech_duration_ms: 0,
                 has_speech: false,
             };
@@ -125,7 +119,6 @@ impl SileroVad {
 
         VadResult {
             trimmed_audio: speech_samples,
-            speech_frame_count: segment_count,
             speech_duration_ms,
             has_speech: true,
         }
@@ -183,7 +176,6 @@ pub fn apply_energy_vad(audio: &[f32]) -> VadResult {
     if audio.is_empty() {
         return VadResult {
             trimmed_audio: Vec::new(),
-            speech_frame_count: 0,
             speech_duration_ms: 0,
             has_speech: false,
         };
@@ -195,7 +187,6 @@ pub fn apply_energy_vad(audio: &[f32]) -> VadResult {
     if speech_frame_count < config.min_speech_frames {
         return VadResult {
             trimmed_audio: Vec::new(),
-            speech_frame_count,
             speech_duration_ms: 0,
             has_speech: false,
         };
@@ -225,7 +216,6 @@ pub fn apply_energy_vad(audio: &[f32]) -> VadResult {
 
     VadResult {
         trimmed_audio,
-        speech_frame_count,
         speech_duration_ms,
         has_speech: true,
     }
@@ -246,6 +236,7 @@ pub fn apply_vad(audio: &[f32], silero: Option<&SileroVad>) -> VadResult {
 }
 
 /// Quick check for whether audio contains speech (energy-based only).
+#[cfg(test)]
 pub fn has_speech(audio: &[f32]) -> bool {
     let config = default_config();
     let flags = classify_frames(audio, &config);
@@ -291,7 +282,6 @@ mod tests {
 
         let result = apply_energy_vad(&audio);
         assert!(result.has_speech);
-        assert!(result.speech_frame_count > 0);
         assert!(result.speech_duration_ms > 0);
         assert!(result.trimmed_audio.len() < audio.len());
         assert!(result.trimmed_audio.len() >= 16_000);

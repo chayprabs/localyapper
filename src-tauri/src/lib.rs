@@ -1,5 +1,3 @@
-#![allow(clippy::duplicate_mod, dead_code)]
-
 mod audio;
 mod commands;
 mod context;
@@ -96,7 +94,7 @@ fn send_notification(handle: &tauri::AppHandle, title: &str, body: &str) {
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    tauri::Builder::default()
+    if let Err(e) = tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -105,13 +103,16 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
-        .setup(|app| {
-            let app_data_dir = app
-                .path()
-                .app_data_dir()
-                .expect("Failed to resolve app data directory");
+        .setup(|app| -> Result<(), Box<dyn std::error::Error>> {
+            let app_data_dir = app.path().app_data_dir().map_err(|e| {
+                log::error!("Failed to resolve app data directory: {e}");
+                Box::new(e) as Box<dyn std::error::Error>
+            })?;
 
-            let conn = db::open_database(&app_data_dir).expect("Failed to initialize database");
+            let conn = db::open_database(&app_data_dir).map_err(|e| {
+                log::error!("Failed to initialize database: {e}");
+                Box::new(e) as Box<dyn std::error::Error>
+            })?;
             let speech_model_setting = db::queries::get_setting(&conn, "speech_model")
                 .unwrap_or_else(|_| stt::whisper::DEFAULT_WHISPER_MODEL.to_string());
             let speech_model_installed =
@@ -263,5 +264,7 @@ pub fn run() {
             commands::system::open_mic_settings,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+    {
+        log::error!("Error while running Tauri application: {e}");
+    }
 }

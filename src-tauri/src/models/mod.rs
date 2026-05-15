@@ -1,6 +1,5 @@
 // Shared data models and pipeline event types
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// A transcription history entry.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -90,7 +89,3 @@ pub struct SpeechModelFileStatus {
     pub size_mb: u64,
     pub model_name: String,
 }
-
-/// All settings as a key-value map (settings table rows flattened).
-/// Keys are setting identifiers (e.g. "hotkey_record", "speech_model").
-pub type AllSettings = HashMap<String, String>;

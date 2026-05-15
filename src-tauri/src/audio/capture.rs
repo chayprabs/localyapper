@@ -8,8 +8,6 @@ use crate::error::LocalYapperError;
 
 /// Target sample rate for capture (16kHz for the local speech engine).
 pub const SAMPLE_RATE: u32 = 16_000;
-/// Mono channel.
-pub const CHANNELS: u16 = 1;
 /// Maximum recording: 120 seconds at 16kHz.
 pub const MAX_RECORDING_SAMPLES: usize = 1_920_000;
 
@@ -250,11 +248,13 @@ impl AudioRecorder {
     }
 
     /// Check if a recording is currently in progress.
+    #[cfg(test)]
     pub fn is_recording(&self) -> bool {
         self.state.load(Ordering::SeqCst) == STATE_RECORDING
     }
 
     /// Get elapsed recording time in seconds, if recording.
+    #[cfg(test)]
     pub fn elapsed_seconds(&self) -> Option<f64> {
         if !self.is_recording() {
             return None;
