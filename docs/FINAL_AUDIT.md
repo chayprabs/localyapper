@@ -3,7 +3,7 @@
 Date: 2026-05-15
 Branch: main
 
-Latest verified GitHub Actions run: `25920211912`
+Reference GitHub Actions verification run: `25920211912`
 Verified commit: `a310c22`
 Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
