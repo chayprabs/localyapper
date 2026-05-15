@@ -84,6 +84,19 @@ Pass criteria:
 - Existing clipboard contents are restored.
 - History and Dashboard reflect the completed dictation.
 
+## Optional Windows Injection Smoke
+
+On an interactive Windows desktop, this ignored test launches Notepad, focuses
+the temporary file window, calls the real clipboard injector, saves the file,
+and confirms that the original clipboard text is restored:
+
+```powershell
+cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection_smoke -- --ignored --nocapture
+```
+
+This does not replace the real microphone dictation pass, but it gives a
+repeatable check for the external-app clipboard injection layer.
+
 ## Hotkey Pass
 
 1. Open Settings > Hotkeys.

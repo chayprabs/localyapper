@@ -51,6 +51,8 @@ disk.
   output, and packaged release artifacts.
 - Manual release QA checklist covers real microphone capture, overlay behavior,
   hotkeys, model handling, and external-app injection.
+- An ignored Windows Notepad smoke test can exercise the real clipboard
+  injector against an external app and verify clipboard restoration.
 - SQLite-backed history and settings.
 - Dashboard, History, Hotkeys, and Speech model pages.
 - System tray with open, pause/resume dictation, and quit actions.
@@ -88,7 +90,9 @@ Results:
 - TypeScript strict check: passed.
 - Rust formatting check: passed.
 - Rust clippy with `-D warnings`: passed.
-- Rust tests: 25 passed, 0 failed.
+- Rust tests: 25 passed, 0 failed, 1 ignored manual desktop smoke.
+- Ignored Windows Notepad injection smoke: passed locally with
+  `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection_smoke -- --ignored --nocapture`.
 - Frontend production build: passed.
 - Tauri release build on Windows: passed.
 - Windows artifact produced:
