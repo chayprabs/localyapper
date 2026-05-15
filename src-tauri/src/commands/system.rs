@@ -16,12 +16,6 @@ pub async fn get_focused_app() -> Result<String, String> {
     Ok(detector::get_focused_window_name())
 }
 
-/// Checks for app updates via GitHub releases API.
-#[tauri::command]
-pub async fn check_update() -> Result<Option<String>, String> {
-    Ok(None)
-}
-
 /// Returns system permissions status (mic + accessibility).
 #[tauri::command]
 pub async fn check_permissions() -> Result<PermissionsStatus, String> {

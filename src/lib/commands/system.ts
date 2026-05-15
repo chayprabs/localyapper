@@ -6,10 +6,6 @@ export async function getFocusedApp(): Promise<string> {
   return invoke<string>("get_focused_app");
 }
 
-export async function checkUpdate(): Promise<string | null> {
-  return invoke<string | null>("check_update");
-}
-
 export async function checkPermissions(): Promise<PermissionsStatus> {
   return invoke<PermissionsStatus>("check_permissions");
 }

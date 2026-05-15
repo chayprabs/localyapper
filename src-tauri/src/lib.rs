@@ -258,7 +258,6 @@ pub fn run() {
             commands::hotkeys::update_hotkey,
             commands::hotkeys::reset_hotkeys,
             commands::system::get_focused_app,
-            commands::system::check_update,
             commands::system::check_permissions,
             commands::system::open_accessibility_settings,
             commands::system::open_mic_settings,
