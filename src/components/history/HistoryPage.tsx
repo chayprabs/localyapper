@@ -1,8 +1,10 @@
 // History page -- paginated list of all past dictations
+import { useSetAtom } from "jotai";
 import { useHistory } from "@/hooks/useHistory";
+import { activePageAtom } from "@/stores/appStore";
 import { HistoryCard } from "./HistoryCard";
 
-function EmptyState() {
+function EmptyState({ onOpenHotkeys }: { onOpenHotkeys: () => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center -mt-16">
       <div className="w-[56px] h-[56px] rounded-full bg-[rgba(0,0,0,0.05)] flex items-center justify-center mb-4">
@@ -16,8 +18,11 @@ function EmptyState() {
       <p className="text-[12px] text-black/[0.26] text-center mb-6">
         Use your record hotkey to start your first dictation.
       </p>
-      <button className="w-[140px] h-[36px] bg-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:bg-[#004ea8] transition-colors shadow-sm">
-        Start Dictating
+      <button
+        onClick={onOpenHotkeys}
+        className="w-[140px] h-[36px] bg-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:bg-[#004ea8] transition-colors shadow-sm"
+      >
+        Open Hotkeys
       </button>
     </div>
   );
@@ -26,6 +31,7 @@ function EmptyState() {
 export function HistoryPage() {
   const { entries, isLoading, hasMore, loadMore, deleteEntry, clearAll } =
     useHistory();
+  const setActivePage = useSetAtom(activePageAtom);
 
   const isEmpty = !isLoading && entries.length === 0;
 
@@ -57,7 +63,7 @@ export function HistoryPage() {
       </header>
 
       {isEmpty ? (
-        <EmptyState />
+        <EmptyState onOpenHotkeys={() => setActivePage("hotkeys")} />
       ) : (
         <div className="flex-1 overflow-y-auto pr-2 -mr-2 flex flex-col gap-2">
           {entries.map((entry) => (
