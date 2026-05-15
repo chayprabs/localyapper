@@ -28,7 +28,7 @@ function isInteractiveTarget(target: EventTarget | null) {
 export function Overlay() {
   const { overlayData, elapsedSeconds, remainingSeconds, autoInjectProgress, processingCountdown, dismissOverlay } =
     useOverlayState();
-  const { visualState, text, durationMs } = overlayData;
+  const { visualState, text, durationMs, error } = overlayData;
 
   if (visualState === "hidden") {
     return <div className="h-screen w-screen bg-transparent" />;
@@ -144,7 +144,12 @@ export function Overlay() {
                   />
                 </div>
                 <div className="flex items-center h-full px-6">
-                  <span className="text-[13px] font-medium text-black/85 truncate pr-12">
+                  {error && (
+                    <span className="absolute top-2 left-6 text-[10px] font-semibold text-destructive">
+                      Paste failed
+                    </span>
+                  )}
+                  <span className={`text-[13px] font-medium text-black/85 truncate pr-12 ${error ? "pt-3" : ""}`}>
                     {text}
                   </span>
                 </div>
@@ -160,18 +165,25 @@ export function Overlay() {
                   />
                 </div>
                 <div className="flex items-center h-full px-6">
-                  <span className="text-[13px] font-medium text-black/85 line-clamp-2 leading-tight pr-8">
+                  {error && (
+                    <span className="absolute top-2 left-6 text-[10px] font-semibold text-destructive">
+                      Paste failed
+                    </span>
+                  )}
+                  <span className={`text-[13px] font-medium text-black/85 line-clamp-2 leading-tight pr-8 ${error ? "pt-3" : ""}`}>
                     {text}
                   </span>
                 </div>
               </>
             )}
-            <div className="absolute bottom-0 left-0 w-full h-[2px] bg-black/[0.05]">
-              <div
-                className="h-full bg-primary transition-none"
-                style={{ width: `${autoInjectProgress * 100}%` }}
-              />
-            </div>
+            {!error && (
+              <div className="absolute bottom-0 left-0 w-full h-[2px] bg-black/[0.05]">
+                <div
+                  className="h-full bg-primary transition-none"
+                  style={{ width: `${autoInjectProgress * 100}%` }}
+                />
+              </div>
+            )}
           </>
         )}
       </div>

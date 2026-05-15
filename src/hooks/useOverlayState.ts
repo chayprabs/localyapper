@@ -285,6 +285,19 @@ export function useOverlayState() {
         }
 
         case "error": {
+          if (text) {
+            setProcessingCountdown(null);
+            setAutoInjectProgress(0);
+            transition("transcribed", {
+              text,
+              durationMs: duration_ms,
+              wordCount: word_count,
+              error: error ?? "Paste failed",
+            });
+            showOverlay();
+            break;
+          }
+
           transition("hidden", { error });
           hideTimeoutRef.current = setTimeout(() => {
             if (generationRef.current !== gen) return;

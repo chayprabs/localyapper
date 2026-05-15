@@ -420,16 +420,23 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
         }
         Ok(Err(e)) => {
             log::error!("Injection failed: {e}");
-            emit_pipeline_event(&app, "error", None, None, None, Some(&e));
+            emit_pipeline_event(
+                &app,
+                "error",
+                Some(&result.final_text),
+                Some(result.duration_ms),
+                Some(result.word_count),
+                Some(&e),
+            );
         }
         Err(e) => {
             log::error!("Injection task panicked: {e}");
             emit_pipeline_event(
                 &app,
                 "error",
-                None,
-                None,
-                None,
+                Some(&result.final_text),
+                Some(result.duration_ms),
+                Some(result.word_count),
                 Some(&format!("Injection task panicked: {e}")),
             );
         }
