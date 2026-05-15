@@ -7,6 +7,7 @@ Reference code-verification run: `25927183008`
 Verified code commit: `2634165`
 Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
+Latest local source verification commit: `5e59de5`
 
 ## Source-Of-Truth Decision
 
@@ -51,7 +52,7 @@ but it does not justify adding LLM features back into this release.
 |---|---|---|
 | Read PRD | `docs/PRD.md` is not present locally or tracked in Git. | Missing source doc |
 | Read progress/design/Claude docs | `docs/PROGRESS.md`, `DESIGN_SYSTEM.md`, `CLAUDE.md`, `src-tauri/CLAUDE.md`, and `src/CLAUDE.md` were read from local files. | Done |
-| Audit whole codebase | Repo map and all active source areas under `src/` and `src-tauri/src/` inspected. | In progress |
+| Audit whole codebase | Repo map, active source under `src/` and `src-tauri/src/`, CI config, packaging config, public docs, and tracked release artifacts were inspected. | Done for current product surface |
 | Write final audit | This file. | Done |
 | Do not use llama-cpp-rs | `Cargo.toml` has no llama dependency. | Pass |
 | Use mistralrs | Current app intentionally has no LLM backend. | Not applicable to current product |
@@ -63,20 +64,20 @@ but it does not justify adding LLM features back into this release.
 | 120 second cap | `MAX_RECORDING_SAMPLES` and elapsed guard cap recording at 120 seconds. | Implemented |
 | Warning at 105 seconds | Frontend overlay timer switches to `stopping-soon`; backend does not emit this state. | Partial |
 | Clipboard save/paste/restore | `injection/injector.rs` implements save -> paste -> restore. | Implemented |
-| Injection failure shows text in overlay | Current failure path emits `error` and hides overlay; text is not preserved. | Release risk |
+| Injection failure shows text in overlay | Backend error events include the transcript after paste failure; the overlay keeps it visible and copyable with a paste-failed indicator. | Pass |
 | Overlay five states | Current states include hidden, listening, stopping-soon, processing, long-recording, transcribed, no-speech. | Implemented with extra states |
 | Backend-only overlay timers | Current overlay uses frontend timers for elapsed, warning, processing countdown, and auto-hide. | Product mismatch |
 | First-launch onboarding | Current wizard is keyed by `settings.setup_complete`, not an onboarding table. | Implemented differently |
 | Main app pages | Current pages: Dashboard, History, Hotkeys, Speech. No Dictionary page. | Current product pass |
 | Database tables | Current active tables are `transcription_history` and `settings`; legacy corrections/dictionary tables are dropped. | Current product pass |
-| Typed IPC wrappers | Commands have wrappers under `src/lib/commands` and types in `src/types/commands.ts`. | Pass |
+| Typed IPC wrappers | Commands have wrappers under `src/lib/commands` and types in `src/types/commands.ts`; the unused placeholder update-check command was removed. | Pass |
 | No TypeScript `any` | ESLint rule rejects explicit `any`; search did not find TS `any` usage. | Pass |
 | No `unwrap()`/`expect()` in production paths | Startup `.expect()` calls were replaced with logged error handling. Search is clean for `unwrap(` and `expect(` in `src-tauri/src`. | Pass |
 | No dead code suppressions | Global dead-code suppression was removed and clippy passes with `-D warnings`. | Pass |
 | Permission commands | `check_permissions` uses microphone/input capability checks and settings-open commands route to OS settings where supported. | Pass |
 | Build docs | `docs/BUILD.md` added for Windows, macOS, and Linux build paths. | Done |
 | Release notes | `docs/RELEASE_NOTES_v0.1.0.md` added for the current release candidate. | Done |
-| Verification | lint, typecheck, fmt check, clippy, tests, and frontend build passed after fixes. | Pass |
+| Verification | lint, typecheck, fmt check, clippy, tests, frontend build, and targeted post-cleanup source gates passed after fixes. | Pass |
 | Tauri dev launch | Hidden smoke test reached Vite, compiled Rust, started `target/debug/localyapper.exe`, loaded STT/VAD, registered hotkeys, and initialized tray. | Pass |
 | Tauri build | Windows NSIS bundle and Linux AppImage bundle passed locally. | Pass |
 | CI/CD workflow | `.github/workflows/release.yml` verified and built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts. | Pass |
@@ -136,6 +137,23 @@ Remediation: permission checks now report microphone availability and
 accessibility/injection readiness using platform-specific checks, and the
 settings commands open OS settings panels where supported.
 
+### P2: Placeholder update check command is registered - Fixed
+
+`check_update` was registered as an IPC command and exposed through a frontend
+wrapper, but it always returned `None` and had no UI caller. Shipping that
+surface would imply update-check behavior that does not exist.
+
+Remediation: the unused command, frontend wrapper, and handler registration were
+removed.
+
+### P2: Overlay debug logging shipped in production hook - Fixed
+
+The overlay hook logged pipeline events and show calls to the browser console.
+Those logs were useful during development but noisy for a release candidate.
+
+Remediation: development `console.log` calls were removed while keeping
+`console.error` failure reporting.
+
 ### P2: Overlay timer authority is split
 
 The backend emits high-level pipeline state events, while the frontend owns
@@ -153,8 +171,16 @@ speech-only release unless product direction changes.
 4. Update public docs for the current product direction.
 5. Add build and release notes docs.
 6. Rerun lint, typecheck, clippy, tests, frontend build, and Tauri build.
+7. Remove stale placeholder IPC/update-check surfaces.
+8. Remove production-only overlay debug logging.
 
-Completed in this run: items 1 through 6. Windows NSIS and Linux AppImage
+Completed in this run: items 1 through 8. Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25927183008` completed
 successfully for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs, and uploaded all four platform artifacts.
+
+Remaining manual validation gap: a real microphone recording injected into an
+external target application still needs hands-on end-to-end QA on a desktop
+session. Automated and CI checks cover build, typing, linting, Rust tests, and
+packaging, but they do not prove the real OS microphone and target-app injection
+path by themselves.

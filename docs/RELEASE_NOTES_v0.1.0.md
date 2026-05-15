@@ -80,6 +80,9 @@ Results:
 - Linux AppImage build in WSL: passed.
 - GitHub Actions release workflow: passed on code-verification run
   `25927183008` for commit `2634165`.
+- Post-baseline source cleanup through commit `5e59de5` passed ESLint,
+  TypeScript, Rust formatting check, and Rust clippy with `-D warnings`
+  locally.
 - GitHub Actions artifacts uploaded:
   - `localyapper-windows-x64`
   - `localyapper-macos-aarch64`
