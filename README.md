@@ -78,10 +78,11 @@ These can be changed in the Hotkeys page.
 
 ## Current Status
 
-LocalYapper is currently in release hardening for v0.1.0.
+LocalYapper is currently a v0.1.0 release candidate.
 
 - Core dictation flow is implemented
-- Public release packaging and CI/CD are still upcoming
+- Cross-platform CI builds are green for Windows, macOS, and Linux
+- Release workflow uploads Windows NSIS, macOS DMG, Linux DEB/AppImage artifacts
 - The current product direction is speech recognition only
 
 ## Stack

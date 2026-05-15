@@ -3,6 +3,10 @@
 Date: 2026-05-15
 Branch: main
 
+Latest verified GitHub Actions run: `25919031482`
+Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
+Silicon build jobs.
+
 ## Source-Of-Truth Decision
 
 The release objective contains requirements from an older product direction: Whisper
@@ -72,8 +76,9 @@ but it does not justify adding LLM features back into this release.
 | Build docs | `docs/BUILD.md` added for Windows, macOS, and Linux build paths. | Done |
 | Release notes | `docs/RELEASE_NOTES_v0.1.0.md` added for the current release candidate. | Done |
 | Verification | lint, typecheck, fmt check, clippy, tests, and frontend build passed after fixes. | Pass |
-| Tauri build | `npm run tauri build` passed on Windows and produced `src-tauri/target/release/localyapper.exe`. | Windows pass |
-| CI/CD workflow | `.github/workflows/release.yml` added to verify and build Windows, macOS, and Linux artifacts. | Added, needs first GitHub run |
+| Tauri dev launch | Hidden smoke test reached Vite, compiled Rust, started `target/debug/localyapper.exe`, loaded STT/VAD, registered hotkeys, and initialized tray. | Pass |
+| Tauri build | Windows NSIS bundle and Linux AppImage bundle passed locally. | Pass |
+| CI/CD workflow | `.github/workflows/release.yml` verified and built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts. | Pass |
 
 ## Findings To Fix Before Release
 
@@ -145,6 +150,7 @@ speech-only release unless product direction changes.
 5. Add build and release notes docs.
 6. Rerun lint, typecheck, clippy, tests, frontend build, and Tauri build.
 
-Completed in this run: items 1 through 6. Windows build was verified locally.
-macOS and Linux packaging are covered by the GitHub Actions workflow and still
-need a green remote run.
+Completed in this run: items 1 through 6. Windows NSIS and Linux AppImage
+bundling were verified locally. GitHub Actions run `25919031482` completed
+successfully for verify plus Windows, Linux, macOS Intel, and macOS Apple
+Silicon build jobs, and uploaded all four platform artifacts.

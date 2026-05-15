@@ -98,7 +98,7 @@ Build:
 
 ```powershell
 npm install
-npm run tauri build
+npm run tauri build -- --bundles nsis
 ```
 
 The repo sets static CRT linking for `x86_64-pc-windows-msvc` in
@@ -123,7 +123,7 @@ Build:
 
 ```bash
 npm install
-npm run tauri build
+npm run tauri build -- --bundles dmg
 ```
 
 For public distribution outside the App Store, Apple code signing and
@@ -149,7 +149,7 @@ Build:
 
 ```bash
 npm install
-npm run tauri build
+npm run tauri build -- --bundles deb,appimage
 ```
 
 Linux packages may be distributed as AppImage, Debian, RPM, Snap, Flatpak, or
@@ -179,3 +179,11 @@ src-tauri/target/
 ```
 
 Both directories are ignored by Git.
+
+The GitHub Actions release workflow currently produces and uploads these
+workflow artifacts on `main`:
+
+- `localyapper-windows-x64` (NSIS installer)
+- `localyapper-macos-aarch64` (Apple Silicon DMG)
+- `localyapper-macos-x64` (Intel DMG)
+- `localyapper-linux-x64` (DEB and AppImage)

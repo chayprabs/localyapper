@@ -60,7 +60,7 @@ cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run build
-npm run tauri build
+npm run tauri build -- --bundles nsis
 ```
 
 Results:
@@ -74,13 +74,20 @@ Results:
 - Tauri release build on Windows: passed.
 - Windows artifact produced:
   `src-tauri/target/release/localyapper.exe`
-- GitHub Actions workflow added for verify plus cross-platform Tauri builds on
-  Windows, macOS, and Linux.
+- Windows NSIS installer build: passed.
+- Linux AppImage build in WSL: passed.
+- GitHub Actions release workflow: passed on run `25919031482`.
+- GitHub Actions artifacts uploaded:
+  - `localyapper-windows-x64`
+  - `localyapper-macos-aarch64`
+  - `localyapper-macos-x64`
+  - `localyapper-linux-x64`
 
 ## Platform Notes
 
-Windows packaging was verified locally. macOS and Linux builds require native
-hosts or CI runners with the prerequisites listed in `docs/BUILD.md`.
+Windows packaging and Linux AppImage packaging were verified locally. macOS and
+Linux release artifacts are built by the GitHub Actions workflow on native CI
+runners.
 
 Runtime injection dependencies on Linux:
 
@@ -89,9 +96,6 @@ Runtime injection dependencies on Linux:
 
 ## Known Limitations
 
-- macOS and Linux release artifacts have not been built in this local Windows
-  run; they are covered by the GitHub Actions release workflow and need a green
-  run before publishing v0.1.0.
 - Permission status commands are registered but currently return placeholder
   values and are not surfaced by the simplified UI.
 - The overlay uses frontend timers for display countdowns and auto-hide while
