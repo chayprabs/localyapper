@@ -78,8 +78,8 @@ Results:
   `src-tauri/target/release/localyapper.exe`
 - Windows NSIS installer build: passed.
 - Linux AppImage build in WSL: passed.
-- GitHub Actions release workflow: passed on run `25920211912` for commit
-  `a310c22`.
+- GitHub Actions release workflow: passed on code-verification run
+  `25927183008` for commit `2634165`.
 - GitHub Actions artifacts uploaded:
   - `localyapper-windows-x64`
   - `localyapper-macos-aarch64`
