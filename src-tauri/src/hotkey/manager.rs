@@ -40,6 +40,7 @@ fn get_hotkey_setting(app: &AppHandle, key: &str, default: &str) -> String {
 /// Initialize global hotkeys. Must be called from Tauri setup() after AppState is managed.
 pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
     log::info!("HOTKEY: Registering hotkeys...");
+    let mut failures = Vec::new();
 
     let hotkey_state = Arc::new(HotkeyState {
         mode: AtomicU8::new(MODE_IDLE),
@@ -82,11 +83,11 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
         },
     ) {
         Ok(()) => log::info!("HOTKEY: Record hotkey registered: {record_hotkey}"),
-        Err(e) => log::warn!(
-            "HOTKEY: FAILED to register record hotkey '{}': {}",
-            record_hotkey,
-            e
-        ),
+        Err(e) => {
+            let message = format!("Failed to register Record hotkey '{record_hotkey}': {e}");
+            log::warn!("HOTKEY: {message}");
+            failures.push(message);
+        }
     }
 
     // Register the hands-free hotkey (toggle on press)
@@ -108,11 +109,12 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
             },
         ) {
             Ok(()) => log::info!("HOTKEY: Hands-free hotkey registered: {hands_free_hotkey}"),
-            Err(e) => log::warn!(
-                "HOTKEY: FAILED to register hands-free hotkey '{}': {}",
-                hands_free_hotkey,
-                e
-            ),
+            Err(e) => {
+                let message =
+                    format!("Failed to register Hands-free hotkey '{hands_free_hotkey}': {e}");
+                log::warn!("HOTKEY: {message}");
+                failures.push(message);
+            }
         }
     }
 
@@ -131,11 +133,12 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
         },
     ) {
         Ok(()) => log::info!("HOTKEY: Paste-last hotkey registered: {paste_last_hotkey}"),
-        Err(e) => log::warn!(
-            "HOTKEY: FAILED to register paste-last hotkey '{}': {}",
-            paste_last_hotkey,
-            e
-        ),
+        Err(e) => {
+            let message =
+                format!("Failed to register Paste Last hotkey '{paste_last_hotkey}': {e}");
+            log::warn!("HOTKEY: {message}");
+            failures.push(message);
+        }
     }
 
     // Register open-app hotkey
@@ -153,18 +156,22 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
         },
     ) {
         Ok(()) => log::info!("HOTKEY: Open-app hotkey registered: {open_app_hotkey}"),
-        Err(e) => log::warn!(
-            "HOTKEY: FAILED to register open-app hotkey '{}': {}",
-            open_app_hotkey,
-            e
-        ),
+        Err(e) => {
+            let message = format!("Failed to register Open App hotkey '{open_app_hotkey}': {e}");
+            log::warn!("HOTKEY: {message}");
+            failures.push(message);
+        }
     }
 
     // NOTE: the cancel hotkey is registered dynamically when recording starts
     // so we do not capture it system-wide while idle.
 
-    log::info!("HOTKEY: Registration complete");
-    Ok(())
+    if failures.is_empty() {
+        log::info!("HOTKEY: Registration complete");
+        Ok(())
+    } else {
+        Err(failures.join("; "))
+    }
 }
 
 /// Unregister all global shortcuts and re-register from current DB settings.
