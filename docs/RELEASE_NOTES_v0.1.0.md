@@ -49,6 +49,8 @@ disk.
 - Repository ignore rules exclude local agent state, private progress/PRD/source
   notes, cloud provider state, signing keys, model binaries, databases, build
   output, and packaged release artifacts.
+- Manual release QA checklist covers real microphone capture, overlay behavior,
+  hotkeys, model handling, and external-app injection.
 - SQLite-backed history and settings.
 - Dashboard, History, Hotkeys, and Speech model pages.
 - System tray with open, pause/resume dictation, and quit actions.

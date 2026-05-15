@@ -92,6 +92,7 @@ but it does not justify adding LLM features back into this release.
 | CI queue behavior | Branch workflows now cancel older in-progress runs for the same ref; tag release runs are preserved. | Pass |
 | Hotkey registration failures | Backend hotkey updates reject empty/duplicate values, report OS registration failures, and restore previous settings if reload fails. | Pass |
 | Git ignore policy | `.gitignore` excludes local agent files, ignored progress/PRD/source docs, cloud state, secrets, databases, models, build output, and release artifacts; no tracked file currently matches ignore rules. | Pass |
+| Manual desktop QA | `docs/MANUAL_QA.md` defines the remaining real microphone, overlay, hotkey, model, and external-app injection validation steps. | Checklist ready; not yet executed |
 
 ## Findings To Fix Before Release
 
@@ -299,8 +300,9 @@ speech-only release unless product direction changes.
 18. Wire the History empty-state action to real navigation.
 19. Report hotkey registration failures and roll back failed updates.
 20. Harden `.gitignore` for local-only release, cloud, model, secret, and agent artifacts.
+21. Add a manual desktop QA checklist for real microphone and external-app injection validation.
 
-Completed in this run: items 1 through 20. Windows NSIS and Linux AppImage
+Completed in this run: items 1 through 21. Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25931329886` completed
 successfully for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs, and uploaded all four platform artifacts. Later source
@@ -309,6 +311,6 @@ hardening through `38b53fe` passed the relevant local frontend and Rust gates;
 
 Remaining manual validation gap: a real microphone recording injected into an
 external target application still needs hands-on end-to-end QA on a desktop
-session. Automated and CI checks cover build, typing, linting, Rust tests, and
-packaging, but they do not prove the real OS microphone and target-app injection
-path by themselves.
+session using `docs/MANUAL_QA.md`. Automated and CI checks cover build, typing,
+linting, Rust tests, and packaging, but they do not prove the real OS
+microphone and target-app injection path by themselves.

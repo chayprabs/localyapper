@@ -55,6 +55,10 @@ npm run build
 npm run tauri build
 ```
 
+After these automated checks pass, run `docs/MANUAL_QA.md` on the target
+desktop platform to validate real microphone capture, overlay behavior, and text
+injection into another focused app.
+
 ## GitHub Actions Release Workflow
 
 The repository includes `.github/workflows/release.yml`.

@@ -160,6 +160,9 @@ cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
+Before tagging a release, also run the manual desktop QA checklist in
+`docs/MANUAL_QA.md` for real microphone capture and external-app injection.
+
 ## Source Of Truth
 
 Some older local planning docs may describe an earlier LLM/Ollama architecture.
@@ -168,6 +171,7 @@ For the current public app, use these as the main references:
 - `README.md`
 - `DESIGN_SYSTEM.md`
 - `docs/FINAL_AUDIT.md`
+- `docs/MANUAL_QA.md`
 - the live code in `src/` and `src-tauri/`
 
 ## License
