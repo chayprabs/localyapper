@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/nicegui/static/tauri-v2-schema.json",
+  "$schema": "https://schema.tauri.app/config/2",
   "productName": "LocalYapper",
   "version": "0.1.0",
   "identifier": "com.localyapper.desktop",
