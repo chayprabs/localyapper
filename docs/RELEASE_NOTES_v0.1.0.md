@@ -112,8 +112,10 @@ Results:
   `src-tauri/target/release/localyapper.exe`
 - Windows NSIS installer build: passed.
 - Linux AppImage build in WSL: passed.
-- GitHub Actions release workflow: passed on code-verification run
+- GitHub Actions release workflow: passed on code-bearing verification run
   `25938753998` for commit `6c5e82d`.
+- Docs-only evidence refresh commit `26b1a3d` passed the full release workflow
+  in run `25939963745`.
 - Post-baseline code hardening through commit `6c5e82d` passed the relevant
   local gates: ESLint, TypeScript, frontend production build, Rust formatting
   check, Rust clippy with `-D warnings`, Rust tests, `npm audit --omit=dev`, a

@@ -3,10 +3,12 @@
 Date: 2026-05-16
 Branch: main
 
-Reference code-verification run: `25938753998`
-Verified code commit: `6c5e82d`
+Reference code-bearing verification run: `25938753998`
+Verified code-bearing commit: `6c5e82d`
 Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
+Latest docs-only evidence refresh run: `25939963745`
+Latest docs-only evidence refresh commit: `26b1a3d`
 Latest local source verification commit: `6c5e82d`
 Latest repository hygiene checkpoint: `aa8eb8a`
 
@@ -310,11 +312,13 @@ speech-only release unless product direction changes.
 25. Add and run an ignored Windows synthetic speech-file smoke test for VAD -> STT validation.
 
 Completed in this run: items 1 through 25. Windows NSIS and Linux AppImage
-bundling were verified locally. GitHub Actions run `25938753998` for commit
-`6c5e82d` completed successfully for verify plus Windows, Linux, macOS Intel,
-and macOS Apple Silicon build jobs, and uploaded all four platform artifacts.
-The latest local source gates passed with 25 Rust tests, 3 ignored manual
-desktop smokes, Rust formatting, and `cargo clippy --all-targets -- -D warnings`.
+bundling were verified locally. GitHub Actions run `25938753998` for
+code-bearing commit `6c5e82d` completed successfully for verify plus Windows,
+Linux, macOS Intel, and macOS Apple Silicon build jobs, and uploaded all four
+platform artifacts. The later docs-only evidence refresh commit `26b1a3d` also
+passed the full release workflow in run `25939963745`. The latest local source
+gates passed with 25 Rust tests, 3 ignored manual desktop smokes, Rust
+formatting, and `cargo clippy --all-targets -- -D warnings`.
 
 Remaining manual validation gap: a real microphone recording injected into an
 external target application still needs hands-on end-to-end QA on a desktop
