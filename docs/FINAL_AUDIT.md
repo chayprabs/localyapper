@@ -84,6 +84,7 @@ but it does not justify adding LLM features back into this release.
 | Tauri dev launch | Hidden smoke test reached Vite, compiled Rust, started `target/debug/localyapper.exe`, loaded STT/VAD, registered hotkeys, and initialized tray. | Pass |
 | Tauri build | Windows NSIS bundle and Linux AppImage bundle passed locally. | Pass |
 | CI/CD workflow | `.github/workflows/release.yml` verified and built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts. | Pass |
+| CI queue behavior | Branch workflows now cancel older in-progress runs for the same ref; tag release runs are preserved. | Pass |
 
 ## Findings To Fix Before Release
 
@@ -195,6 +196,14 @@ remaining non-production audit advisory is Vite/esbuild dev-server-only and npm
 requires a forced Vite 8 upgrade to clear it; this repo remains on the required
 Vite 5 line.
 
+### P2: Frequent checkpoint pushes create redundant release workflow runs - Fixed
+
+The working cadence uses frequent commits and pushes, which started multiple
+full cross-platform release workflows for intermediate commits.
+
+Remediation: the release workflow now uses branch-level concurrency to cancel
+older in-progress runs for the same ref. Tag release runs are not cancelled.
+
 ### P2: Overlay timer authority is split
 
 The backend emits high-level pipeline state events, while the frontend owns
@@ -219,8 +228,9 @@ speech-only release unless product direction changes.
 11. Remove unused Tauri FS/Shell plugin surface.
 12. Apply non-breaking npm audit fixes for production dependencies.
 13. Prune stale DB settings and honor `auto_start` at startup.
+14. Add release-workflow concurrency for frequent branch checkpoints.
 
-Completed in this run: items 1 through 13. Windows NSIS and Linux AppImage
+Completed in this run: items 1 through 14. Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25927183008` completed
 successfully for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs, and uploaded all four platform artifacts.
