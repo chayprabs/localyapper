@@ -100,16 +100,22 @@ repeatable check for the external-app clipboard injection layer.
 ## Optional Microphone Transcription Smoke
 
 On a machine with the speech model installed, this ignored test records from the
-default microphone for five seconds, runs VAD, loads the local speech model, and
-asserts that STT returns a non-empty transcript:
+default microphone, runs VAD, loads the local speech model, and asserts that STT
+returns a non-empty transcript:
 
 ```powershell
 cargo test --manifest-path src-tauri/Cargo.toml manual_microphone_transcription_smoke -- --ignored --nocapture
 ```
 
-Speak a short sentence immediately after the test starts. If your app data
-directory is not in the platform default location, set `LOCALYAPPER_APP_DATA_DIR`
-to the directory that contains the `models` folder before running the command.
+The default timing is a 3-second countdown followed by 5 seconds of recording.
+Speak a short sentence while the test prints `Recording now.`.
+
+Optional environment variables:
+
+- `LOCALYAPPER_MIC_SMOKE_COUNTDOWN_SECS`: countdown before recording starts.
+- `LOCALYAPPER_MIC_SMOKE_RECORD_SECS`: recording duration in seconds.
+- `LOCALYAPPER_APP_DATA_DIR`: app data directory containing the `models` folder
+  if it is not in the platform default location.
 
 ## Hotkey Pass
 

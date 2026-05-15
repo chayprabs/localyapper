@@ -94,7 +94,7 @@ but it does not justify adding LLM features back into this release.
 | Git ignore policy | `.gitignore` excludes local agent files, ignored progress/PRD/source docs, cloud state, secrets, databases, models, build output, and release artifacts; no tracked file currently matches ignore rules. | Pass |
 | Manual desktop QA | `docs/MANUAL_QA.md` defines the remaining real microphone, overlay, hotkey, model, and external-app injection validation steps. | Checklist ready; not yet executed |
 | Windows external-app injection smoke | Ignored test `manual_windows_notepad_injection_smoke` launches Notepad, uses the real injector, verifies saved pasted text, and checks clipboard restoration. | Passed locally on Windows |
-| Microphone transcription smoke | Ignored test `manual_microphone_transcription_smoke` records five seconds from the default microphone, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Added; requires human speaker to execute |
+| Microphone transcription smoke | Ignored test `manual_microphone_transcription_smoke` records from the default microphone after a configurable countdown, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Added; requires human speaker to execute |
 
 ## Findings To Fix Before Release
 

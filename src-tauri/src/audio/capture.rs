@@ -304,6 +304,15 @@ mod manual_tests {
     use std::thread;
     use std::time::Duration;
 
+    fn env_u64(key: &str, default: u64) -> Result<u64, String> {
+        match std::env::var(key) {
+            Ok(value) => value
+                .parse::<u64>()
+                .map_err(|_| format!("{key} must be a positive integer, got {value:?}")),
+            Err(_) => Ok(default),
+        }
+    }
+
     fn default_app_data_dir() -> Result<PathBuf, String> {
         if let Ok(path) = std::env::var("LOCALYAPPER_APP_DATA_DIR") {
             return Ok(PathBuf::from(path));
@@ -344,18 +353,32 @@ mod manual_tests {
     #[test]
     #[ignore = "requires an interactive desktop, a microphone, installed speech model files, and spoken audio"]
     fn manual_microphone_transcription_smoke() -> Result<(), String> {
+        let countdown_secs = env_u64("LOCALYAPPER_MIC_SMOKE_COUNTDOWN_SECS", 3)?;
+        let record_secs = env_u64("LOCALYAPPER_MIC_SMOKE_RECORD_SECS", 5)?;
+        if record_secs == 0 {
+            return Err("LOCALYAPPER_MIC_SMOKE_RECORD_SECS must be greater than 0".to_string());
+        }
+
         let app_data_dir = default_app_data_dir()?;
         let models_dir = app_data_dir.join("models");
         let speech_model_dir = models_dir.join(stt_model_dir_name(DEFAULT_STT_MODEL));
         let vad_path = models_dir.join(SILERO_VAD_FILENAME);
 
         println!("Using speech model: {}", speech_model_dir.display());
-        println!("Speak a short sentence after recording starts.");
+        println!("Recording for {record_secs}s after a {countdown_secs}s countdown.");
+        println!("Speak a short sentence while recording is active.");
+
+        for remaining in (1..=countdown_secs).rev() {
+            println!("Recording starts in {remaining}...");
+            thread::sleep(Duration::from_secs(1));
+        }
 
         let recorder = AudioRecorder::new();
         recorder.start().map_err(|e| e.to_string())?;
-        thread::sleep(Duration::from_secs(5));
+        println!("Recording now.");
+        thread::sleep(Duration::from_secs(record_secs));
         let audio = recorder.stop().map_err(|e| e.to_string())?;
+        println!("Captured {} samples at 16 kHz.", audio.len());
 
         if audio.len() < SAMPLE_RATE as usize {
             return Err(format!(
