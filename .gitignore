@@ -1,24 +1,45 @@
 # Dependencies
 node_modules/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
 
 # Build output
 dist/
+build/
+.vite/
 src-tauri/target/
+target/
 *.tsbuildinfo
 vite.config.d.ts
+.eslintcache
+coverage/
+.nyc_output/
 
 # Release artifacts
 *.msi
+*.exe
 *.dmg
+*.pkg
 *.AppImage
 *.deb
 *.rpm
+*.snap
+*.zip
+*.tar.gz
+*.tgz
+*.blockmap
+*.sig
+*.asc
 
 # Models (large binary files)
 *.bin
 *.gguf
 *.onnx
 *.download
+src-tauri/resources/models/
 
 # Local app data / databases
 *.db
@@ -26,11 +47,21 @@ vite.config.d.ts
 *.db-wal
 *.sqlite
 *.sqlite3
+*.tmp
+*.bak
 
 # Environment files
 .env
 .env.*
 !.env.example
+
+# Secrets / signing keys
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
 
 # Local agent and assistant state
 .claude/
@@ -58,9 +89,22 @@ docs/**/*SOURCE*.md
 docs/**/source*.md
 docs/**/*source*.md
 
+# Cloud provider local state
+.cloud/
+.vercel/
+.netlify/
+.wrangler/
+.cloudflare/
+.firebase/
+.serverless/
+.sst/
+.amplify/
+.aws-sam/
+
 # IDE
 .vscode/
 .idea/
+*.code-workspace
 *.swp
 *.swo
 *~
