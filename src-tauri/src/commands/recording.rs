@@ -24,7 +24,7 @@ pub(crate) async fn execute_pipeline(
     };
 
     if !vad_result.has_speech {
-        println!("STT: No speech detected in audio");
+        log::info!("STT: No speech detected in audio");
         return Ok(PipelineResult {
             raw_text: String::new(),
             final_text: String::new(),
@@ -39,15 +39,15 @@ pub(crate) async fn execute_pipeline(
 
     let whisper = crate::commands::models::ensure_speech_model_loaded(app_handle, state).await?;
 
-    println!("STT: Transcribing...");
+    log::info!("STT: Transcribing...");
     let stt_start = Instant::now();
     let raw_text = tokio::task::spawn_blocking(move || whisper.transcribe(&trimmed_audio))
         .await
         .map_err(|e| format!("Transcription task failed: {e}"))?
         .map_err(|e| e.to_string())?;
-    println!(
-        "STT: Result: [{}] ({}ms)",
-        raw_text,
+    log::info!(
+        "STT: Result received: {} chars ({}ms)",
+        raw_text.len(),
         stt_start.elapsed().as_millis()
     );
 

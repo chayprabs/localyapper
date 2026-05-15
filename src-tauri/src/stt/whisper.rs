@@ -165,14 +165,9 @@ impl WhisperEngine {
         let text = result.text.trim().to_string();
 
         log::info!(
-            "Transcribed {} samples -> {} chars: {:?}",
+            "Transcribed {} samples -> {} chars",
             audio.len(),
-            text.len(),
-            if text.len() > 80 {
-                format!("{}...", &text[..80])
-            } else {
-                text.clone()
-            }
+            text.len()
         );
 
         Ok(text)

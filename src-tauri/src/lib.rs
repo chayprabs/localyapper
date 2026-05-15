@@ -70,7 +70,7 @@ pub(crate) fn load_speech_model_from_setting(
         )
     })?;
 
-    println!("STT: Loading engine from {}", candidate.display());
+    log::info!("STT: Loading engine from {}", candidate.display());
     WhisperEngine::new(&candidate)
         .map(Arc::new)
         .map_err(|e| format!("Failed to load STT from {}: {e}", candidate.display()))
@@ -152,17 +152,16 @@ pub fn run() {
                 if vad_path.exists() {
                     match SileroVad::new(&vad_path) {
                         Ok(vad) => {
-                            println!("VAD: Silero VAD loaded successfully");
+                            log::info!("VAD: Silero VAD loaded successfully");
                             Some(vad)
                         }
                         Err(e) => {
-                            println!("VAD: Failed to load Silero VAD: {e}, using energy fallback");
                             log::warn!("Failed to load Silero VAD: {e}");
                             None
                         }
                     }
                 } else {
-                    println!(
+                    log::info!(
                         "VAD: Silero model not found at {}, using energy fallback",
                         vad_path.display()
                     );
@@ -204,8 +203,8 @@ pub fn run() {
             }
 
             match hotkey::manager::register_hotkeys(app.handle()) {
-                Ok(()) => println!("STARTUP: Hotkeys registered successfully"),
-                Err(e) => println!("STARTUP: FAILED to register hotkeys: {e}"),
+                Ok(()) => log::info!("STARTUP: Hotkeys registered successfully"),
+                Err(e) => log::error!("STARTUP: FAILED to register hotkeys: {e}"),
             }
 
             if let Err(e) = tray::setup_tray(app) {

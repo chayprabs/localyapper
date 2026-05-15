@@ -225,11 +225,11 @@ pub fn apply_energy_vad(audio: &[f32]) -> VadResult {
 pub fn apply_vad(audio: &[f32], silero: Option<&SileroVad>) -> VadResult {
     match silero {
         Some(vad) => {
-            println!("VAD: Using Silero VAD");
+            log::info!("VAD: Using Silero VAD");
             vad.process(audio)
         }
         None => {
-            println!("VAD: Using energy-based fallback");
+            log::info!("VAD: Using energy-based fallback");
             apply_energy_vad(audio)
         }
     }

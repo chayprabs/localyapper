@@ -360,7 +360,7 @@ pub async fn reload_models(
     let mut errors: Vec<String> = Vec::new();
 
     let speech_model_loaded = state.whisper.lock().map(|g| g.is_some()).unwrap_or(false);
-    println!("RELOAD: STT currently loaded: {speech_model_loaded}");
+    log::info!("RELOAD: STT currently loaded: {speech_model_loaded}");
 
     if !speech_model_loaded {
         if let Err(e) = ensure_speech_model_loaded(&app_handle, state.inner()).await {
@@ -397,7 +397,7 @@ pub async fn reload_models(
             if let Err(e) = vad_result {
                 log::warn!("{e}");
             } else {
-                println!("RELOAD: Silero VAD loaded successfully");
+                log::info!("RELOAD: Silero VAD loaded successfully");
             }
         }
     }
