@@ -78,11 +78,11 @@ These can be changed in the Hotkeys page.
 
 ## Current Status
 
-LocalYapper is currently in active development.
+LocalYapper is currently in release hardening for v0.1.0.
 
-- Current phase: `Phase 17 - Cross-Platform Polish`
-- Core dictation flow is implemented and working
+- Core dictation flow is implemented
 - Public release packaging and CI/CD are still upcoming
+- The current product direction is speech recognition only
 
 ## Stack
 
@@ -161,11 +161,12 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 ## Source Of Truth
 
-Some older planning docs in the repo still describe an earlier LLM/Ollama architecture. For the current app, use these as the main references:
+Some older local planning docs may describe an earlier LLM/Ollama architecture.
+For the current public app, use these as the main references:
 
-- `AGENTS.md`
-- `CLAUDE.md`
-- `docs/PROGRESS.md`
+- `README.md`
+- `DESIGN_SYSTEM.md`
+- `docs/FINAL_AUDIT.md`
 - the live code in `src/` and `src-tauri/`
 
 ## License
