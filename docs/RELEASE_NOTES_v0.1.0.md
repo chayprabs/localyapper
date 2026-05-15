@@ -1,7 +1,7 @@
 # LocalYapper v0.1.0 Release Notes
 
 Status: release candidate
-Date: 2026-05-15
+Date: 2026-05-16
 
 ## Summary
 
@@ -52,7 +52,8 @@ disk.
 - Manual release QA checklist covers real microphone capture, overlay behavior,
   hotkeys, model handling, and external-app injection.
 - An ignored Windows Notepad smoke test can exercise the real clipboard
-  injector against an external app and verify clipboard restoration.
+  injector against an external app and verify clipboard restoration, though
+  Windows foreground focus can be inconsistent in non-user-driven test runs.
 - An ignored microphone transcription smoke test can exercise default mic
   capture, VAD, and local STT with a human speaker.
 - An ignored Windows synthetic speech-file smoke test can exercise VAD and local
@@ -95,8 +96,10 @@ Results:
 - Rust formatting check: passed.
 - Rust clippy with `-D warnings`: passed.
 - Rust tests: 25 passed, 0 failed, 3 ignored manual desktop smokes.
-- Ignored Windows Notepad injection smoke: passed locally with
+- Ignored Windows Notepad injection smoke: available with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection_smoke -- --ignored --nocapture`.
+  It passed earlier locally, but later attempts hit Windows foreground-focus
+  restrictions, so it is not treated as release-completing evidence by itself.
 - Ignored microphone transcription smoke: added for manual execution with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_microphone_transcription_smoke -- --ignored --nocapture`.
   It supports configurable timing and an optional Windows TTS prompt for
@@ -110,12 +113,12 @@ Results:
 - Windows NSIS installer build: passed.
 - Linux AppImage build in WSL: passed.
 - GitHub Actions release workflow: passed on code-verification run
-  `25931329886` for commit `001ff6c`.
-- Post-baseline code hardening through commit `38b53fe` passed the relevant
+  `25938753998` for commit `6c5e82d`.
+- Post-baseline code hardening through commit `6c5e82d` passed the relevant
   local gates: ESLint, TypeScript, frontend production build, Rust formatting
   check, Rust clippy with `-D warnings`, Rust tests, `npm audit --omit=dev`, a
-  Windows NSIS Tauri build after plugin-surface reduction, and focused hotkey
-  rollback tests.
+  Windows NSIS Tauri build after plugin-surface reduction, focused hotkey
+  rollback tests, and generated speech STT smoke validation.
 - Commit `aa8eb8a` is an ignore-policy-only repository hygiene checkpoint.
 - GitHub Actions artifacts uploaded:
   - `localyapper-windows-x64`

@@ -1,13 +1,13 @@
 # LocalYapper Final Audit
 
-Date: 2026-05-15
+Date: 2026-05-16
 Branch: main
 
-Reference code-verification run: `25931329886`
-Verified code commit: `001ff6c`
+Reference code-verification run: `25938753998`
+Verified code commit: `6c5e82d`
 Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
-Latest local source verification commit: `38b53fe`
+Latest local source verification commit: `6c5e82d`
 Latest repository hygiene checkpoint: `aa8eb8a`
 
 ## Source-Of-Truth Decision
@@ -93,7 +93,7 @@ but it does not justify adding LLM features back into this release.
 | Hotkey registration failures | Backend hotkey updates reject empty/duplicate values, report OS registration failures, and restore previous settings if reload fails. | Pass |
 | Git ignore policy | `.gitignore` excludes local agent files, ignored progress/PRD/source docs, cloud state, secrets, databases, models, build output, and release artifacts; no tracked file currently matches ignore rules. | Pass |
 | Manual desktop QA | `docs/MANUAL_QA.md` defines the remaining real microphone, overlay, hotkey, model, and external-app injection validation steps. | Checklist ready; not yet executed |
-| Windows external-app injection smoke | Ignored test `manual_windows_notepad_injection_smoke` launches Notepad, uses the real injector, verifies saved pasted text, and checks clipboard restoration. | Passed locally on Windows |
+| Windows external-app injection smoke | Ignored test `manual_windows_notepad_injection_smoke` launches Notepad, uses the real injector, verifies saved pasted text, and checks clipboard restoration. | Passed earlier locally; later focus attempts were inconsistent under Windows foreground restrictions |
 | Microphone transcription smoke | Ignored test `manual_microphone_transcription_smoke` records from the default microphone after a configurable countdown, can optionally play a Windows speech prompt, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Added; requires human speaker or speaker-to-mic setup to execute |
 | Windows synthetic speech STT smoke | Ignored test `manual_windows_tts_file_transcription_smoke` generates a Windows SAPI WAV, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Passed locally on Windows |
 
@@ -310,18 +310,18 @@ speech-only release unless product direction changes.
 25. Add and run an ignored Windows synthetic speech-file smoke test for VAD -> STT validation.
 
 Completed in this run: items 1 through 25. Windows NSIS and Linux AppImage
-bundling were verified locally. GitHub Actions run `25931329886` completed
-successfully for verify plus Windows, Linux, macOS Intel, and macOS Apple
-Silicon build jobs, and uploaded all four platform artifacts. Later source
-hardening through `38b53fe` passed the relevant local frontend and Rust gates;
-`aa8eb8a` is an ignore-policy-only checkpoint.
+bundling were verified locally. GitHub Actions run `25938753998` for commit
+`6c5e82d` completed successfully for verify plus Windows, Linux, macOS Intel,
+and macOS Apple Silicon build jobs, and uploaded all four platform artifacts.
+The latest local source gates passed with 25 Rust tests, 3 ignored manual
+desktop smokes, Rust formatting, and `cargo clippy --all-targets -- -D warnings`.
 
 Remaining manual validation gap: a real microphone recording injected into an
 external target application still needs hands-on end-to-end QA on a desktop
 session using `docs/MANUAL_QA.md`. The ignored Windows Notepad smoke test
-verifies the injector against an external app, but it does not prove the real
-microphone capture plus speech recognition path by itself. A local attempt to
-run the microphone smoke with the optional Windows TTS prompt captured audio but
-did not pass VAD, so the real mic plus STT path still needs a hands-on spoken
-pass. The synthetic Windows speech-file smoke validates VAD plus STT against
-generated spoken audio, but it does not validate OS microphone capture.
+validated the injector earlier, but later attempts showed Windows foreground
+focus can be inconsistent in this desktop session. A local attempt to run the
+microphone smoke with the optional Windows TTS prompt captured audio but did not
+pass VAD, so the real mic plus STT path still needs a hands-on spoken pass. The
+synthetic Windows speech-file smoke validates VAD plus STT against generated
+spoken audio, but it does not validate OS microphone capture.
