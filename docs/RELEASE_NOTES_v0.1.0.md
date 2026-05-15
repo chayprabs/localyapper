@@ -39,6 +39,11 @@ disk.
 - Unused Tauri FS/Shell plugin permissions are not enabled.
 - Branch release workflows cancel older in-progress runs for the same ref, while
   tag release runs are preserved.
+- Unsupported legacy speech model settings fall back to the current Parakeet
+  default.
+- Dashboard, History, Hotkeys, Speech, and Wizard setup operations show inline
+  errors when user-facing actions fail.
+- The History empty-state action opens Hotkeys instead of doing nothing.
 - SQLite-backed history and settings.
 - Dashboard, History, Hotkeys, and Speech model pages.
 - System tray with open, pause/resume dictation, and quit actions.
@@ -85,7 +90,7 @@ Results:
 - Linux AppImage build in WSL: passed.
 - GitHub Actions release workflow: passed on code-verification run
   `25927183008` for commit `2634165`.
-- Post-baseline code hardening through commit `478ea3d` passed the relevant local
+- Post-baseline code hardening through commit `98d9a94` passed the relevant local
   gates: ESLint, TypeScript, frontend production build, Rust formatting check,
   Rust clippy with `-D warnings`, Rust tests, `npm audit --omit=dev`, and a
   Windows NSIS Tauri build after plugin-surface reduction.

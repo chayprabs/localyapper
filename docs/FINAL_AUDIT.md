@@ -7,7 +7,7 @@ Reference code-verification run: `25927183008`
 Verified code commit: `2634165`
 Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
-Latest local source verification commit: `478ea3d`
+Latest local source verification commit: `98d9a94`
 
 ## Source-Of-Truth Decision
 
@@ -78,6 +78,10 @@ but it does not justify adding LLM features back into this release.
 | Production logging | Backend diagnostics use the logger; direct stdout logging and transcript-content log previews were removed. | Pass |
 | Tauri plugin surface | Unused frontend FS/Shell permissions and unused FS/Shell Rust plugins were removed; Windows NSIS build still passes. | Pass |
 | npm production audit | `npm audit --omit=dev` reports 0 vulnerabilities after non-breaking transitive lockfile fixes. | Pass |
+| Frontend dependency surface | Unused `lucide-react` and `class-variance-authority` dependencies were removed; the required Recharts 2 stack dependency was left in place. | Pass |
+| Speech model setting normalization | Removed legacy Whisper directory mapping from active model resolution; old DB values still migrate/fall back to the current Parakeet default. | Pass |
+| User-visible errors | Dashboard, History, Hotkeys, Speech, and Wizard setup actions now surface operation failures inline instead of only logging to DevTools. | Pass |
+| Inert UI controls | History empty-state action now navigates to Hotkeys instead of being a no-op. | Pass |
 | Build docs | `docs/BUILD.md` added for Windows, macOS, and Linux build paths. | Done |
 | Release notes | `docs/RELEASE_NOTES_v0.1.0.md` added for the current release candidate. | Done |
 | Verification | lint, typecheck, fmt check, clippy, tests, frontend build, and targeted post-cleanup source gates passed after fixes. | Pass |
@@ -204,6 +208,40 @@ full cross-platform release workflows for intermediate commits.
 Remediation: the release workflow now uses branch-level concurrency to cancel
 older in-progress runs for the same ref. Tag release runs are not cancelled.
 
+### P2: Unused frontend dependencies were shipped - Fixed
+
+`lucide-react` and `class-variance-authority` were present in the production
+dependency manifest but not imported by the current UI.
+
+Remediation: both unused dependencies were removed from `package.json` and
+`package-lock.json`. The current UI still uses Material Symbols, and Recharts 2
+was left in place because it is part of the declared frontend stack.
+
+### P2: Legacy Whisper settings leaked into current model resolution - Fixed
+
+Old Whisper model values were still mapped to `whisper-*` directories in active
+STT path helpers, even though the current app uses Parakeet via `sherpa-onnx`.
+
+Remediation: active model selection now normalizes unsupported or removed model
+settings to the current Parakeet default. Database migration still maps old
+`whisper_model` values to `speech_model = parakeet-110m`.
+
+### P2: Several UI errors were console-only - Fixed
+
+Hotkey update/reset/load failures, History load/delete/clear failures,
+Dashboard load/delete failures, Speech settings/delete failures, and Wizard
+finish/skip failures were not consistently visible to the user.
+
+Remediation: those flows now show compact inline error messages in the relevant
+page or wizard step while preserving existing logging for diagnostics.
+
+### P2: History empty-state action was inert - Fixed
+
+The History empty-state button said "Start Dictating" but had no handler.
+
+Remediation: the action now navigates to the Hotkeys page, where the user can
+see or change the shortcut that starts dictation.
+
 ### P2: Overlay timer authority is split
 
 The backend emits high-level pipeline state events, while the frontend owns
@@ -229,8 +267,12 @@ speech-only release unless product direction changes.
 12. Apply non-breaking npm audit fixes for production dependencies.
 13. Prune stale DB settings and honor `auto_start` at startup.
 14. Add release-workflow concurrency for frequent branch checkpoints.
+15. Remove unused frontend dependencies while keeping the declared Recharts 2 stack dependency.
+16. Normalize stale speech model settings to the current Parakeet default.
+17. Make page and wizard operation failures visible inline.
+18. Wire the History empty-state action to real navigation.
 
-Completed in this run: items 1 through 14. Windows NSIS and Linux AppImage
+Completed in this run: items 1 through 18. Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25927183008` completed
 successfully for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs, and uploaded all four platform artifacts.
