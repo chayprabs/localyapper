@@ -34,6 +34,9 @@ disk.
   transcription, the overlay keeps the transcript visible and copyable.
 - Best-effort system permission checks and OS settings shortcuts for microphone
   and accessibility/injection setup.
+- Release logging uses the configured logger and does not include transcript
+  content.
+- Unused Tauri FS/Shell plugin permissions are not enabled.
 - SQLite-backed history and settings.
 - Dashboard, History, Hotkeys, and Speech model pages.
 - System tray with open, pause/resume dictation, and quit actions.
@@ -80,9 +83,10 @@ Results:
 - Linux AppImage build in WSL: passed.
 - GitHub Actions release workflow: passed on code-verification run
   `25927183008` for commit `2634165`.
-- Post-baseline source cleanup through commit `5e59de5` passed ESLint,
-  TypeScript, Rust formatting check, and Rust clippy with `-D warnings`
-  locally.
+- Post-baseline hardening through commit `478ea3d` passed the relevant local
+  gates: ESLint, TypeScript, frontend production build, Rust formatting check,
+  Rust clippy with `-D warnings`, Rust tests, `npm audit --omit=dev`, and a
+  Windows NSIS Tauri build after plugin-surface reduction.
 - GitHub Actions artifacts uploaded:
   - `localyapper-windows-x64`
   - `localyapper-macos-aarch64`

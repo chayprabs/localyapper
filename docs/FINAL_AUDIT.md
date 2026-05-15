@@ -7,7 +7,7 @@ Reference code-verification run: `25927183008`
 Verified code commit: `2634165`
 Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
-Latest local source verification commit: `5e59de5`
+Latest local source verification commit: `478ea3d`
 
 ## Source-Of-Truth Decision
 
@@ -75,6 +75,9 @@ but it does not justify adding LLM features back into this release.
 | No `unwrap()`/`expect()` in production paths | Startup `.expect()` calls were replaced with logged error handling. Search is clean for `unwrap(` and `expect(` in `src-tauri/src`. | Pass |
 | No dead code suppressions | Global dead-code suppression was removed and clippy passes with `-D warnings`. | Pass |
 | Permission commands | `check_permissions` uses microphone/input capability checks and settings-open commands route to OS settings where supported. | Pass |
+| Production logging | Backend diagnostics use the logger; direct stdout logging and transcript-content log previews were removed. | Pass |
+| Tauri plugin surface | Unused frontend FS/Shell permissions and unused FS/Shell Rust plugins were removed; Windows NSIS build still passes. | Pass |
+| npm production audit | `npm audit --omit=dev` reports 0 vulnerabilities after non-breaking transitive lockfile fixes. | Pass |
 | Build docs | `docs/BUILD.md` added for Windows, macOS, and Linux build paths. | Done |
 | Release notes | `docs/RELEASE_NOTES_v0.1.0.md` added for the current release candidate. | Done |
 | Verification | lint, typecheck, fmt check, clippy, tests, frontend build, and targeted post-cleanup source gates passed after fixes. | Pass |
@@ -154,6 +157,44 @@ Those logs were useful during development but noisy for a release candidate.
 Remediation: development `console.log` calls were removed while keeping
 `console.error` failure reporting.
 
+### P2: Backend writes production diagnostics directly to stdout - Fixed
+
+Release-path backend code used `println!` for hotkey, VAD, STT, pipeline, and
+startup diagnostics. One STT log also included transcript content, which is not
+appropriate for a privacy-first dictation app.
+
+Remediation: backend diagnostics now go through the configured logger, and
+transcription logs report only sample and character counts.
+
+### P2: Unused Tauri FS/Shell plugin surface - Fixed
+
+The frontend did not use Tauri FS or Shell APIs, but the app still shipped
+their plugin permissions and Rust/JS dependencies.
+
+Remediation: unused FS/Shell permissions, plugins, and dependencies were
+removed. A Windows NSIS Tauri build passed after the removal.
+
+### P2: Stale settings were seeded but never read - Fixed
+
+Older settings such as sound effects, media muting, language, max recording
+seconds, and auto-inject delay remained in the database seed data without
+active product behavior.
+
+Remediation: stale defaults are no longer seeded and are cleaned from existing
+databases. The remaining `auto_start` setting now controls autostart enable and
+disable behavior at startup.
+
+### P2: Production npm audit had a high transitive finding - Fixed
+
+`npm audit --omit=dev` reported a high-severity transitive `lodash` finding via
+Recharts.
+
+Remediation: non-breaking transitive lockfile fixes updated `lodash` and other
+patched packages. `npm audit --omit=dev` now reports 0 vulnerabilities. The
+remaining non-production audit advisory is Vite/esbuild dev-server-only and npm
+requires a forced Vite 8 upgrade to clear it; this repo remains on the required
+Vite 5 line.
+
 ### P2: Overlay timer authority is split
 
 The backend emits high-level pipeline state events, while the frontend owns
@@ -173,8 +214,13 @@ speech-only release unless product direction changes.
 6. Rerun lint, typecheck, clippy, tests, frontend build, and Tauri build.
 7. Remove stale placeholder IPC/update-check surfaces.
 8. Remove production-only overlay debug logging.
+9. Remove stale auto-inject setting and clarify overlay dismiss progress.
+10. Route backend diagnostics through the logger without logging transcript text.
+11. Remove unused Tauri FS/Shell plugin surface.
+12. Apply non-breaking npm audit fixes for production dependencies.
+13. Prune stale DB settings and honor `auto_start` at startup.
 
-Completed in this run: items 1 through 8. Windows NSIS and Linux AppImage
+Completed in this run: items 1 through 13. Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25927183008` completed
 successfully for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs, and uploaded all four platform artifacts.
