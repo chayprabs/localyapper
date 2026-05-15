@@ -24,6 +24,8 @@ disk.
   - Cancel: `Escape`
   - Paste last dictation: `Ctrl+Alt+J`
   - Open app: `Ctrl+Alt+O`
+- Hotkey changes reject empty or duplicate shortcuts, report OS registration
+  failures, and roll back to the previous shortcuts if reload fails.
 - 16 kHz mono microphone capture through `cpal`.
 - Silero VAD when available, with energy-based fallback.
 - Parakeet speech recognition through `sherpa-onnx`.
@@ -44,6 +46,9 @@ disk.
 - Dashboard, History, Hotkeys, Speech, and Wizard setup operations show inline
   errors when user-facing actions fail.
 - The History empty-state action opens Hotkeys instead of doing nothing.
+- Repository ignore rules exclude local agent state, private progress/PRD/source
+  notes, cloud provider state, signing keys, model binaries, databases, build
+  output, and packaged release artifacts.
 - SQLite-backed history and settings.
 - Dashboard, History, Hotkeys, and Speech model pages.
 - System tray with open, pause/resume dictation, and quit actions.
@@ -81,7 +86,7 @@ Results:
 - TypeScript strict check: passed.
 - Rust formatting check: passed.
 - Rust clippy with `-D warnings`: passed.
-- Rust tests: 21 passed, 0 failed.
+- Rust tests: 25 passed, 0 failed.
 - Frontend production build: passed.
 - Tauri release build on Windows: passed.
 - Windows artifact produced:
@@ -89,11 +94,13 @@ Results:
 - Windows NSIS installer build: passed.
 - Linux AppImage build in WSL: passed.
 - GitHub Actions release workflow: passed on code-verification run
-  `25927183008` for commit `2634165`.
-- Post-baseline code hardening through commit `98d9a94` passed the relevant local
-  gates: ESLint, TypeScript, frontend production build, Rust formatting check,
-  Rust clippy with `-D warnings`, Rust tests, `npm audit --omit=dev`, and a
-  Windows NSIS Tauri build after plugin-surface reduction.
+  `25931329886` for commit `001ff6c`.
+- Post-baseline code hardening through commit `38b53fe` passed the relevant
+  local gates: ESLint, TypeScript, frontend production build, Rust formatting
+  check, Rust clippy with `-D warnings`, Rust tests, `npm audit --omit=dev`, a
+  Windows NSIS Tauri build after plugin-surface reduction, and focused hotkey
+  rollback tests.
+- Commit `aa8eb8a` is an ignore-policy-only repository hygiene checkpoint.
 - GitHub Actions artifacts uploaded:
   - `localyapper-windows-x64`
   - `localyapper-macos-aarch64`

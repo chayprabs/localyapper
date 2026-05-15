@@ -3,11 +3,12 @@
 Date: 2026-05-15
 Branch: main
 
-Reference code-verification run: `25927183008`
-Verified code commit: `2634165`
+Reference code-verification run: `25931329886`
+Verified code commit: `001ff6c`
 Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
-Latest local source verification commit: `98d9a94`
+Latest local source verification commit: `38b53fe`
+Latest repository hygiene checkpoint: `aa8eb8a`
 
 ## Source-Of-Truth Decision
 
@@ -89,6 +90,8 @@ but it does not justify adding LLM features back into this release.
 | Tauri build | Windows NSIS bundle and Linux AppImage bundle passed locally. | Pass |
 | CI/CD workflow | `.github/workflows/release.yml` verified and built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts. | Pass |
 | CI queue behavior | Branch workflows now cancel older in-progress runs for the same ref; tag release runs are preserved. | Pass |
+| Hotkey registration failures | Backend hotkey updates reject empty/duplicate values, report OS registration failures, and restore previous settings if reload fails. | Pass |
+| Git ignore policy | `.gitignore` excludes local agent files, ignored progress/PRD/source docs, cloud state, secrets, databases, models, build output, and release artifacts; no tracked file currently matches ignore rules. | Pass |
 
 ## Findings To Fix Before Release
 
@@ -242,6 +245,29 @@ The History empty-state button said "Start Dictating" but had no handler.
 Remediation: the action now navigates to the Hotkeys page, where the user can
 see or change the shortcut that starts dictation.
 
+### P2: Hotkey registration failures could leave stale settings - Fixed
+
+Hotkey update and reset commands previously wrote settings before reloading OS
+hotkeys. If registration failed at the OS layer, the user could be left with a
+saved shortcut that was not actually active.
+
+Remediation: hotkey updates now reject empty values and case-insensitive
+duplicates, return registration errors to the UI, restore the previous settings
+on reload failure, and attempt to reload the previous known-good hotkeys.
+Regression tests cover uniqueness, current-setting reads, and restore behavior.
+
+### P2: Ignore rules missed common local release artifacts - Fixed
+
+The repo already ignored major build folders and local agent files, but the
+ignore policy did not cover several common leak points such as cloud provider
+state, signing keys, package-manager caches, model resource directories, temp
+files, and packaged installers.
+
+Remediation: `.gitignore` now excludes those categories while keeping tracked
+source, docs, package locks, icons, and workflow files visible. A tracked-file
+check confirmed no existing Git-tracked file is being hidden by the ignore
+rules.
+
 ### P2: Overlay timer authority is split
 
 The backend emits high-level pipeline state events, while the frontend owns
@@ -271,11 +297,15 @@ speech-only release unless product direction changes.
 16. Normalize stale speech model settings to the current Parakeet default.
 17. Make page and wizard operation failures visible inline.
 18. Wire the History empty-state action to real navigation.
+19. Report hotkey registration failures and roll back failed updates.
+20. Harden `.gitignore` for local-only release, cloud, model, secret, and agent artifacts.
 
-Completed in this run: items 1 through 18. Windows NSIS and Linux AppImage
-bundling were verified locally. GitHub Actions run `25927183008` completed
+Completed in this run: items 1 through 20. Windows NSIS and Linux AppImage
+bundling were verified locally. GitHub Actions run `25931329886` completed
 successfully for verify plus Windows, Linux, macOS Intel, and macOS Apple
-Silicon build jobs, and uploaded all four platform artifacts.
+Silicon build jobs, and uploaded all four platform artifacts. Later source
+hardening through `38b53fe` passed the relevant local frontend and Rust gates;
+`aa8eb8a` is an ignore-policy-only checkpoint.
 
 Remaining manual validation gap: a real microphone recording injected into an
 external target application still needs hands-on end-to-end QA on a desktop
