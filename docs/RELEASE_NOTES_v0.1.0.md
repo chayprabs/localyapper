@@ -53,6 +53,8 @@ disk.
   hotkeys, model handling, and external-app injection.
 - An ignored Windows Notepad smoke test can exercise the real clipboard
   injector against an external app and verify clipboard restoration.
+- An ignored microphone transcription smoke test can exercise default mic
+  capture, VAD, and local STT with a human speaker.
 - SQLite-backed history and settings.
 - Dashboard, History, Hotkeys, and Speech model pages.
 - System tray with open, pause/resume dictation, and quit actions.
@@ -90,9 +92,11 @@ Results:
 - TypeScript strict check: passed.
 - Rust formatting check: passed.
 - Rust clippy with `-D warnings`: passed.
-- Rust tests: 25 passed, 0 failed, 1 ignored manual desktop smoke.
+- Rust tests: 25 passed, 0 failed, 2 ignored manual desktop smokes.
 - Ignored Windows Notepad injection smoke: passed locally with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection_smoke -- --ignored --nocapture`.
+- Ignored microphone transcription smoke: added for manual execution with
+  `cargo test --manifest-path src-tauri/Cargo.toml manual_microphone_transcription_smoke -- --ignored --nocapture`.
 - Frontend production build: passed.
 - Tauri release build on Windows: passed.
 - Windows artifact produced:

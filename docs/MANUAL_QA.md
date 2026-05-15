@@ -97,6 +97,20 @@ cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection
 This does not replace the real microphone dictation pass, but it gives a
 repeatable check for the external-app clipboard injection layer.
 
+## Optional Microphone Transcription Smoke
+
+On a machine with the speech model installed, this ignored test records from the
+default microphone for five seconds, runs VAD, loads the local speech model, and
+asserts that STT returns a non-empty transcript:
+
+```powershell
+cargo test --manifest-path src-tauri/Cargo.toml manual_microphone_transcription_smoke -- --ignored --nocapture
+```
+
+Speak a short sentence immediately after the test starts. If your app data
+directory is not in the platform default location, set `LOCALYAPPER_APP_DATA_DIR`
+to the directory that contains the `models` folder before running the command.
+
 ## Hotkey Pass
 
 1. Open Settings > Hotkeys.

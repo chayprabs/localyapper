@@ -292,3 +292,100 @@ mod tests {
         assert!(result.is_err());
     }
 }
+
+#[cfg(test)]
+mod manual_tests {
+    use super::*;
+    use crate::audio::vad::{apply_vad, SileroVad};
+    use crate::stt::whisper::{
+        stt_model_dir_name, WhisperEngine, DEFAULT_STT_MODEL, SILERO_VAD_FILENAME,
+    };
+    use std::path::PathBuf;
+    use std::thread;
+    use std::time::Duration;
+
+    fn default_app_data_dir() -> Result<PathBuf, String> {
+        if let Ok(path) = std::env::var("LOCALYAPPER_APP_DATA_DIR") {
+            return Ok(PathBuf::from(path));
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            let app_data = std::env::var("APPDATA")
+                .map_err(|_| "APPDATA is not set; set LOCALYAPPER_APP_DATA_DIR".to_string())?;
+            Ok(PathBuf::from(app_data).join("com.localyapper.desktop"))
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            let home = std::env::var("HOME")
+                .map_err(|_| "HOME is not set; set LOCALYAPPER_APP_DATA_DIR".to_string())?;
+            Ok(PathBuf::from(home)
+                .join("Library")
+                .join("Application Support")
+                .join("com.localyapper.desktop"))
+        }
+
+        #[cfg(all(unix, not(target_os = "macos")))]
+        {
+            if let Ok(data_home) = std::env::var("XDG_DATA_HOME") {
+                Ok(PathBuf::from(data_home).join("com.localyapper.desktop"))
+            } else {
+                let home = std::env::var("HOME")
+                    .map_err(|_| "HOME is not set; set LOCALYAPPER_APP_DATA_DIR".to_string())?;
+                Ok(PathBuf::from(home)
+                    .join(".local")
+                    .join("share")
+                    .join("com.localyapper.desktop"))
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "requires an interactive desktop, a microphone, installed speech model files, and spoken audio"]
+    fn manual_microphone_transcription_smoke() -> Result<(), String> {
+        let app_data_dir = default_app_data_dir()?;
+        let models_dir = app_data_dir.join("models");
+        let speech_model_dir = models_dir.join(stt_model_dir_name(DEFAULT_STT_MODEL));
+        let vad_path = models_dir.join(SILERO_VAD_FILENAME);
+
+        println!("Using speech model: {}", speech_model_dir.display());
+        println!("Speak a short sentence after recording starts.");
+
+        let recorder = AudioRecorder::new();
+        recorder.start().map_err(|e| e.to_string())?;
+        thread::sleep(Duration::from_secs(5));
+        let audio = recorder.stop().map_err(|e| e.to_string())?;
+
+        if audio.len() < SAMPLE_RATE as usize {
+            return Err(format!(
+                "Captured too little audio: {} samples at 16 kHz",
+                audio.len()
+            ));
+        }
+
+        let silero = if vad_path.exists() {
+            Some(SileroVad::new(&vad_path).map_err(|e| e.to_string())?)
+        } else {
+            None
+        };
+        let vad_result = apply_vad(&audio, silero.as_ref());
+        if !vad_result.has_speech {
+            return Err(
+                "No speech detected; rerun and speak during the recording window".to_string(),
+            );
+        }
+
+        let engine = WhisperEngine::new(&speech_model_dir).map_err(|e| e.to_string())?;
+        let text = engine
+            .transcribe(&vad_result.trimmed_audio)
+            .map_err(|e| e.to_string())?;
+
+        println!("Transcript: {text}");
+        if text.trim().is_empty() {
+            return Err("STT returned an empty transcript".to_string());
+        }
+
+        Ok(())
+    }
+}
