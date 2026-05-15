@@ -54,7 +54,6 @@ export function useOverlayState() {
 
   const showOverlay = useCallback(async () => {
     try {
-      console.log("[overlay] showOverlay called");
       const win = getCurrentWindow();
       await win.show();
       // Do NOT call setFocus() — the overlay must not steal focus from the target app
@@ -163,14 +162,11 @@ export function useOverlayState() {
   );
 
   useEffect(() => {
-    console.log("[overlay] Pipeline state listener attached");
     const unlisten = listen<PipelineEvent>("pipeline-state", (event) => {
       const { state, text, duration_ms, word_count, error } = event.payload;
-      console.log("[overlay] Received pipeline-state:", state, { text, duration_ms, word_count, error });
 
       // "injected" while showing transcribed text — don't interrupt the 3s display
       if (state === "injected" && overlayDataRef.current.visualState === "transcribed") {
-        console.log("[overlay] Ignoring 'injected' — transcribed display still active");
         return;
       }
 
