@@ -15,16 +15,26 @@ interface HistoryData {
   entries: HistoryEntry[];
   isLoading: boolean;
   hasMore: boolean;
+  error: string | null;
   loadMore: () => void;
   deleteEntry: (id: string) => Promise<void>;
   clearAll: () => Promise<void>;
   refresh: () => void;
 }
 
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error
+    ? error.message
+    : typeof error === "string"
+      ? error
+      : fallback;
+}
+
 export function useHistory(): HistoryData {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const offsetRef = useRef(0);
 
   const fetchInitial = useCallback(async () => {
@@ -34,9 +44,11 @@ export function useHistory(): HistoryData {
       setEntries(result);
       setHasMore(result.length === PAGE_SIZE);
       offsetRef.current = result.length;
-    } catch {
+      setError(null);
+    } catch (fetchError) {
       setEntries([]);
       setHasMore(false);
+      setError(toErrorMessage(fetchError, "Failed to load history"));
     }
     setIsLoading(false);
   }, []);
@@ -63,17 +75,21 @@ export function useHistory(): HistoryData {
       setEntries((prev) => [...prev, ...result]);
       setHasMore(result.length === PAGE_SIZE);
       offsetRef.current += result.length;
-    } catch {
+      setError(null);
+    } catch (loadError) {
       setHasMore(false);
+      setError(toErrorMessage(loadError, "Failed to load more history"));
     }
   }, []);
 
   const deleteEntry = useCallback(
     async (id: string) => {
+      setError(null);
       setEntries((prev) => prev.filter((e) => e.id !== id));
       try {
         await deleteHistoryEntry(id);
-      } catch {
+      } catch (deleteError) {
+        setError(toErrorMessage(deleteError, "Failed to delete history entry"));
         void fetchInitial();
       }
     },
@@ -81,16 +97,23 @@ export function useHistory(): HistoryData {
   );
 
   const clearAll = useCallback(async () => {
+    setError(null);
     setEntries([]);
     setHasMore(false);
     offsetRef.current = 0;
-    await clearHistory();
-  }, []);
+    try {
+      await clearHistory();
+    } catch (clearError) {
+      setError(toErrorMessage(clearError, "Failed to clear history"));
+      void fetchInitial();
+    }
+  }, [fetchInitial]);
 
   return {
     entries,
     isLoading,
     hasMore,
+    error,
     loadMore: () => void loadMore(),
     deleteEntry,
     clearAll,

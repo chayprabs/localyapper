@@ -29,7 +29,7 @@ function EmptyState({ onOpenHotkeys }: { onOpenHotkeys: () => void }) {
 }
 
 export function HistoryPage() {
-  const { entries, isLoading, hasMore, loadMore, deleteEntry, clearAll } =
+  const { entries, isLoading, hasMore, error, loadMore, deleteEntry, clearAll } =
     useHistory();
   const setActivePage = useSetAtom(activePageAtom);
 
@@ -47,8 +47,15 @@ export function HistoryPage() {
 
   return (
     <div className="flex flex-col h-full px-12 py-10">
-      <header className="mb-10 flex justify-between items-baseline shrink-0">
-        <h1 className="text-[26px] font-semibold text-[#1C1C1E]">History</h1>
+      <header className="mb-10 flex justify-between items-start gap-4 shrink-0">
+        <div>
+          <h1 className="text-[26px] font-semibold text-[#1C1C1E]">History</h1>
+          {error && (
+            <p className="mt-3 max-w-[520px] rounded-lg border border-[#ba1a1a]/15 bg-[#ba1a1a]/[0.06] px-3 py-2 text-[12px] font-medium text-[#ba1a1a]">
+              {error}
+            </p>
+          )}
+        </div>
         <button
           onClick={handleClearAll}
           disabled={isEmpty}
