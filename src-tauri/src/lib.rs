@@ -100,9 +100,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_fs::init())
         .setup(|app| -> Result<(), Box<dyn std::error::Error>> {
             let app_data_dir = app.path().app_data_dir().map_err(|e| {
                 log::error!("Failed to resolve app data directory: {e}");

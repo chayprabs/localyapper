@@ -16,13 +16,8 @@
     "core:window:allow-start-dragging",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
-    "fs:allow-read-dir",
-    "fs:allow-read-file",
-    "fs:allow-write-file",
-    "fs:allow-mkdir",
     "autostart:allow-enable",
     "autostart:allow-disable",
-    "shell:allow-open",
     "notification:default"
   ]
 }
