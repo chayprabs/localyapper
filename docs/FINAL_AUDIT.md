@@ -73,6 +73,7 @@ but it does not justify adding LLM features back into this release.
 | Release notes | `docs/RELEASE_NOTES_v0.1.0.md` added for the current release candidate. | Done |
 | Verification | lint, typecheck, fmt check, clippy, tests, and frontend build passed after fixes. | Pass |
 | Tauri build | `npm run tauri build` passed on Windows and produced `src-tauri/target/release/localyapper.exe`. | Windows pass |
+| CI/CD workflow | `.github/workflows/release.yml` added to verify and build Windows, macOS, and Linux artifacts. | Added, needs first GitHub run |
 
 ## Findings To Fix Before Release
 
@@ -145,4 +146,5 @@ speech-only release unless product direction changes.
 6. Rerun lint, typecheck, clippy, tests, frontend build, and Tauri build.
 
 Completed in this run: items 1 through 6. Windows build was verified locally.
-macOS and Linux packaging still need native hosts or CI runners.
+macOS and Linux packaging are covered by the GitHub Actions workflow and still
+need a green remote run.

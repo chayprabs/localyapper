@@ -55,6 +55,28 @@ npm run build
 npm run tauri build
 ```
 
+## GitHub Actions Release Workflow
+
+The repository includes `.github/workflows/release.yml`.
+
+On pushes and pull requests to `main`, the workflow:
+
+- installs the Linux system dependencies required by Tauri,
+- runs frontend lint and TypeScript checks,
+- runs Rust formatting, clippy, and tests,
+- builds the frontend,
+- builds Tauri artifacts on Windows, macOS Apple Silicon, macOS Intel, and Linux.
+
+On tags matching `v*`, the workflow also creates a draft GitHub Release through
+`tauri-apps/tauri-action` and uploads the built platform artifacts.
+
+Release tag format:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 ## Windows Build
 
 Required:
@@ -157,4 +179,3 @@ src-tauri/target/
 ```
 
 Both directories are ignored by Git.
-

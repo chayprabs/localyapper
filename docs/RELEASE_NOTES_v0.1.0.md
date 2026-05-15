@@ -74,6 +74,8 @@ Results:
 - Tauri release build on Windows: passed.
 - Windows artifact produced:
   `src-tauri/target/release/localyapper.exe`
+- GitHub Actions workflow added for verify plus cross-platform Tauri builds on
+  Windows, macOS, and Linux.
 
 ## Platform Notes
 
@@ -88,11 +90,11 @@ Runtime injection dependencies on Linux:
 ## Known Limitations
 
 - macOS and Linux release artifacts have not been built in this local Windows
-  run.
+  run; they are covered by the GitHub Actions release workflow and need a green
+  run before publishing v0.1.0.
 - Permission status commands are registered but currently return placeholder
   values and are not surfaced by the simplified UI.
 - The overlay uses frontend timers for display countdowns and auto-hide while
   backend events drive major pipeline state transitions.
 - First launch is tracked with the `setup_complete` setting, not a separate
   onboarding table.
-
