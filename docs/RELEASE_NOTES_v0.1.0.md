@@ -108,11 +108,13 @@ Results:
 - TypeScript strict check: passed.
 - Rust formatting check: passed.
 - Rust clippy with `-D warnings`: passed.
-- Rust tests: 25 passed, 0 failed, 3 ignored manual desktop smokes.
+- Rust tests: 27 passed, 0 failed, 3 ignored manual desktop smokes.
 - Ignored Windows Notepad injection smoke: available with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection_smoke -- --ignored --nocapture`.
-  It passed earlier locally, but later attempts hit Windows foreground-focus
-  restrictions, so it is not treated as release-completing evidence by itself.
+  It passed in the interactive Windows desktop session and verified clipboard
+  save -> paste -> restore against Notepad. It is still not treated as
+  release-completing evidence by itself because it does not validate spoken
+  microphone capture or the full hotkey-driven dictation flow.
 - Ignored microphone transcription smoke: added for manual execution with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_microphone_transcription_smoke -- --ignored --nocapture`.
   It supports configurable timing and an optional Windows TTS prompt for

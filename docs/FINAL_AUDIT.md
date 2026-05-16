@@ -100,7 +100,7 @@ but it does not justify adding LLM features back into this release.
 | Hotkey registration failures | Backend hotkey updates reject empty/duplicate values, report OS registration failures, and restore previous settings if reload fails. | Pass |
 | Git ignore policy | `.gitignore` excludes local agent files, ignored progress/PRD/source docs, cloud state, secrets, databases, models, build output, and release artifacts; no tracked file currently matches ignore rules. | Pass |
 | Manual desktop QA | `docs/MANUAL_QA.md` defines the remaining real microphone, overlay, hotkey, model, and external-app injection validation steps. | Checklist ready; not yet executed |
-| Windows external-app injection smoke | Ignored test `manual_windows_notepad_injection_smoke` launches Notepad, uses the real injector, verifies saved pasted text, and checks clipboard restoration. | Passed earlier locally; later focus attempts were inconsistent under Windows foreground restrictions |
+| Windows external-app injection smoke | Ignored test `manual_windows_notepad_injection_smoke` launches Notepad, uses the real injector, verifies saved pasted text, and checks clipboard restoration. | Passed in the interactive Windows desktop session; still not a substitute for full spoken dictation QA |
 | Microphone transcription smoke | Ignored test `manual_microphone_transcription_smoke` records from the default microphone after a configurable countdown, can optionally play a Windows speech prompt, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Added; requires human speaker or speaker-to-mic setup to execute |
 | Windows synthetic speech STT smoke | Ignored test `manual_windows_tts_file_transcription_smoke` generates a Windows SAPI WAV, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Passed locally on Windows |
 
@@ -394,9 +394,9 @@ non-empty transcript through VAD plus STT.
 Remaining manual validation gap: a real microphone recording injected into an
 external target application still needs hands-on end-to-end QA on a desktop
 session using `docs/MANUAL_QA.md`. The ignored Windows Notepad smoke test
-validated the injector earlier, but later attempts showed Windows foreground
-focus can be inconsistent in this desktop session. A local attempt to run the
-microphone smoke with the optional Windows TTS prompt captured audio but did not
-pass VAD, so the real mic plus STT path still needs a hands-on spoken pass. The
-synthetic Windows speech-file smoke validates VAD plus STT against generated
-spoken audio, but it does not validate OS microphone capture.
+validated the external-app clipboard save -> paste -> restore path in this
+interactive desktop session. A local attempt to run the microphone smoke with
+the optional Windows TTS prompt captured audio but did not pass VAD, so the real
+mic plus STT path still needs a hands-on spoken pass. The synthetic Windows
+speech-file smoke validates VAD plus STT against generated spoken audio, but it
+does not validate OS microphone capture.
