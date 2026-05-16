@@ -3,13 +3,14 @@
 Date: 2026-05-16
 Branch: main
 
-Recent verification checkpoint: `ecd543a`
-Recent verification run: `25956466390`
+Recent workflow enforcement checkpoint: `747fae5`
+Recent workflow enforcement run: `25959323267`
 Result: success for Verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
 Artifacts: `localyapper-windows-x64`, `localyapper-linux-x64`,
 `localyapper-macos-x64`, and `localyapper-macos-aarch64`.
-Earlier reference code-bearing verification run: `25938753998` for commit
+Earlier reference code-bearing verification runs include `25956466390` for
+checkpoint `ecd543a` and `25938753998` for commit
 `6c5e82d`.
 Ignore-policy checkpoint: `aa8eb8a`.
 
@@ -83,7 +84,7 @@ but it does not justify adding LLM features back into this release.
 | Permission commands | `check_permissions` uses microphone/input capability checks and settings-open commands route to OS settings where supported. | Pass |
 | Production logging | Backend diagnostics use the logger; direct stdout logging and transcript-content log previews were removed. | Pass |
 | Tauri plugin surface | Unused frontend FS/Shell permissions and unused FS/Shell Rust plugins were removed; Windows NSIS build still passes. | Pass |
-| npm production audit | `npm audit --omit=dev` reports 0 vulnerabilities after non-breaking transitive lockfile fixes. | Pass |
+| npm production audit | `npm audit --omit=dev` reports 0 vulnerabilities after non-breaking transitive lockfile fixes and is enforced by the Verify CI job. | Pass |
 | Frontend dependency surface | Unused `lucide-react` and `class-variance-authority` dependencies were removed; the required Recharts 2 stack dependency was left in place. | Pass |
 | Speech model setting normalization | Removed legacy Whisper directory mapping from active model resolution; old DB values still migrate/fall back to the current Parakeet default. | Pass |
 | User-visible errors | Dashboard, History, Hotkeys, Speech, and Wizard setup actions now surface operation failures inline instead of only logging to DevTools. | Pass |
@@ -92,10 +93,10 @@ but it does not justify adding LLM features back into this release.
 | History and dashboard data queries | In-memory query tests verify reverse-chronological history paging, stats aggregation, delete-not-found errors, and clear-all behavior. | Pass |
 | Build docs | `docs/BUILD.md` added for Windows, macOS, and Linux build paths. | Done |
 | Release notes | `docs/RELEASE_NOTES_v0.1.0.md` added for the current release candidate. | Done |
-| Verification | lint, typecheck, fmt check, clippy, tests, frontend build, production audit, dev-launch smoke, synthetic speech STT smoke, and GitHub Actions passed after fixes. | Pass |
+| Verification | lint, production audit, typecheck, fmt check, all-targets clippy, tests, frontend build, dev-launch smoke, synthetic speech STT smoke, and GitHub Actions passed after fixes. | Pass |
 | Tauri dev launch | Hidden smoke test reached Vite, compiled Rust, started `target/debug/localyapper.exe`, loaded STT/VAD, registered hotkeys, and initialized tray. | Pass |
 | Tauri build | Windows NSIS bundle and Linux AppImage bundle passed locally. | Pass |
-| CI/CD workflow | `.github/workflows/release.yml` run `25956466390` verified and built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts for checkpoint `ecd543a`. | Pass |
+| CI/CD workflow | `.github/workflows/release.yml` run `25959323267` enforced production audit and all-targets clippy, then built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts for checkpoint `747fae5`. | Pass |
 | CI queue behavior | Branch workflows now cancel older in-progress runs for the same ref; tag release runs are preserved. | Pass |
 | Model download recovery | Speech model downloads validate completed temp files and replace stale incomplete destination files before rename, avoiding Windows overwrite failures. Startup and model status now report installed only when both ONNX and tokens files are valid. | Pass |
 | Hotkey registration failures | Backend hotkey updates reject empty/duplicate values, report OS registration failures, and restore previous settings if reload fails. | Pass |
@@ -381,9 +382,11 @@ current speech-only release unless product direction changes.
     deletion errors, and clear-all behavior.
 
 Windows NSIS and Linux AppImage bundling were verified locally earlier in the
-release run. GitHub Actions run `25956466390` for checkpoint `ecd543a`
+release run. GitHub Actions run `25959323267` for checkpoint `747fae5`
 completed successfully for Verify plus Windows, Linux, macOS Intel, and macOS
-Apple Silicon build jobs, and uploaded all four platform artifacts.
+Apple Silicon build jobs, and uploaded all four platform artifacts. That Verify
+job includes `npm audit --omit=dev` and
+`cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`.
 
 The most recent local source gates at audit time passed with:
 
