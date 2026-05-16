@@ -379,6 +379,37 @@ mod manual_tests {
         }
     }
 
+    fn play_optional_speech_prompt() -> Result<bool, String> {
+        let text = match std::env::var("LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT") {
+            Ok(value) if !value.trim().is_empty() => value,
+            _ => return Ok(false),
+        };
+
+        let script = "Add-Type -AssemblyName System.Speech; \
+            $speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer; \
+            $speaker.Rate = 0; \
+            $speaker.Volume = 100; \
+            $speaker.Speak($env:LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT); \
+            $speaker.Dispose()";
+        let status = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                script,
+            ])
+            .env("LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT", &text)
+            .status()
+            .map_err(|e| format!("Failed to run Windows speech prompt: {e}"))?;
+
+        if status.success() {
+            Ok(true)
+        } else {
+            Err(format!("Windows speech prompt exited with status {status}"))
+        }
+    }
+
     struct WindowSearch {
         title_fragment: String,
         hwnd: HWND,
@@ -713,6 +744,9 @@ mod manual_tests {
             .start_for_device(input_device)
             .map_err(|e| e.to_string())?;
         println!("Recording now.");
+        if play_optional_speech_prompt()? {
+            println!("Windows speech prompt completed.");
+        }
         thread::sleep(Duration::from_secs(record_secs));
         let audio = recorder.stop().map_err(|e| e.to_string())?;
 

@@ -195,6 +195,9 @@ cargo test --manifest-path src-tauri/Cargo.toml manual_windows_microphone_to_not
 Speak the expected phrase clearly after the countdown. Optional microphone
 environment variables from the microphone transcription smoke also apply,
 including `LOCALYAPPER_MIC_SMOKE_INPUT_DEVICE` and `LOCALYAPPER_APP_DATA_DIR`.
+For a physical speaker-to-microphone setup on Windows, set
+`LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT` to the same phrase; the test plays it
+at full synthesizer volume while recording is active.
 
 This is the narrowest repeatable Windows signoff for microphone capture -> VAD
 -> local STT -> external-app injection. It still requires a real human speaker
