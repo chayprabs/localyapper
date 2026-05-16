@@ -306,6 +306,9 @@ mod manual_tests {
     use std::thread;
     use std::time::Duration;
 
+    const MIN_CAPTURE_RATIO_NUMERATOR: u64 = 4;
+    const MIN_CAPTURE_RATIO_DENOMINATOR: u64 = 5;
+
     fn env_u64(key: &str, default: u64) -> Result<u64, String> {
         match std::env::var(key) {
             Ok(value) => value
@@ -313,6 +316,17 @@ mod manual_tests {
                 .map_err(|_| format!("{key} must be a positive integer, got {value:?}")),
             Err(_) => Ok(default),
         }
+    }
+
+    fn env_bool(key: &str) -> bool {
+        std::env::var(key)
+            .map(|value| {
+                let value = value.trim();
+                value.eq_ignore_ascii_case("1")
+                    || value.eq_ignore_ascii_case("true")
+                    || value.eq_ignore_ascii_case("yes")
+            })
+            .unwrap_or(false)
     }
 
     fn default_app_data_dir() -> Result<PathBuf, String> {
@@ -397,6 +411,7 @@ mod manual_tests {
     fn manual_microphone_transcription_smoke() -> Result<(), String> {
         let countdown_secs = env_u64("LOCALYAPPER_MIC_SMOKE_COUNTDOWN_SECS", 3)?;
         let record_secs = env_u64("LOCALYAPPER_MIC_SMOKE_RECORD_SECS", 5)?;
+        let wait_for_enter = env_bool("LOCALYAPPER_MIC_SMOKE_WAIT_FOR_ENTER");
         if record_secs == 0 {
             return Err("LOCALYAPPER_MIC_SMOKE_RECORD_SECS must be greater than 0".to_string());
         }
@@ -433,6 +448,14 @@ mod manual_tests {
         println!("Recording for {record_secs}s after a {countdown_secs}s countdown.");
         println!("Speak a short sentence while recording is active.");
 
+        if wait_for_enter {
+            println!("Press Enter when ready to start the countdown.");
+            let mut line = String::new();
+            std::io::stdin()
+                .read_line(&mut line)
+                .map_err(|e| format!("Failed to read Enter confirmation: {e}"))?;
+        }
+
         for remaining in (1..=countdown_secs).rev() {
             println!("Recording starts in {remaining}...");
             thread::sleep(Duration::from_secs(1));
@@ -453,10 +476,14 @@ mod manual_tests {
             .fold(0.0_f32, |max, sample| max.max(sample.abs()));
         println!("Captured audio RMS: {rms:.6}, peak: {peak:.6}");
 
-        if audio.len() < SAMPLE_RATE as usize {
+        let min_expected_samples = (u64::from(SAMPLE_RATE)
+            .saturating_mul(record_secs)
+            .saturating_mul(MIN_CAPTURE_RATIO_NUMERATOR)
+            / MIN_CAPTURE_RATIO_DENOMINATOR) as usize;
+        if audio.len() < min_expected_samples {
             return Err(format!(
-                "Captured too little audio: {} samples at 16 kHz",
-                audio.len()
+                "Captured too little audio: {} samples at 16 kHz; expected at least {min_expected_samples}",
+                audio.len(),
             ));
         }
 

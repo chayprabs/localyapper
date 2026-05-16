@@ -117,9 +117,9 @@ Results:
   microphone capture or the full hotkey-driven dictation flow.
 - Ignored microphone transcription smoke: added for manual execution with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_microphone_transcription_smoke -- --ignored --nocapture`.
-  It supports configurable timing, an optional Windows TTS prompt for
-  speaker-to-microphone setups, and prints the selected input device, native
-  capture format, RMS, and peak level.
+  It supports configurable timing, optional wait-for-Enter start, an optional
+  Windows TTS prompt for speaker-to-microphone setups, and prints the selected
+  input device, native capture format, RMS, and peak level.
 - Ignored Windows synthetic speech-file smoke: passed locally with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_tts_file_transcription_smoke -- --ignored --nocapture`.
 - Frontend production build: passed.

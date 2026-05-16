@@ -117,6 +117,8 @@ Optional environment variables:
 
 - `LOCALYAPPER_MIC_SMOKE_COUNTDOWN_SECS`: countdown before recording starts.
 - `LOCALYAPPER_MIC_SMOKE_RECORD_SECS`: recording duration in seconds.
+- `LOCALYAPPER_MIC_SMOKE_WAIT_FOR_ENTER`: set to `true` to wait for Enter
+  before starting the countdown.
 - `LOCALYAPPER_APP_DATA_DIR`: app data directory containing the `models` folder
   if it is not in the platform default location.
 - `LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT`: Windows-only optional spoken prompt

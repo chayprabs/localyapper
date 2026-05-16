@@ -101,7 +101,7 @@ but it does not justify adding LLM features back into this release.
 | Git ignore policy | `.gitignore` excludes local agent files, ignored progress/PRD/source docs, cloud state, secrets, databases, models, build output, and release artifacts; no tracked file currently matches ignore rules. | Pass |
 | Manual desktop QA | `docs/MANUAL_QA.md` defines the remaining real microphone, overlay, hotkey, model, and external-app injection validation steps. | Checklist ready; not yet executed |
 | Windows external-app injection smoke | Ignored test `manual_windows_notepad_injection_smoke` launches Notepad, uses the real injector, verifies saved pasted text, and checks clipboard restoration. | Passed in the interactive Windows desktop session; still not a substitute for full spoken dictation QA |
-| Microphone transcription smoke | Ignored test `manual_microphone_transcription_smoke` records from the default microphone after a configurable countdown, can optionally play a Windows speech prompt, prints input device/config plus RMS/peak diagnostics, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Added; requires human speaker or speaker-to-mic setup to execute |
+| Microphone transcription smoke | Ignored test `manual_microphone_transcription_smoke` records from the default microphone after a configurable countdown, can optionally wait for Enter, can optionally play a Windows speech prompt, prints input device/config plus RMS/peak diagnostics, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Added; requires human speaker or speaker-to-mic setup to execute |
 | Windows synthetic speech STT smoke | Ignored test `manual_windows_tts_file_transcription_smoke` generates a Windows SAPI WAV, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Passed locally on Windows |
 
 ## Findings To Fix Before Release
@@ -370,8 +370,9 @@ current speech-only release unless product direction changes.
     a completed transcript.
 32. Added a visible overlay error state for pipeline failures that occur before
     transcript text is available.
-33. Added default input device, capture-format, RMS, and peak diagnostics to
-    the ignored microphone transcription smoke test.
+33. Added wait-for-Enter support plus default input device, capture-format,
+    RMS, and peak diagnostics to the ignored microphone transcription smoke
+    test.
 
 Windows NSIS and Linux AppImage bundling were verified locally earlier in the
 release run. GitHub Actions run `25956466390` for checkpoint `ecd543a`
