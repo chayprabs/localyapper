@@ -52,6 +52,23 @@ impl AudioRecorder {
 
     /// Start recording from the default microphone.
     pub fn start(&self) -> Result<(), LocalYapperError> {
+        let host = cpal::default_host();
+        let device = host.default_input_device().ok_or_else(|| {
+            LocalYapperError::AudioError(
+                "No microphone found. Please connect a microphone and try again.".to_string(),
+            )
+        })?;
+
+        self.start_with_device(device)
+    }
+
+    /// Start recording from a specific input device. Used by manual desktop tests.
+    #[cfg(test)]
+    pub fn start_for_device(&self, device: cpal::Device) -> Result<(), LocalYapperError> {
+        self.start_with_device(device)
+    }
+
+    fn start_with_device(&self, device: cpal::Device) -> Result<(), LocalYapperError> {
         let current = self.state.load(Ordering::SeqCst);
         if current != STATE_IDLE {
             return Err(LocalYapperError::AudioError(
@@ -65,13 +82,6 @@ impl AudioRecorder {
         if let Ok(mut buf) = self.buffer.lock() {
             buf.clear();
         }
-
-        let host = cpal::default_host();
-        let device = host.default_input_device().ok_or_else(|| {
-            LocalYapperError::AudioError(
-                "No microphone found. Please connect a microphone and try again.".to_string(),
-            )
-        })?;
 
         // Use the device's default config (most compatible), then resample to 16kHz mono
         let default_config = device.default_input_config().map_err(|e| {
@@ -354,6 +364,72 @@ mod manual_tests {
             .unwrap_or_default()
     }
 
+    fn input_device_name(device: &cpal::Device) -> String {
+        device
+            .name()
+            .unwrap_or_else(|e| format!("unknown device name ({e})"))
+    }
+
+    fn input_device_config_summary(device: &cpal::Device) -> String {
+        match device.default_input_config() {
+            Ok(config) => format!(
+                "{} Hz, {} channel(s), {:?}",
+                config.sample_rate().0,
+                config.channels(),
+                config.sample_format()
+            ),
+            Err(e) => format!("config unavailable: {e}"),
+        }
+    }
+
+    fn print_available_input_devices(host: &cpal::Host) -> Result<(), String> {
+        println!("Available input devices:");
+        let mut found = false;
+        let devices = host
+            .input_devices()
+            .map_err(|e| format!("Failed to enumerate input devices: {e}"))?;
+
+        for (index, device) in devices.enumerate() {
+            found = true;
+            println!(
+                "  {index}: {} ({})",
+                input_device_name(&device),
+                input_device_config_summary(&device)
+            );
+        }
+
+        if !found {
+            println!("  none");
+        }
+
+        Ok(())
+    }
+
+    fn selected_input_device(host: &cpal::Host) -> Result<cpal::Device, String> {
+        match std::env::var("LOCALYAPPER_MIC_SMOKE_INPUT_DEVICE") {
+            Ok(requested) if !requested.trim().is_empty() => {
+                let requested = requested.trim().to_ascii_lowercase();
+                let devices = host
+                    .input_devices()
+                    .map_err(|e| format!("Failed to enumerate input devices: {e}"))?;
+
+                for device in devices {
+                    let name = input_device_name(&device);
+                    if name.to_ascii_lowercase().contains(&requested) {
+                        return Ok(device);
+                    }
+                }
+
+                Err(format!(
+                    "No input device matched LOCALYAPPER_MIC_SMOKE_INPUT_DEVICE={requested:?}"
+                ))
+            }
+            _ => host.default_input_device().ok_or_else(|| {
+                "No microphone found. Please connect a microphone and try again.".to_string()
+            }),
+        }
+    }
+
     fn missing_expected_words(expected_words: &[String], transcript: &str) -> Vec<String> {
         let transcript_words = normalized_words(transcript);
         expected_words
@@ -472,28 +548,13 @@ mod manual_tests {
         let vad_path = models_dir.join(SILERO_VAD_FILENAME);
 
         let host = cpal::default_host();
-        match host.default_input_device() {
-            Some(device) => {
-                let device_name = match device.name() {
-                    Ok(name) => name,
-                    Err(e) => format!("unknown device name ({e})"),
-                };
-                match device.default_input_config() {
-                    Ok(config) => {
-                        println!(
-                            "Default input device: {device_name} ({} Hz, {} channel(s), {:?})",
-                            config.sample_rate().0,
-                            config.channels(),
-                            config.sample_format()
-                        );
-                    }
-                    Err(e) => {
-                        println!("Default input device: {device_name} (config unavailable: {e})");
-                    }
-                }
-            }
-            None => println!("Default input device: none"),
-        }
+        print_available_input_devices(&host)?;
+        let input_device = selected_input_device(&host)?;
+        println!(
+            "Selected input device: {} ({})",
+            input_device_name(&input_device),
+            input_device_config_summary(&input_device)
+        );
         println!("Using speech model: {}", speech_model_dir.display());
         println!("Recording for {record_secs}s after a {countdown_secs}s countdown.");
         println!("Speak a short sentence while recording is active.");
@@ -515,7 +576,9 @@ mod manual_tests {
         }
 
         let recorder = AudioRecorder::new();
-        recorder.start().map_err(|e| e.to_string())?;
+        recorder
+            .start_for_device(input_device)
+            .map_err(|e| e.to_string())?;
         println!("Recording now.");
         if play_optional_speech_prompt()? {
             println!("Windows speech prompt completed.");

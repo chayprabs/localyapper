@@ -133,6 +133,8 @@ Optional environment variables:
 - `LOCALYAPPER_MIC_SMOKE_RECORD_SECS`: recording duration in seconds.
 - `LOCALYAPPER_MIC_SMOKE_WAIT_FOR_ENTER`: set to `true` to wait for Enter
   before starting the countdown.
+- `LOCALYAPPER_MIC_SMOKE_INPUT_DEVICE`: optional case-insensitive substring of
+  the input device name to record from instead of the OS default.
 - `LOCALYAPPER_MIC_SMOKE_EXPECTED_WORDS`: optional phrase whose normalized
   words must all appear in the transcript.
 - `LOCALYAPPER_APP_DATA_DIR`: app data directory containing the `models` folder
