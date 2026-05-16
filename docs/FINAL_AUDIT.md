@@ -428,6 +428,11 @@ Strict physical speaker-to-microphone attempts using the Windows speech prompt
 failed on both available inputs because captured audio was too quiet for VAD:
 the built-in microphone array reached RMS `0.000237` / peak `0.013403`, and
 the USB condenser microphone reached RMS `0.000868` / peak `0.039918`.
+Windows output volume was already `100%` and unmuted during follow-up testing,
+so this was not caused by low system volume. Longer repeated prompts through
+the USB condenser reached STT with RMS up to `0.005834` / peak `0.117552`, but
+expected-word validation still failed because transcripts were distorted, for
+example `Hello world visits a microbone test`.
 The synthetic Windows speech-file smoke validates VAD plus STT against
 generated spoken audio, and the generated speech to Notepad smoke validates the
 same generated-speech transcript through the real Notepad injector and passed
