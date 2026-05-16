@@ -329,6 +329,55 @@ mod manual_tests {
             .unwrap_or(false)
     }
 
+    fn normalized_words(text: &str) -> Vec<String> {
+        let mut words = Vec::new();
+        let mut current = String::new();
+
+        for ch in text.chars() {
+            if ch.is_ascii_alphanumeric() {
+                current.push(ch.to_ascii_lowercase());
+            } else if !current.is_empty() {
+                words.push(std::mem::take(&mut current));
+            }
+        }
+
+        if !current.is_empty() {
+            words.push(current);
+        }
+
+        words
+    }
+
+    fn expected_transcript_words() -> Vec<String> {
+        std::env::var("LOCALYAPPER_MIC_SMOKE_EXPECTED_WORDS")
+            .map(|value| normalized_words(&value))
+            .unwrap_or_default()
+    }
+
+    fn missing_expected_words(expected_words: &[String], transcript: &str) -> Vec<String> {
+        let transcript_words = normalized_words(transcript);
+        expected_words
+            .iter()
+            .filter(|word| {
+                !transcript_words
+                    .iter()
+                    .any(|transcript_word| transcript_word == *word)
+            })
+            .cloned()
+            .collect()
+    }
+
+    #[test]
+    fn expected_word_validation_normalizes_transcript() {
+        let expected_words = normalized_words("Local yapper release smoke");
+
+        assert!(missing_expected_words(&expected_words, "local, Yapper release smoke.").is_empty());
+        assert_eq!(
+            missing_expected_words(&expected_words, "local release"),
+            vec!["yapper".to_string(), "smoke".to_string()]
+        );
+    }
+
     fn default_app_data_dir() -> Result<PathBuf, String> {
         if let Ok(path) = std::env::var("LOCALYAPPER_APP_DATA_DIR") {
             return Ok(PathBuf::from(path));
@@ -412,6 +461,7 @@ mod manual_tests {
         let countdown_secs = env_u64("LOCALYAPPER_MIC_SMOKE_COUNTDOWN_SECS", 3)?;
         let record_secs = env_u64("LOCALYAPPER_MIC_SMOKE_RECORD_SECS", 5)?;
         let wait_for_enter = env_bool("LOCALYAPPER_MIC_SMOKE_WAIT_FOR_ENTER");
+        let expected_words = expected_transcript_words();
         if record_secs == 0 {
             return Err("LOCALYAPPER_MIC_SMOKE_RECORD_SECS must be greater than 0".to_string());
         }
@@ -447,6 +497,9 @@ mod manual_tests {
         println!("Using speech model: {}", speech_model_dir.display());
         println!("Recording for {record_secs}s after a {countdown_secs}s countdown.");
         println!("Speak a short sentence while recording is active.");
+        if !expected_words.is_empty() {
+            println!("Expected transcript word(s): {}", expected_words.join(", "));
+        }
 
         if wait_for_enter {
             println!("Press Enter when ready to start the countdown.");
@@ -507,6 +560,15 @@ mod manual_tests {
         println!("Transcript: {text}");
         if text.trim().is_empty() {
             return Err("STT returned an empty transcript".to_string());
+        }
+        if !expected_words.is_empty() {
+            let missing_words = missing_expected_words(&expected_words, &text);
+            if !missing_words.is_empty() {
+                return Err(format!(
+                    "Transcript did not contain expected word(s): {}. Transcript was: {text:?}",
+                    missing_words.join(", ")
+                ));
+            }
         }
 
         Ok(())

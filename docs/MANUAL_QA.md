@@ -113,12 +113,28 @@ The test prints the selected default input device, native capture format,
 captured sample count, RMS, and peak level to help diagnose wrong-device or
 too-quiet-input failures.
 
+For release signoff, use expected words so a tiny false-positive transcript
+cannot pass the smoke:
+
+```powershell
+$env:LOCALYAPPER_MIC_SMOKE_WAIT_FOR_ENTER='true'
+$env:LOCALYAPPER_MIC_SMOKE_RECORD_SECS='7'
+$env:LOCALYAPPER_MIC_SMOKE_EXPECTED_WORDS='local yapper microphone release smoke'
+cargo test --manifest-path src-tauri/Cargo.toml manual_microphone_transcription_smoke -- --ignored --nocapture
+```
+
+Speak the expected phrase clearly after the countdown. The test normalizes
+punctuation and case, then requires every expected word to appear in the
+transcript.
+
 Optional environment variables:
 
 - `LOCALYAPPER_MIC_SMOKE_COUNTDOWN_SECS`: countdown before recording starts.
 - `LOCALYAPPER_MIC_SMOKE_RECORD_SECS`: recording duration in seconds.
 - `LOCALYAPPER_MIC_SMOKE_WAIT_FOR_ENTER`: set to `true` to wait for Enter
   before starting the countdown.
+- `LOCALYAPPER_MIC_SMOKE_EXPECTED_WORDS`: optional phrase whose normalized
+  words must all appear in the transcript.
 - `LOCALYAPPER_APP_DATA_DIR`: app data directory containing the `models` folder
   if it is not in the platform default location.
 - `LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT`: Windows-only optional spoken prompt
