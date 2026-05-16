@@ -106,6 +106,7 @@ but it does not justify adding LLM features back into this release.
 | Windows external-app injection smoke | Ignored test `manual_windows_notepad_injection_smoke` launches Notepad, uses the real injector, verifies saved pasted text, and checks clipboard restoration. | Passed in the interactive Windows desktop session; still not a substitute for full spoken dictation QA |
 | Microphone transcription smoke | Ignored test `manual_microphone_transcription_smoke` records from the default microphone after a configurable countdown, can optionally wait for Enter, can optionally require expected transcript words, can optionally play a Windows speech prompt, prints input device/config plus RMS/peak diagnostics, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Added; requires human speaker or speaker-to-mic setup to execute |
 | Windows synthetic speech STT smoke | Ignored test `manual_windows_tts_file_transcription_smoke` generates a Windows SAPI WAV, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Passed locally on Windows |
+| Windows generated speech to Notepad smoke | Ignored test `manual_windows_tts_to_notepad_pipeline_smoke` generates Windows SAPI speech, runs VAD and STT, injects the transcript into Notepad with the real injector, saves the file, and verifies clipboard restoration. | Passed locally on Windows; still not a substitute for real microphone QA |
 
 ## Findings To Fix Before Release
 
@@ -380,6 +381,9 @@ current speech-only release unless product direction changes.
     and stale speech model normalization.
 35. Added history/query tests for paging, dashboard statistics, missing-entry
     deletion errors, and clear-all behavior.
+36. Added and ran a Windows generated speech to Notepad smoke that chains generated
+    speech, VAD, local STT, clipboard injection, file save, and clipboard
+    restoration in one interactive check.
 
 Windows NSIS and Linux AppImage bundling were verified locally earlier in the
 release run. GitHub Actions run `25960350839` for checkpoint `ea0ba6d`
@@ -396,7 +400,7 @@ The most recent local source gates at audit time passed with:
 - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
 - `cargo test --manifest-path src-tauri/Cargo.toml`
 
-The most recent local Rust test run passed 35 tests with 3 ignored manual desktop
+The most recent local Rust test run passed 35 tests with 4 ignored manual desktop
 smokes. A controlled `npm run tauri dev` smoke reached Vite on port 1420,
 compiled Rust, launched `target\debug\localyapper.exe`, and began loading the
 Parakeet speech model before the test process was stopped. The ignored Windows
@@ -413,4 +417,6 @@ fragment and was not accepted as release-completing evidence. The real mic plus
 STT path still needs a hands-on spoken pass using
 `LOCALYAPPER_MIC_SMOKE_EXPECTED_WORDS` or the full manual dictation checklist.
 The synthetic Windows speech-file smoke validates VAD plus STT against
-generated spoken audio, but it does not validate OS microphone capture.
+generated spoken audio, and the generated speech to Notepad smoke validates the
+same generated-speech transcript through the real Notepad injector and passed
+locally, but neither validates OS microphone capture.

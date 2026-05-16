@@ -125,6 +125,11 @@ Results:
   capture format, RMS, and peak level.
 - Ignored Windows synthetic speech-file smoke: passed locally with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_tts_file_transcription_smoke -- --ignored --nocapture`.
+- Ignored Windows generated speech to Notepad smoke: available with
+  `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_tts_to_notepad_pipeline_smoke -- --ignored --nocapture`.
+  It chains generated speech, VAD, local STT, real Notepad injection, file
+  save, and clipboard restoration in one interactive check. It passed locally
+  on Windows.
 - Frontend production build: passed.
 - Tauri release build on Windows: passed.
 - Windows artifact produced:
@@ -138,7 +143,7 @@ Results:
   ESLint, TypeScript, Rust clippy with `--all-targets -- -D warnings`, Rust
   tests, controlled `npm run tauri dev` launch smoke, and generated speech STT
   smoke validation.
-- The most recent local Rust test run passed 35 tests with 3 ignored manual
+- The most recent local Rust test run passed 35 tests with 4 ignored manual
   desktop smokes.
 - Fresh database setup tests cover current default settings, legacy feature
   cleanup, and stale speech model normalization.

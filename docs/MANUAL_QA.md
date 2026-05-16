@@ -158,6 +158,24 @@ Optional environment variable:
 This validates VAD plus local STT with generated speech audio, but it does not
 replace the real microphone capture pass.
 
+## Optional Windows Generated Speech To Notepad Smoke
+
+This ignored Windows-only test generates a 16 kHz mono WAV with Windows SAPI,
+runs it through VAD and the installed speech model, injects the resulting
+transcript into Notepad with the real clipboard injector, saves the Notepad
+file, and verifies clipboard restoration:
+
+```powershell
+cargo test --manifest-path src-tauri/Cargo.toml manual_windows_tts_to_notepad_pipeline_smoke -- --ignored --nocapture
+```
+
+Optional environment variable:
+
+- `LOCALYAPPER_TTS_TO_NOTEPAD_TEXT`: phrase to synthesize before STT.
+
+This validates generated speech -> VAD -> local STT -> Notepad injection, but
+it still does not replace the real microphone capture pass.
+
 ## Hotkey Pass
 
 1. Open Settings > Hotkeys.
