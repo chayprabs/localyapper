@@ -98,6 +98,7 @@ but it does not justify adding LLM features back into this release.
 | CI queue behavior | Branch workflows now cancel older in-progress runs for the same ref; tag release runs are preserved. | Pass |
 | Model download recovery | Speech model downloads validate completed temp files and replace stale incomplete destination files before rename, avoiding Windows overwrite failures. Startup and model status now report installed only when both ONNX and tokens files are valid. | Pass |
 | Hotkey registration failures | Backend hotkey updates reject empty/duplicate values, report OS registration failures, and restore previous settings if reload fails. | Pass |
+| Fresh database setup defaults | In-memory schema tests verify `setup_complete=false`, current hotkey defaults, current speech model default, removed legacy tables/settings cleanup, and stale speech model normalization. | Pass |
 | Git ignore policy | `.gitignore` excludes local agent files, ignored progress/PRD/source docs, cloud state, secrets, databases, models, build output, and release artifacts; no tracked file currently matches ignore rules. | Pass |
 | Manual desktop QA | `docs/MANUAL_QA.md` defines the remaining real microphone, overlay, hotkey, model, and external-app injection validation steps. | Checklist ready; not yet executed |
 | Windows external-app injection smoke | Ignored test `manual_windows_notepad_injection_smoke` launches Notepad, uses the real injector, verifies saved pasted text, and checks clipboard restoration. | Passed in the interactive Windows desktop session; still not a substitute for full spoken dictation QA |
@@ -373,6 +374,8 @@ current speech-only release unless product direction changes.
 33. Added wait-for-Enter support plus default input device, capture-format,
     RMS, and peak diagnostics to the ignored microphone transcription smoke
     test.
+34. Added schema tests for fresh setup defaults, removed legacy state cleanup,
+    and stale speech model normalization.
 
 Windows NSIS and Linux AppImage bundling were verified locally earlier in the
 release run. GitHub Actions run `25956466390` for checkpoint `ecd543a`
@@ -387,7 +390,7 @@ The most recent local source gates at audit time passed with:
 - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
 - `cargo test --manifest-path src-tauri/Cargo.toml`
 
-The most recent local Rust test run passed 27 tests with 3 ignored manual desktop
+The most recent local Rust test run passed 30 tests with 3 ignored manual desktop
 smokes. A controlled `npm run tauri dev` smoke reached Vite on port 1420,
 compiled Rust, launched `target\debug\localyapper.exe`, and began loading the
 Parakeet speech model before the test process was stopped. The ignored Windows

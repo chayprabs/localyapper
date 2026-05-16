@@ -137,3 +137,109 @@ fn migrate_legacy_speech_model_settings(conn: &Connection) -> Result<(), LocalYa
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::queries;
+
+    #[test]
+    fn initialize_database_seeds_current_defaults() -> Result<(), LocalYapperError> {
+        let conn = Connection::open_in_memory()?;
+
+        initialize_database(&conn)?;
+
+        assert_eq!(queries::get_setting(&conn, "setup_complete")?, "false");
+        assert_eq!(queries::get_setting(&conn, "hotkey_record")?, "F8");
+        assert_eq!(queries::get_setting(&conn, "hotkey_hands_free")?, "Ctrl+F8");
+        assert_eq!(
+            queries::get_setting(&conn, "speech_model")?,
+            "parakeet-110m"
+        );
+
+        let settings_count: i64 =
+            conn.query_row("SELECT COUNT(*) FROM settings", [], |row| row.get(0))?;
+        assert_eq!(settings_count, 10);
+
+        Ok(())
+    }
+
+    #[test]
+    fn initialize_database_removes_legacy_feature_state() -> Result<(), LocalYapperError> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(
+            "
+            CREATE TABLE corrections (id TEXT PRIMARY KEY);
+            CREATE TABLE personal_dictionary (id TEXT PRIMARY KEY);
+            CREATE TABLE settings (
+                key         TEXT PRIMARY KEY,
+                value       TEXT NOT NULL,
+                updated_at  DATETIME DEFAULT (datetime('now'))
+            );
+            INSERT INTO settings (key, value) VALUES
+                ('confidence_threshold', '0.8'),
+                ('training_paragraph_index', '4'),
+                ('auto_inject_delay_ms', '10000'),
+                ('language', 'en');
+            ",
+        )?;
+
+        initialize_database(&conn)?;
+
+        let corrections_exists: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'corrections'",
+            [],
+            |row| row.get(0),
+        )?;
+        let dictionary_exists: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'personal_dictionary'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(corrections_exists, 0);
+        assert_eq!(dictionary_exists, 0);
+
+        let stale_settings_count: i64 = conn.query_row(
+            "
+            SELECT COUNT(*) FROM settings
+            WHERE key IN (
+                'confidence_threshold',
+                'training_paragraph_index',
+                'auto_inject_delay_ms',
+                'language'
+            )
+            ",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(stale_settings_count, 0);
+        assert_eq!(queries::get_setting(&conn, "setup_complete")?, "false");
+
+        Ok(())
+    }
+
+    #[test]
+    fn initialize_database_normalizes_removed_speech_model_setting() -> Result<(), LocalYapperError>
+    {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(
+            "
+            CREATE TABLE settings (
+                key         TEXT PRIMARY KEY,
+                value       TEXT NOT NULL,
+                updated_at  DATETIME DEFAULT (datetime('now'))
+            );
+            INSERT INTO settings (key, value) VALUES ('speech_model', 'base.en');
+            ",
+        )?;
+
+        initialize_database(&conn)?;
+
+        assert_eq!(
+            queries::get_setting(&conn, "speech_model")?,
+            "parakeet-110m"
+        );
+
+        Ok(())
+    }
+}

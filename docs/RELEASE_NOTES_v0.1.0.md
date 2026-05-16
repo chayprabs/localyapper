@@ -108,7 +108,7 @@ Results:
 - TypeScript strict check: passed.
 - Rust formatting check: passed.
 - Rust clippy with `-D warnings`: passed.
-- Rust tests: 27 passed, 0 failed, 3 ignored manual desktop smokes.
+- Rust tests: 30 passed, 0 failed, 3 ignored manual desktop smokes.
 - Ignored Windows Notepad injection smoke: available with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection_smoke -- --ignored --nocapture`.
   It passed in the interactive Windows desktop session and verified clipboard
@@ -135,8 +135,10 @@ Results:
   ESLint, TypeScript, Rust clippy with `--all-targets -- -D warnings`, Rust
   tests, controlled `npm run tauri dev` launch smoke, and generated speech STT
   smoke validation.
-- The most recent local Rust test run passed 27 tests with 3 ignored manual
+- The most recent local Rust test run passed 30 tests with 3 ignored manual
   desktop smokes.
+- Fresh database setup tests cover current default settings, legacy feature
+  cleanup, and stale speech model normalization.
 - GitHub Actions artifacts uploaded:
   - `localyapper-windows-x64`
   - `localyapper-macos-aarch64`
