@@ -3,16 +3,15 @@
 Date: 2026-05-16
 Branch: main
 
-Reference code-bearing verification run: `25938753998`
-Verified code-bearing commit: `6c5e82d`
-Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
+Current verified main head: `9004ea9`
+Current verification run: `25956038398`
+Result: success for Verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
-Docs-only evidence refresh run: `25939963745`
-Docs-only evidence refresh commit: `26b1a3d`
-Completed workflow checkpoint run: `25942731189`
-Completed workflow checkpoint commit: `6e49f2e`
-Local source verification commit: `6c5e82d`
-Ignore-policy checkpoint: `aa8eb8a`
+Artifacts: `localyapper-windows-x64`, `localyapper-linux-x64`,
+`localyapper-macos-x64`, and `localyapper-macos-aarch64`.
+Earlier reference code-bearing verification run: `25938753998` for commit
+`6c5e82d`.
+Ignore-policy checkpoint: `aa8eb8a`.
 
 ## Source-Of-Truth Decision
 
@@ -92,10 +91,10 @@ but it does not justify adding LLM features back into this release.
 | Inert UI controls | History empty-state action now navigates to Hotkeys instead of being a no-op. | Pass |
 | Build docs | `docs/BUILD.md` added for Windows, macOS, and Linux build paths. | Done |
 | Release notes | `docs/RELEASE_NOTES_v0.1.0.md` added for the current release candidate. | Done |
-| Verification | lint, typecheck, fmt check, clippy, tests, frontend build, and targeted post-cleanup source gates passed after fixes. | Pass |
+| Verification | lint, typecheck, fmt check, clippy, tests, frontend build, production audit, dev-launch smoke, synthetic speech STT smoke, and GitHub Actions passed after fixes. | Pass |
 | Tauri dev launch | Hidden smoke test reached Vite, compiled Rust, started `target/debug/localyapper.exe`, loaded STT/VAD, registered hotkeys, and initialized tray. | Pass |
 | Tauri build | Windows NSIS bundle and Linux AppImage bundle passed locally. | Pass |
-| CI/CD workflow | `.github/workflows/release.yml` verified and built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts. | Pass |
+| CI/CD workflow | `.github/workflows/release.yml` run `25956038398` verified and built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts for current head `9004ea9`. | Pass |
 | CI queue behavior | Branch workflows now cancel older in-progress runs for the same ref; tag release runs are preserved. | Pass |
 | Model download recovery | Speech model downloads validate completed temp files and replace stale incomplete destination files before rename, avoiding Windows overwrite failures. Startup and model status now report installed only when both ONNX and tokens files are valid. | Pass |
 | Hotkey registration failures | Backend hotkey updates reject empty/duplicate values, report OS registration failures, and restore previous settings if reload fails. | Pass |
@@ -372,17 +371,25 @@ current speech-only release unless product direction changes.
 32. Added a visible overlay error state for pipeline failures that occur before
     transcript text is available.
 
-Windows NSIS and Linux AppImage
-bundling were verified locally. GitHub Actions run `25938753998` for
-code-bearing commit `6c5e82d` completed successfully for verify plus Windows,
-Linux, macOS Intel, and macOS Apple Silicon build jobs, and uploaded all four
-platform artifacts. The later docs-only evidence refresh commit `26b1a3d` also
-passed the full release workflow in run `25939963745`. The completed workflow
-checkpoint commit `6e49f2e` passed the full release workflow in run
-`25942731189`, including verify plus Windows, Linux, macOS Intel, and macOS
-Apple Silicon build jobs. The latest local source gates passed with 25 Rust
-tests, 3 ignored manual desktop smokes, Rust formatting, and
-`cargo clippy --all-targets -- -D warnings`.
+Windows NSIS and Linux AppImage bundling were verified locally earlier in the
+release run. GitHub Actions run `25956038398` for current head `9004ea9`
+completed successfully for Verify plus Windows, Linux, macOS Intel, and macOS
+Apple Silicon build jobs, and uploaded all four platform artifacts.
+
+The latest local source gates passed with:
+
+- `npm audit --omit=dev`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
+- `cargo test --manifest-path src-tauri/Cargo.toml`
+
+The latest local Rust test run passed 27 tests with 3 ignored manual desktop
+smokes. A controlled `npm run tauri dev` smoke reached Vite on port 1420,
+compiled Rust, launched `target\debug\localyapper.exe`, and began loading the
+Parakeet speech model before the test process was stopped. The ignored Windows
+synthetic speech-file smoke also passed on current head and produced a
+non-empty transcript through VAD plus STT.
 
 Remaining manual validation gap: a real microphone recording injected into an
 external target application still needs hands-on end-to-end QA on a desktop
