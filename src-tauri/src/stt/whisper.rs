@@ -62,6 +62,34 @@ pub fn stt_model_files(model: &str) -> Vec<(&'static str, String)> {
     }
 }
 
+/// Minimum size required before a downloaded STT file is treated as usable.
+pub fn minimum_valid_stt_model_file_size(filename: &str) -> u64 {
+    if filename == "tokens.txt" {
+        100
+    } else {
+        1_000_000
+    }
+}
+
+/// Return the valid size of a model file if it exists and is large enough.
+pub fn valid_stt_model_file_size(model_dir: &Path, filename: &str) -> Option<u64> {
+    let path = model_dir.join(filename);
+    let size = std::fs::metadata(path).ok()?.len();
+    if size > minimum_valid_stt_model_file_size(filename) {
+        Some(size)
+    } else {
+        None
+    }
+}
+
+/// True when a model directory has all files needed by the Parakeet loader.
+pub fn is_valid_stt_model_dir(model_dir: &Path) -> bool {
+    model_dir.is_dir()
+        && (valid_stt_model_file_size(model_dir, "model.int8.onnx").is_some()
+            || valid_stt_model_file_size(model_dir, "model.onnx").is_some())
+        && valid_stt_model_file_size(model_dir, "tokens.txt").is_some()
+}
+
 /// Silero VAD model download URL.
 pub const SILERO_VAD_FILENAME: &str = "silero_vad.onnx";
 pub const SILERO_VAD_URL: &str =
@@ -220,6 +248,37 @@ mod tests {
     #[test]
     fn unknown_model_returns_empty_files() {
         assert!(stt_model_files("nonexistent-model").is_empty());
+    }
+
+    #[test]
+    fn minimum_valid_model_file_size_accepts_small_token_files() {
+        assert_eq!(minimum_valid_stt_model_file_size("tokens.txt"), 100);
+        assert_eq!(minimum_valid_stt_model_file_size("model.onnx"), 1_000_000);
+    }
+
+    #[test]
+    fn speech_model_dir_requires_valid_onnx_and_tokens() {
+        let dir = std::env::temp_dir().join(format!(
+            "localyapper-model-status-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&dir).expect("test model dir");
+
+        std::fs::write(dir.join("model.onnx"), vec![0_u8; 512]).expect("tiny model");
+        std::fs::write(dir.join("tokens.txt"), vec![b'a'; 256]).expect("tokens");
+        assert!(!is_valid_stt_model_dir(&dir));
+
+        std::fs::write(
+            dir.join("model.onnx"),
+            vec![0_u8; minimum_valid_stt_model_file_size("model.onnx") as usize + 1],
+        )
+        .expect("valid model");
+        assert!(is_valid_stt_model_dir(&dir));
+
+        std::fs::remove_file(dir.join("tokens.txt")).expect("remove tokens");
+        assert!(!is_valid_stt_model_dir(&dir));
+
+        std::fs::remove_dir_all(&dir).expect("cleanup");
     }
 }
 

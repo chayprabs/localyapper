@@ -1,5 +1,4 @@
 // IPC command handlers -- speech model download, status, and lifecycle
-use std::path::Path;
 use std::sync::atomic::Ordering;
 
 use futures_util::StreamExt;
@@ -8,35 +7,6 @@ use tauri::{Emitter, Manager};
 use crate::models::{DownloadProgress, ModelsStatus, SpeechModelFileStatus};
 use crate::state::AppState;
 use crate::stt::whisper::WhisperEngine;
-
-fn minimum_valid_model_file_size(filename: &str) -> u64 {
-    if filename == "tokens.txt" {
-        100
-    } else {
-        1_000_000
-    }
-}
-
-fn model_file_size(model_dir: &Path, filename: &str) -> Option<u64> {
-    let path = model_dir.join(filename);
-    let size = std::fs::metadata(path).ok()?.len();
-    if size > minimum_valid_model_file_size(filename) {
-        Some(size)
-    } else {
-        None
-    }
-}
-
-fn valid_onnx_model_size(model_dir: &Path) -> Option<u64> {
-    model_file_size(model_dir, "model.int8.onnx")
-        .or_else(|| model_file_size(model_dir, "model.onnx"))
-}
-
-fn is_valid_speech_model_dir(model_dir: &Path) -> bool {
-    model_dir.is_dir()
-        && valid_onnx_model_size(model_dir).is_some()
-        && model_file_size(model_dir, "tokens.txt").is_some()
-}
 
 fn selected_speech_model_name(state: &AppState) -> String {
     let model = state
@@ -130,7 +100,7 @@ pub async fn download_speech_model(
 
     for (filename, url) in &model_files {
         let dest_path = model_dir.join(filename);
-        let min_size = minimum_valid_model_file_size(filename);
+        let min_size = crate::stt::whisper::minimum_valid_stt_model_file_size(filename);
 
         if dest_path.exists() {
             let size = std::fs::metadata(&dest_path).map(|m| m.len()).unwrap_or(0);
@@ -318,7 +288,7 @@ pub async fn check_speech_model_file_exists(
 
     let model_dir = models_dir.join(&dir_name);
 
-    if is_valid_speech_model_dir(&model_dir) {
+    if crate::stt::whisper::is_valid_stt_model_dir(&model_dir) {
         let total_size: u64 = std::fs::read_dir(&model_dir)
             .map(|entries| {
                 entries
@@ -374,7 +344,7 @@ pub async fn delete_speech_model(
         .map(|entries| {
             entries
                 .filter_map(|entry| entry.ok())
-                .any(|entry| is_valid_speech_model_dir(&entry.path()))
+                .any(|entry| crate::stt::whisper::is_valid_stt_model_dir(&entry.path()))
         })
         .unwrap_or(false);
 
@@ -457,41 +427,4 @@ pub async fn check_models_status(
     Ok(ModelsStatus {
         speech_model_loaded,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{is_valid_speech_model_dir, minimum_valid_model_file_size};
-    use std::fs;
-
-    #[test]
-    fn minimum_valid_model_file_size_accepts_small_token_files() {
-        assert_eq!(minimum_valid_model_file_size("tokens.txt"), 100);
-        assert_eq!(minimum_valid_model_file_size("model.onnx"), 1_000_000);
-    }
-
-    #[test]
-    fn speech_model_dir_requires_valid_onnx_and_tokens() {
-        let dir = std::env::temp_dir().join(format!(
-            "localyapper-model-status-test-{}",
-            uuid::Uuid::new_v4()
-        ));
-        fs::create_dir_all(&dir).expect("test model dir");
-
-        fs::write(dir.join("model.onnx"), vec![0_u8; 512]).expect("tiny model");
-        fs::write(dir.join("tokens.txt"), vec![b'a'; 256]).expect("tokens");
-        assert!(!is_valid_speech_model_dir(&dir));
-
-        fs::write(
-            dir.join("model.onnx"),
-            vec![0_u8; minimum_valid_model_file_size("model.onnx") as usize + 1],
-        )
-        .expect("valid model");
-        assert!(is_valid_speech_model_dir(&dir));
-
-        fs::remove_file(dir.join("tokens.txt")).expect("remove tokens");
-        assert!(!is_valid_speech_model_dir(&dir));
-
-        fs::remove_dir_all(&dir).expect("cleanup");
-    }
 }

@@ -13,7 +13,7 @@ mod tray;
 use audio::capture::AudioRecorder;
 use audio::vad::SileroVad;
 use state::AppState;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use stt::whisper::WhisperEngine;
@@ -45,19 +45,13 @@ pub(crate) fn speech_model_candidates(app: &tauri::AppHandle, model_setting: &st
     candidates
 }
 
-fn is_valid_speech_model_dir(dir: &Path) -> bool {
-    dir.is_dir()
-        && (dir.join("model.int8.onnx").exists() || dir.join("model.onnx").exists())
-        && dir.join("tokens.txt").exists()
-}
-
 pub(crate) fn resolve_speech_model_dir(
     app: &tauri::AppHandle,
     model_setting: &str,
 ) -> Option<PathBuf> {
     speech_model_candidates(app, model_setting)
         .into_iter()
-        .find(|candidate| is_valid_speech_model_dir(candidate))
+        .find(|candidate| stt::whisper::is_valid_stt_model_dir(candidate))
 }
 
 pub(crate) fn load_speech_model_from_setting(

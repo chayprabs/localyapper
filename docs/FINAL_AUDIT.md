@@ -94,7 +94,7 @@ but it does not justify adding LLM features back into this release.
 | Tauri build | Windows NSIS bundle and Linux AppImage bundle passed locally. | Pass |
 | CI/CD workflow | `.github/workflows/release.yml` verified and built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts. | Pass |
 | CI queue behavior | Branch workflows now cancel older in-progress runs for the same ref; tag release runs are preserved. | Pass |
-| Model download recovery | Speech model downloads validate completed temp files and replace stale incomplete destination files before rename, avoiding Windows overwrite failures. Model status now reports installed only when both ONNX and tokens files are valid. | Pass |
+| Model download recovery | Speech model downloads validate completed temp files and replace stale incomplete destination files before rename, avoiding Windows overwrite failures. Startup and model status now report installed only when both ONNX and tokens files are valid. | Pass |
 | Hotkey registration failures | Backend hotkey updates reject empty/duplicate values, report OS registration failures, and restore previous settings if reload fails. | Pass |
 | Git ignore policy | `.gitignore` excludes local agent files, ignored progress/PRD/source docs, cloud state, secrets, databases, models, build output, and release artifacts; no tracked file currently matches ignore rules. | Pass |
 | Manual desktop QA | `docs/MANUAL_QA.md` defines the remaining real microphone, overlay, hotkey, model, and external-app injection validation steps. | Checklist ready; not yet executed |
@@ -286,9 +286,10 @@ destination file already exists.
 
 Remediation: completed temp files are now validated for a minimum expected
 size, stale incomplete destination files are removed before rename, and
-non-file destination paths fail with a clear error. The model status command
-now uses the same minimum-file checks before reporting the speech model as
-installed, so the UI no longer treats partial ONNX-only directories as ready.
+non-file destination paths fail with a clear error. Startup model resolution and
+the model status command now share the same minimum-file checks before reporting
+the speech model as installed, so the UI and preloader no longer treat partial
+ONNX-only directories as ready.
 
 ### P2: Overlay timer authority is split
 
@@ -333,6 +334,8 @@ current speech-only release unless product direction changes.
     corrupt destination files.
 28. Hardened speech model installed-status checks so partial model directories
     without valid ONNX and token files are reported as not installed.
+29. Reused the same speech model completeness checks for startup preload,
+    on-demand load resolution, model status, and model deletion decisions.
 
 Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25938753998` for
