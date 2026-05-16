@@ -208,9 +208,13 @@ fn inject_wayland(text: &str, auto_send: bool) -> Result<(), String> {
 #[cfg(all(test, target_os = "windows"))]
 mod manual_tests {
     use super::inject;
-    use crate::audio::vad::{apply_vad, compute_rms};
-    use crate::stt::whisper::{stt_model_dir_name, WhisperEngine, DEFAULT_STT_MODEL};
+    use crate::audio::capture::{AudioRecorder, SAMPLE_RATE};
+    use crate::audio::vad::{apply_vad, compute_rms, SileroVad};
+    use crate::stt::whisper::{
+        stt_model_dir_name, WhisperEngine, DEFAULT_STT_MODEL, SILERO_VAD_FILENAME,
+    };
     use arboard::Clipboard;
+    use cpal::traits::{DeviceTrait, HostTrait};
     use enigo::{Direction, Enigo, Key, Keyboard, Settings};
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -245,6 +249,133 @@ mod manual_tests {
             let _ = self.child.kill();
             let _ = self.child.wait();
             let _ = fs::remove_file(&self.path);
+        }
+    }
+
+    const MIN_CAPTURE_RATIO_NUMERATOR: u64 = 4;
+    const MIN_CAPTURE_RATIO_DENOMINATOR: u64 = 5;
+
+    fn env_u64(key: &str, default: u64) -> Result<u64, String> {
+        match std::env::var(key) {
+            Ok(value) => value
+                .parse::<u64>()
+                .map_err(|_| format!("{key} must be a positive integer, got {value:?}")),
+            Err(_) => Ok(default),
+        }
+    }
+
+    fn env_bool(key: &str) -> bool {
+        std::env::var(key)
+            .map(|value| {
+                let value = value.trim();
+                value.eq_ignore_ascii_case("1")
+                    || value.eq_ignore_ascii_case("true")
+                    || value.eq_ignore_ascii_case("yes")
+            })
+            .unwrap_or(false)
+    }
+
+    fn normalized_words(text: &str) -> Vec<String> {
+        let mut words = Vec::new();
+        let mut current = String::new();
+
+        for ch in text.chars() {
+            if ch.is_ascii_alphanumeric() {
+                current.push(ch.to_ascii_lowercase());
+            } else if !current.is_empty() {
+                words.push(std::mem::take(&mut current));
+            }
+        }
+
+        if !current.is_empty() {
+            words.push(current);
+        }
+
+        words
+    }
+
+    fn expected_transcript_words() -> Vec<String> {
+        std::env::var("LOCALYAPPER_MIC_SMOKE_EXPECTED_WORDS")
+            .map(|value| normalized_words(&value))
+            .unwrap_or_default()
+    }
+
+    fn missing_expected_words(expected_words: &[String], transcript: &str) -> Vec<String> {
+        let transcript_words = normalized_words(transcript);
+        expected_words
+            .iter()
+            .filter(|word| {
+                !transcript_words
+                    .iter()
+                    .any(|transcript_word| transcript_word == *word)
+            })
+            .cloned()
+            .collect()
+    }
+
+    fn input_device_name(device: &cpal::Device) -> String {
+        device
+            .name()
+            .unwrap_or_else(|e| format!("unknown device name ({e})"))
+    }
+
+    fn input_device_config_summary(device: &cpal::Device) -> String {
+        match device.default_input_config() {
+            Ok(config) => format!(
+                "{} Hz, {} channel(s), {:?}",
+                config.sample_rate().0,
+                config.channels(),
+                config.sample_format()
+            ),
+            Err(e) => format!("config unavailable: {e}"),
+        }
+    }
+
+    fn print_available_input_devices(host: &cpal::Host) -> Result<(), String> {
+        println!("Available input devices:");
+        let mut found = false;
+        let devices = host
+            .input_devices()
+            .map_err(|e| format!("Failed to enumerate input devices: {e}"))?;
+
+        for (index, device) in devices.enumerate() {
+            found = true;
+            println!(
+                "  {index}: {} ({})",
+                input_device_name(&device),
+                input_device_config_summary(&device)
+            );
+        }
+
+        if !found {
+            println!("  none");
+        }
+
+        Ok(())
+    }
+
+    fn selected_input_device(host: &cpal::Host) -> Result<cpal::Device, String> {
+        match std::env::var("LOCALYAPPER_MIC_SMOKE_INPUT_DEVICE") {
+            Ok(requested) if !requested.trim().is_empty() => {
+                let requested = requested.trim().to_ascii_lowercase();
+                let devices = host
+                    .input_devices()
+                    .map_err(|e| format!("Failed to enumerate input devices: {e}"))?;
+
+                for device in devices {
+                    let name = input_device_name(&device);
+                    if name.to_ascii_lowercase().contains(&requested) {
+                        return Ok(device);
+                    }
+                }
+
+                Err(format!(
+                    "No input device matched LOCALYAPPER_MIC_SMOKE_INPUT_DEVICE={requested:?}"
+                ))
+            }
+            _ => host.default_input_device().ok_or_else(|| {
+                "No microphone found. Please connect a microphone and try again.".to_string()
+            }),
         }
     }
 
@@ -535,6 +666,108 @@ mod manual_tests {
             .map_err(|e| e.to_string())
     }
 
+    fn transcribe_microphone_input() -> Result<String, String> {
+        let countdown_secs = env_u64("LOCALYAPPER_MIC_SMOKE_COUNTDOWN_SECS", 3)?;
+        let record_secs = env_u64("LOCALYAPPER_MIC_SMOKE_RECORD_SECS", 5)?;
+        let wait_for_enter = env_bool("LOCALYAPPER_MIC_SMOKE_WAIT_FOR_ENTER");
+        let expected_words = expected_transcript_words();
+        if record_secs == 0 {
+            return Err("LOCALYAPPER_MIC_SMOKE_RECORD_SECS must be greater than 0".to_string());
+        }
+
+        let app_data_dir = default_app_data_dir()?;
+        let models_dir = app_data_dir.join("models");
+        let speech_model_dir = models_dir.join(stt_model_dir_name(DEFAULT_STT_MODEL));
+        let vad_path = models_dir.join(SILERO_VAD_FILENAME);
+
+        let host = cpal::default_host();
+        print_available_input_devices(&host)?;
+        let input_device = selected_input_device(&host)?;
+        println!(
+            "Selected input device: {} ({})",
+            input_device_name(&input_device),
+            input_device_config_summary(&input_device)
+        );
+        println!("Using speech model: {}", speech_model_dir.display());
+        println!("Recording for {record_secs}s after a {countdown_secs}s countdown.");
+        println!("Speak the expected phrase while recording is active.");
+        if !expected_words.is_empty() {
+            println!("Expected transcript word(s): {}", expected_words.join(", "));
+        }
+
+        if wait_for_enter {
+            println!("Press Enter when ready to start the countdown.");
+            let mut line = String::new();
+            std::io::stdin()
+                .read_line(&mut line)
+                .map_err(|e| format!("Failed to read Enter confirmation: {e}"))?;
+        }
+
+        for remaining in (1..=countdown_secs).rev() {
+            println!("Recording starts in {remaining}...");
+            thread::sleep(Duration::from_secs(1));
+        }
+
+        let recorder = AudioRecorder::new();
+        recorder
+            .start_for_device(input_device)
+            .map_err(|e| e.to_string())?;
+        println!("Recording now.");
+        thread::sleep(Duration::from_secs(record_secs));
+        let audio = recorder.stop().map_err(|e| e.to_string())?;
+
+        println!("Captured {} samples at 16 kHz.", audio.len());
+        let rms = compute_rms(&audio);
+        let peak = audio
+            .iter()
+            .fold(0.0_f32, |max, sample| max.max(sample.abs()));
+        println!("Captured audio RMS: {rms:.6}, peak: {peak:.6}");
+
+        let min_expected_samples = (u64::from(SAMPLE_RATE)
+            .saturating_mul(record_secs)
+            .saturating_mul(MIN_CAPTURE_RATIO_NUMERATOR)
+            / MIN_CAPTURE_RATIO_DENOMINATOR) as usize;
+        if audio.len() < min_expected_samples {
+            return Err(format!(
+                "Captured too little audio: {} samples at 16 kHz; expected at least {min_expected_samples}",
+                audio.len(),
+            ));
+        }
+
+        let silero = if vad_path.exists() {
+            Some(SileroVad::new(&vad_path).map_err(|e| e.to_string())?)
+        } else {
+            None
+        };
+        let vad_result = apply_vad(&audio, silero.as_ref());
+        if !vad_result.has_speech {
+            return Err(format!(
+                "No speech detected; rerun and speak during the recording window. Captured RMS: {rms:.6}, peak: {peak:.6}"
+            ));
+        }
+
+        let engine = WhisperEngine::new(&speech_model_dir).map_err(|e| e.to_string())?;
+        let transcript = engine
+            .transcribe(&vad_result.trimmed_audio)
+            .map_err(|e| e.to_string())?;
+
+        println!("Transcript: {transcript}");
+        if transcript.trim().is_empty() {
+            return Err("STT returned an empty transcript for microphone audio".to_string());
+        }
+        if !expected_words.is_empty() {
+            let missing_words = missing_expected_words(&expected_words, &transcript);
+            if !missing_words.is_empty() {
+                return Err(format!(
+                    "Transcript did not contain expected word(s): {}. Transcript was: {transcript:?}",
+                    missing_words.join(", ")
+                ));
+            }
+        }
+
+        Ok(transcript)
+    }
+
     #[test]
     #[ignore = "requires an interactive Windows desktop and opens Notepad"]
     fn manual_windows_notepad_injection_smoke() -> Result<(), String> {
@@ -590,6 +823,43 @@ mod manual_tests {
         let injected_text = format!("{marker}: {transcript}");
         let original_clipboard = format!("{marker} original clipboard");
         let guard = open_empty_notepad_file("localyapper-tts-to-notepad-smoke")?;
+
+        let mut clipboard = Clipboard::new().map_err(|e| format!("Clipboard init failed: {e}"))?;
+        clipboard
+            .set_text(original_clipboard.clone())
+            .map_err(|e| format!("Clipboard setup failed: {e}"))?;
+
+        inject(&injected_text, false)?;
+        thread::sleep(Duration::from_millis(200));
+        save_focused_document()?;
+        let saved_text = wait_for_file_text(&guard.path, &injected_text)?;
+
+        let restored_clipboard = clipboard
+            .get_text()
+            .map_err(|e| format!("Clipboard read failed: {e}"))?;
+        if restored_clipboard != original_clipboard {
+            return Err(format!(
+                "Clipboard was not restored. Expected {original_clipboard:?}, got {restored_clipboard:?}"
+            ));
+        }
+        if !saved_text.contains(&injected_text) {
+            return Err(format!("Saved text did not contain {injected_text:?}"));
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "requires an interactive Windows desktop, microphone, spoken audio, installed speech model files, and opens Notepad"]
+    fn manual_windows_microphone_to_notepad_pipeline_smoke() -> Result<(), String> {
+        let transcript = transcribe_microphone_input()?;
+        let marker = format!(
+            "LocalYapper microphone to Notepad smoke {}",
+            chrono::Utc::now().timestamp_millis()
+        );
+        let injected_text = format!("{marker}: {transcript}");
+        let original_clipboard = format!("{marker} original clipboard");
+        let guard = open_empty_notepad_file("localyapper-mic-to-notepad-smoke")?;
 
         let mut clipboard = Clipboard::new().map_err(|e| format!("Clipboard init failed: {e}"))?;
         clipboard

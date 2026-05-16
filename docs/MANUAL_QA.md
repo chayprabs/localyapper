@@ -178,6 +178,28 @@ Optional environment variable:
 This validates generated speech -> VAD -> local STT -> Notepad injection, but
 it still does not replace the real microphone capture pass.
 
+## Optional Windows Microphone To Notepad Smoke
+
+This ignored Windows-only test records from the selected or default microphone,
+runs VAD and the installed speech model, injects the resulting transcript into
+Notepad with the real clipboard injector, saves the Notepad file, and verifies
+clipboard restoration:
+
+```powershell
+$env:LOCALYAPPER_MIC_SMOKE_WAIT_FOR_ENTER='true'
+$env:LOCALYAPPER_MIC_SMOKE_RECORD_SECS='7'
+$env:LOCALYAPPER_MIC_SMOKE_EXPECTED_WORDS='local yapper microphone release smoke'
+cargo test --manifest-path src-tauri/Cargo.toml manual_windows_microphone_to_notepad_pipeline_smoke -- --ignored --nocapture
+```
+
+Speak the expected phrase clearly after the countdown. Optional microphone
+environment variables from the microphone transcription smoke also apply,
+including `LOCALYAPPER_MIC_SMOKE_INPUT_DEVICE` and `LOCALYAPPER_APP_DATA_DIR`.
+
+This is the narrowest repeatable Windows signoff for microphone capture -> VAD
+-> local STT -> external-app injection. It still requires a real human speaker
+or a proven physical speaker-to-microphone setup.
+
 ## Hotkey Pass
 
 1. Open Settings > Hotkeys.

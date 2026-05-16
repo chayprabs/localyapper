@@ -110,7 +110,7 @@ Results:
 - TypeScript strict check: passed.
 - Rust formatting check: passed.
 - Rust clippy with `--all-targets -- -D warnings`: passed.
-- Rust tests: 34 passed, 0 failed, 3 ignored manual desktop smokes.
+- Rust tests: 35 passed, 0 failed, 5 ignored manual desktop smokes.
 - Ignored Windows Notepad injection smoke: available with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection_smoke -- --ignored --nocapture`.
   It passed in the interactive Windows desktop session and verified clipboard
@@ -130,6 +130,11 @@ Results:
   It chains generated speech, VAD, local STT, real Notepad injection, file
   save, and clipboard restoration in one interactive check. It passed locally
   on Windows.
+- Ignored Windows microphone to Notepad smoke: available with
+  `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_microphone_to_notepad_pipeline_smoke -- --ignored --nocapture`.
+  It chains selected microphone capture, VAD, local STT, optional expected-word
+  validation, real Notepad injection, file save, and clipboard restoration in
+  one interactive check. It is the remaining human-spoken release signoff path.
 - Frontend production build: passed.
 - Tauri release build on Windows: passed.
 - Windows artifact produced:
@@ -144,7 +149,7 @@ Results:
   ESLint, TypeScript, Rust clippy with `--all-targets -- -D warnings`, Rust
   tests, controlled `npm run tauri dev` launch smoke, and generated speech STT
   smoke validation.
-- The most recent local Rust test run passed 35 tests with 4 ignored manual
+- The most recent local Rust test run passed 35 tests with 5 ignored manual
   desktop smokes.
 - Fresh database setup tests cover current default settings, legacy feature
   cleanup, and stale speech model normalization.
