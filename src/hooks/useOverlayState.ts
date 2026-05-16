@@ -124,15 +124,9 @@ export function useOverlayState() {
         if (generationRef.current !== gen) return;
         const elapsed = (Date.now() - startTime) / 1000;
         setElapsedSeconds(elapsed);
-
-        if (elapsed >= WARNING_THRESHOLD_SECONDS) {
-          const remaining = MAX_RECORDING_SECONDS - elapsed;
-          if (remaining <= 0) return;
-          transition("stopping-soon");
-        }
       }, 100);
     },
-    [transition],
+    [],
   );
 
   const startTranscribedDisplayCountdown = useCallback(
