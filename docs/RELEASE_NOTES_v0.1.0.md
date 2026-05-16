@@ -38,6 +38,8 @@ disk.
   transcription, the overlay keeps the transcript visible and copyable.
 - Dashboard and History refresh after paste-failure recovery when the transcript
   has still been saved.
+- Pipeline errors before transcript text exists, such as missing model files,
+  now show a visible overlay error instead of silently hiding the overlay.
 - Best-effort system permission checks and OS settings shortcuts for microphone
   and accessibility/injection setup.
 - Release logging uses the configured logger and does not include transcript

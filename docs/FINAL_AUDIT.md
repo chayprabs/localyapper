@@ -71,6 +71,7 @@ but it does not justify adding LLM features back into this release.
 | Clipboard save/paste/restore | `injection/injector.rs` implements save -> paste -> restore. | Implemented |
 | Injection failure shows text in overlay | Backend error events include the transcript after paste failure; the overlay keeps it visible and copyable with a paste-failed indicator. | Pass |
 | Paste-failure history refresh | Dashboard and History refresh when a paste-failure event includes saved transcript text, not only on successful injection. | Pass |
+| Pipeline errors visible | Overlay shows a visible error state for pipeline failures before transcript text is available, such as missing model files or STT load failures. | Pass |
 | Overlay five states | Current states include hidden, listening, stopping-soon, processing, long-recording, transcribed, no-speech. | Implemented with extra states |
 | Backend-only overlay timers | Current overlay uses frontend timers for elapsed, warning, processing countdown, and auto-hide. | Product mismatch |
 | First-launch onboarding | Current wizard is keyed by `settings.setup_complete`, not an onboarding table. | Implemented differently |
@@ -134,6 +135,18 @@ Remediation: injection failure events now include the transcript, and the
 overlay keeps it visible and copyable with a paste-failed indicator. Dashboard
 and History also refresh on paste-failure events with transcript text because
 the history entry is saved before injection is attempted.
+
+### P1: Pipeline errors without text were hidden - Fixed
+
+If the pipeline failed before producing text, for example because model files
+were missing or STT failed to load, the overlay transitioned to hidden with an
+error value. The user could return from a recording with no visible indication
+of what went wrong.
+
+Remediation: the overlay now has a visible `error` state for failures without
+transcript text. It shows the backend error for several seconds, while
+paste-failure errors with transcript text continue to use the copyable
+transcribed state.
 
 ### P1: Build and release documentation are missing - Fixed
 
@@ -356,6 +369,8 @@ current speech-only release unless product direction changes.
     in Settings and first-launch wizard flows.
 31. Refreshed Dashboard and History after paste-failure events that still save
     a completed transcript.
+32. Added a visible overlay error state for pipeline failures that occur before
+    transcript text is available.
 
 Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25938753998` for

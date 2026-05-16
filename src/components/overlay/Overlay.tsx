@@ -45,7 +45,10 @@ export function Overlay() {
 
   const isTranscribed = visualState === "transcribed";
   const isLong = text != null && text.length > 40;
-  const pillHeight = isTranscribed || visualState === "long-recording" ? "h-[72px]" : "h-[64px]";
+  const pillHeight =
+    isTranscribed || visualState === "long-recording" || visualState === "error"
+      ? "h-[72px]"
+      : "h-[64px]";
   const pillRadius = isTranscribed ? "rounded-[36px]" : "rounded-full";
 
   const handlePointerDown = async (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -134,6 +137,22 @@ export function Overlay() {
             <span className="text-[13px] font-medium text-black/40 tracking-tight">
               No speech detected
             </span>
+          </div>
+        )}
+
+        {visualState === "error" && (
+          <div className="flex items-center gap-3 h-full">
+            <span className="material-symbols-outlined text-[20px] text-destructive shrink-0">
+              error
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold text-destructive">
+                Dictation failed
+              </p>
+              <p className="text-[12px] font-medium text-black/65 line-clamp-2 leading-tight">
+                {error ?? "Something went wrong"}
+              </p>
+            </div>
           </div>
         )}
 

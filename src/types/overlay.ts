@@ -8,7 +8,8 @@ export type OverlayVisualState =
   | "processing"    // Pipeline running after recording stops
   | "long-recording"// Processing a recording > 30s, shows minute counter
   | "transcribed"   // Final text displayed, dismiss progress running
-  | "no-speech";    // VAD found no speech, auto-hides after 2s
+  | "no-speech"     // VAD found no speech, auto-hides after 2s
+  | "error";        // Pipeline failed before text was available
 
 export interface PipelineEvent {
   state: string;

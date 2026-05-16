@@ -291,11 +291,19 @@ export function useOverlayState() {
             break;
           }
 
-          transition("hidden", { error });
+          setProcessingCountdown(null);
+          transition("error", {
+            text: null,
+            durationMs: duration_ms,
+            wordCount: word_count,
+            error: error ?? "Something went wrong",
+          });
+          showOverlay();
           hideTimeoutRef.current = setTimeout(() => {
             if (generationRef.current !== gen) return;
+            transition("hidden");
             hideOverlay();
-          }, 1000);
+          }, 4000);
           break;
         }
       }
