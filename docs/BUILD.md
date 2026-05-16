@@ -49,7 +49,7 @@ Run these before tagging or publishing a release:
 npm run lint
 npx tsc --noEmit
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
-cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run build
 npm run tauri build

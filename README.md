@@ -156,7 +156,7 @@ Run these after changes:
 ```bash
 npm run lint
 npx tsc --noEmit
-cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 

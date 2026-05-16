@@ -96,7 +96,7 @@ Run on Windows in `C:\Users\chait\Project\localyapper`:
 npm run lint
 npx tsc --noEmit
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
-cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run build
 npm run tauri build -- --bundles nsis
@@ -107,7 +107,7 @@ Results:
 - ESLint: passed.
 - TypeScript strict check: passed.
 - Rust formatting check: passed.
-- Rust clippy with `-D warnings`: passed.
+- Rust clippy with `--all-targets -- -D warnings`: passed.
 - Rust tests: 34 passed, 0 failed, 3 ignored manual desktop smokes.
 - Ignored Windows Notepad injection smoke: available with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection_smoke -- --ignored --nocapture`.
