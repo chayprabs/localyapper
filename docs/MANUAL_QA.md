@@ -109,6 +109,9 @@ cargo test --manifest-path src-tauri/Cargo.toml manual_microphone_transcription_
 
 The default timing is a 3-second countdown followed by 5 seconds of recording.
 Speak a short sentence while the test prints `Recording now.`.
+The test prints the selected default input device, native capture format,
+captured sample count, RMS, and peak level to help diagnose wrong-device or
+too-quiet-input failures.
 
 Optional environment variables:
 

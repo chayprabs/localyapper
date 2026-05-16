@@ -406,6 +406,29 @@ mod manual_tests {
         let speech_model_dir = models_dir.join(stt_model_dir_name(DEFAULT_STT_MODEL));
         let vad_path = models_dir.join(SILERO_VAD_FILENAME);
 
+        let host = cpal::default_host();
+        match host.default_input_device() {
+            Some(device) => {
+                let device_name = match device.name() {
+                    Ok(name) => name,
+                    Err(e) => format!("unknown device name ({e})"),
+                };
+                match device.default_input_config() {
+                    Ok(config) => {
+                        println!(
+                            "Default input device: {device_name} ({} Hz, {} channel(s), {:?})",
+                            config.sample_rate().0,
+                            config.channels(),
+                            config.sample_format()
+                        );
+                    }
+                    Err(e) => {
+                        println!("Default input device: {device_name} (config unavailable: {e})");
+                    }
+                }
+            }
+            None => println!("Default input device: none"),
+        }
         println!("Using speech model: {}", speech_model_dir.display());
         println!("Recording for {record_secs}s after a {countdown_secs}s countdown.");
         println!("Speak a short sentence while recording is active.");
