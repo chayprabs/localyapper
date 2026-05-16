@@ -94,6 +94,7 @@ Run on Windows in `C:\Users\chait\Project\localyapper`:
 
 ```bash
 npm run lint
+npm audit --omit=dev
 npx tsc --noEmit
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
@@ -105,6 +106,7 @@ npm run tauri build -- --bundles nsis
 Results:
 
 - ESLint: passed.
+- Production npm audit: passed.
 - TypeScript strict check: passed.
 - Rust formatting check: passed.
 - Rust clippy with `--all-targets -- -D warnings`: passed.
