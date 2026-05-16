@@ -9,6 +9,8 @@ Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
 Latest docs-only evidence refresh run: `25939963745`
 Latest docs-only evidence refresh commit: `26b1a3d`
+Latest pushed checkpoint run: `25942731189`
+Latest pushed checkpoint commit: `6e49f2e`
 Latest local source verification commit: `6c5e82d`
 Latest repository hygiene checkpoint: `aa8eb8a`
 
@@ -316,9 +318,12 @@ bundling were verified locally. GitHub Actions run `25938753998` for
 code-bearing commit `6c5e82d` completed successfully for verify plus Windows,
 Linux, macOS Intel, and macOS Apple Silicon build jobs, and uploaded all four
 platform artifacts. The later docs-only evidence refresh commit `26b1a3d` also
-passed the full release workflow in run `25939963745`. The latest local source
-gates passed with 25 Rust tests, 3 ignored manual desktop smokes, Rust
-formatting, and `cargo clippy --all-targets -- -D warnings`.
+passed the full release workflow in run `25939963745`. The latest pushed
+checkpoint commit `6e49f2e` passed the full release workflow in run
+`25942731189`, including verify plus Windows, Linux, macOS Intel, and macOS
+Apple Silicon build jobs. The latest local source gates passed with 25 Rust
+tests, 3 ignored manual desktop smokes, Rust formatting, and
+`cargo clippy --all-targets -- -D warnings`.
 
 Remaining manual validation gap: a real microphone recording injected into an
 external target application still needs hands-on end-to-end QA on a desktop
