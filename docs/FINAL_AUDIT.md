@@ -3,15 +3,15 @@
 Date: 2026-05-16
 Branch: main
 
-Recent workflow enforcement checkpoint: `1025593`
-Recent workflow enforcement run: `25959625219`
+Reference code-bearing verification checkpoint: `ea0ba6d`
+Reference code-bearing verification run: `25960350839`
 Result: success for Verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
 Artifacts: `localyapper-windows-x64`, `localyapper-linux-x64`,
 `localyapper-macos-x64`, and `localyapper-macos-aarch64`.
-Earlier reference code-bearing verification runs include `25959323267` for
-checkpoint `747fae5`, `25956466390` for checkpoint `ecd543a`, and
-`25938753998` for commit `6c5e82d`.
+Earlier reference code-bearing verification runs include `25959625219` for
+checkpoint `1025593`, `25959323267` for checkpoint `747fae5`, `25956466390`
+for checkpoint `ecd543a`, and `25938753998` for commit `6c5e82d`.
 Ignore-policy checkpoint: `aa8eb8a`.
 
 ## Source-Of-Truth Decision
@@ -96,7 +96,7 @@ but it does not justify adding LLM features back into this release.
 | Verification | lint, production audit, typecheck, fmt check, all-targets clippy, tests, frontend build, dev-launch smoke, synthetic speech STT smoke, and GitHub Actions passed after fixes. | Pass |
 | Tauri dev launch | Hidden smoke test reached Vite, compiled Rust, started `target/debug/localyapper.exe`, loaded STT/VAD, registered hotkeys, and initialized tray. | Pass |
 | Tauri build | Windows NSIS bundle and Linux AppImage bundle passed locally. | Pass |
-| CI/CD workflow | `.github/workflows/release.yml` run `25959625219` enforced production audit and all-targets clippy, then built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts for checkpoint `1025593`. | Pass |
+| CI/CD workflow | `.github/workflows/release.yml` run `25960350839` enforced production audit and all-targets clippy, then built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts for checkpoint `ea0ba6d`. | Pass |
 | CI queue behavior | Branch workflows now cancel older in-progress runs for the same ref; tag release runs are preserved. | Pass |
 | Model download recovery | Speech model downloads validate completed temp files and replace stale incomplete destination files before rename, avoiding Windows overwrite failures. Startup and model status now report installed only when both ONNX and tokens files are valid. | Pass |
 | Hotkey registration failures | Backend hotkey updates reject empty/duplicate values, report OS registration failures, and restore previous settings if reload fails. | Pass |
@@ -382,7 +382,7 @@ current speech-only release unless product direction changes.
     deletion errors, and clear-all behavior.
 
 Windows NSIS and Linux AppImage bundling were verified locally earlier in the
-release run. GitHub Actions run `25959625219` for checkpoint `1025593`
+release run. GitHub Actions run `25960350839` for checkpoint `ea0ba6d`
 completed successfully for Verify plus Windows, Linux, macOS Intel, and macOS
 Apple Silicon build jobs, and uploaded all four platform artifacts. That Verify
 job includes `npm audit --omit=dev` and
@@ -396,7 +396,7 @@ The most recent local source gates at audit time passed with:
 - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
 - `cargo test --manifest-path src-tauri/Cargo.toml`
 
-The most recent local Rust test run passed 34 tests with 3 ignored manual desktop
+The most recent local Rust test run passed 35 tests with 3 ignored manual desktop
 smokes. A controlled `npm run tauri dev` smoke reached Vite on port 1420,
 compiled Rust, launched `target\debug\localyapper.exe`, and began loading the
 Parakeet speech model before the test process was stopped. The ignored Windows
