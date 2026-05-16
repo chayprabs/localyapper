@@ -89,6 +89,7 @@ but it does not justify adding LLM features back into this release.
 | User-visible errors | Dashboard, History, Hotkeys, Speech, and Wizard setup actions now surface operation failures inline instead of only logging to DevTools. | Pass |
 | Post-download recovery UI | Speech model download flows distinguish file download failure from successful download followed by engine-start failure. | Pass |
 | Inert UI controls | History empty-state action now navigates to Hotkeys instead of being a no-op. | Pass |
+| History and dashboard data queries | In-memory query tests verify reverse-chronological history paging, stats aggregation, delete-not-found errors, and clear-all behavior. | Pass |
 | Build docs | `docs/BUILD.md` added for Windows, macOS, and Linux build paths. | Done |
 | Release notes | `docs/RELEASE_NOTES_v0.1.0.md` added for the current release candidate. | Done |
 | Verification | lint, typecheck, fmt check, clippy, tests, frontend build, production audit, dev-launch smoke, synthetic speech STT smoke, and GitHub Actions passed after fixes. | Pass |
@@ -376,6 +377,8 @@ current speech-only release unless product direction changes.
     test.
 34. Added schema tests for fresh setup defaults, removed legacy state cleanup,
     and stale speech model normalization.
+35. Added history/query tests for paging, dashboard statistics, missing-entry
+    deletion errors, and clear-all behavior.
 
 Windows NSIS and Linux AppImage bundling were verified locally earlier in the
 release run. GitHub Actions run `25956466390` for checkpoint `ecd543a`
@@ -390,7 +393,7 @@ The most recent local source gates at audit time passed with:
 - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
 - `cargo test --manifest-path src-tauri/Cargo.toml`
 
-The most recent local Rust test run passed 30 tests with 3 ignored manual desktop
+The most recent local Rust test run passed 34 tests with 3 ignored manual desktop
 smokes. A controlled `npm run tauri dev` smoke reached Vite on port 1420,
 compiled Rust, launched `target\debug\localyapper.exe`, and began loading the
 Parakeet speech model before the test process was stopped. The ignored Windows
