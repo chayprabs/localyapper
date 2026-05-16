@@ -125,14 +125,15 @@ Results:
   `src-tauri/target/release/localyapper.exe`
 - Windows NSIS installer build: passed.
 - Linux AppImage build in WSL: passed.
-- GitHub Actions release workflow: passed on current head `9004ea9` in run
-  `25956038398`, including Verify, Windows, Linux, macOS Intel, and macOS Apple
+- GitHub Actions release workflow: passed for checkpoint `ecd543a` in run
+  `25956466390`, including Verify, Windows, Linux, macOS Intel, and macOS Apple
   Silicon jobs.
-- Current local gates passed: `npm audit --omit=dev`, ESLint, TypeScript,
-  Rust clippy with `--all-targets -- -D warnings`, Rust tests, controlled
-  `npm run tauri dev` launch smoke, and generated speech STT smoke validation.
-- The current local Rust test run passed 27 tests with 3 ignored manual desktop
-  smokes.
+- Most recent local gates at release-note time passed: `npm audit --omit=dev`,
+  ESLint, TypeScript, Rust clippy with `--all-targets -- -D warnings`, Rust
+  tests, controlled `npm run tauri dev` launch smoke, and generated speech STT
+  smoke validation.
+- The most recent local Rust test run passed 27 tests with 3 ignored manual
+  desktop smokes.
 - GitHub Actions artifacts uploaded:
   - `localyapper-windows-x64`
   - `localyapper-macos-aarch64`

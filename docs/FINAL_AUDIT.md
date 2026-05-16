@@ -3,8 +3,8 @@
 Date: 2026-05-16
 Branch: main
 
-Current verified main head: `9004ea9`
-Current verification run: `25956038398`
+Recent verification checkpoint: `ecd543a`
+Recent verification run: `25956466390`
 Result: success for Verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
 Artifacts: `localyapper-windows-x64`, `localyapper-linux-x64`,
@@ -94,7 +94,7 @@ but it does not justify adding LLM features back into this release.
 | Verification | lint, typecheck, fmt check, clippy, tests, frontend build, production audit, dev-launch smoke, synthetic speech STT smoke, and GitHub Actions passed after fixes. | Pass |
 | Tauri dev launch | Hidden smoke test reached Vite, compiled Rust, started `target/debug/localyapper.exe`, loaded STT/VAD, registered hotkeys, and initialized tray. | Pass |
 | Tauri build | Windows NSIS bundle and Linux AppImage bundle passed locally. | Pass |
-| CI/CD workflow | `.github/workflows/release.yml` run `25956038398` verified and built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts for current head `9004ea9`. | Pass |
+| CI/CD workflow | `.github/workflows/release.yml` run `25956466390` verified and built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts for checkpoint `ecd543a`. | Pass |
 | CI queue behavior | Branch workflows now cancel older in-progress runs for the same ref; tag release runs are preserved. | Pass |
 | Model download recovery | Speech model downloads validate completed temp files and replace stale incomplete destination files before rename, avoiding Windows overwrite failures. Startup and model status now report installed only when both ONNX and tokens files are valid. | Pass |
 | Hotkey registration failures | Backend hotkey updates reject empty/duplicate values, report OS registration failures, and restore previous settings if reload fails. | Pass |
@@ -372,11 +372,11 @@ current speech-only release unless product direction changes.
     transcript text is available.
 
 Windows NSIS and Linux AppImage bundling were verified locally earlier in the
-release run. GitHub Actions run `25956038398` for current head `9004ea9`
+release run. GitHub Actions run `25956466390` for checkpoint `ecd543a`
 completed successfully for Verify plus Windows, Linux, macOS Intel, and macOS
 Apple Silicon build jobs, and uploaded all four platform artifacts.
 
-The latest local source gates passed with:
+The most recent local source gates at audit time passed with:
 
 - `npm audit --omit=dev`
 - `npm run lint`
@@ -384,11 +384,11 @@ The latest local source gates passed with:
 - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
 - `cargo test --manifest-path src-tauri/Cargo.toml`
 
-The latest local Rust test run passed 27 tests with 3 ignored manual desktop
+The most recent local Rust test run passed 27 tests with 3 ignored manual desktop
 smokes. A controlled `npm run tauri dev` smoke reached Vite on port 1420,
 compiled Rust, launched `target\debug\localyapper.exe`, and began loading the
 Parakeet speech model before the test process was stopped. The ignored Windows
-synthetic speech-file smoke also passed on current head and produced a
+synthetic speech-file smoke also passed and produced a
 non-empty transcript through VAD plus STT.
 
 Remaining manual validation gap: a real microphone recording injected into an
