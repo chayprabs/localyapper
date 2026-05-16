@@ -64,7 +64,8 @@ pub struct PermissionsStatus {
 /// Pipeline state event emitted to frontend for overlay state transitions.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PipelineEvent {
-    /// One of: "listening", "processing", "transcribed", "injected", "cancelled", "error"
+    /// Known states include "listening", "stopping-soon", "processing",
+    /// "transcribed", "injected", "no-speech", "cancelled", and "error".
     pub state: String,
     /// The transcribed/final text (populated in "transcribed" and "injected" states).
     pub text: Option<String>,

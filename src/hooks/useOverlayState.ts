@@ -191,15 +191,18 @@ export function useOverlayState() {
         }
 
         case "stopping-soon": {
+          const initialElapsed = duration_ms != null
+            ? Math.max(0, duration_ms / 1000)
+            : WARNING_THRESHOLD_SECONDS;
           setTranscribedDisplayProgress(0);
           transition("stopping-soon", {
             text: null,
             durationMs: null,
             wordCount: null,
             error: null,
-            recordingStartedAt: Date.now() - 108 * 1000,
+            recordingStartedAt: Date.now() - initialElapsed * 1000,
           });
-          startElapsedTimer(gen, 108);
+          startElapsedTimer(gen, initialElapsed);
           showOverlay();
           break;
         }

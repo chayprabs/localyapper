@@ -21,6 +21,13 @@ const MODE_HANDS_FREE: u8 = 2;
 /// State machine mode: recording stopped, pipeline is running.
 const MODE_PROCESSING: u8 = 3;
 
+/// Recording duration where the overlay should switch to the final warning state.
+const RECORDING_WARNING_SECONDS: u64 = 105;
+/// Hard cap for one recording session. The session is stopped and processed at this limit.
+const MAX_RECORDING_SECONDS: u64 = 120;
+/// How long the transcribed overlay remains visible before accepting a new recording.
+const TRANSCRIBED_OVERLAY_SECONDS: u64 = 3;
+
 /// Shared hotkey state machine tracking recording mode.
 struct HotkeyState {
     /// Current mode: idle, hold-recording, hands-free, or processing.
@@ -211,6 +218,48 @@ async fn start_recording_session(
     log::info!("AUDIO: Capture started");
     log::info!("{log_message}");
     register_cancel_hotkey(app, state.clone());
+    spawn_recording_limit_watchdog(app.clone(), state.clone(), active_mode);
+}
+
+fn spawn_recording_limit_watchdog(app: AppHandle, hotkey_state: Arc<HotkeyState>, active_mode: u8) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(RECORDING_WARNING_SECONDS)).await;
+
+        if hotkey_state.mode.load(Ordering::SeqCst) != active_mode {
+            return;
+        }
+
+        emit_pipeline_event(
+            &app,
+            "stopping-soon",
+            None,
+            Some((RECORDING_WARNING_SECONDS * 1000) as i64),
+            None,
+            None,
+        );
+
+        tokio::time::sleep(Duration::from_secs(
+            MAX_RECORDING_SECONDS - RECORDING_WARNING_SECONDS,
+        ))
+        .await;
+
+        if hotkey_state
+            .mode
+            .compare_exchange(
+                active_mode,
+                MODE_PROCESSING,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .is_err()
+        {
+            return;
+        }
+
+        log::info!("HOTKEY: Recording reached {MAX_RECORDING_SECONDS}s cap; stopping");
+        unregister_cancel_hotkey(&app);
+        run_pipeline_and_inject(app, hotkey_state).await;
+    });
 }
 
 /// Handle record hotkey pressed - start hold-to-talk recording.
@@ -456,9 +505,9 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
         }
     }
 
-    // 9. Wait for transcribed overlay to dismiss (3s), then return to idle.
+    // 9. Wait for transcribed overlay to dismiss, then return to idle.
     // Keeps MODE_PROCESSING active so new recordings are blocked during display.
-    tokio::time::sleep(Duration::from_secs(3)).await;
+    tokio::time::sleep(Duration::from_secs(TRANSCRIBED_OVERLAY_SECONDS)).await;
     hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
 }
 
@@ -550,8 +599,8 @@ fn emit_pipeline_event(
 
     // Update tray tooltip to reflect pipeline state
     let tooltip = match state {
-        "listening" => "LocalYapper \u{2014} Recording...",
-        "processing" => "LocalYapper \u{2014} Processing...",
+        "listening" | "stopping-soon" => "LocalYapper \u{2014} Recording...",
+        "processing" | "long-recording" => "LocalYapper \u{2014} Processing...",
         _ => "LocalYapper",
     };
     crate::tray::update_tray_tooltip(app, tooltip);

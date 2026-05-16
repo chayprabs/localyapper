@@ -66,8 +66,8 @@ but it does not justify adding LLM features back into this release.
 | Hotkey hold-to-record | `hotkey/manager.rs` handles press/release. | Implemented |
 | Hands-free mode | Implemented as `Ctrl+F8` toggle, not double-tap same hotkey. | Product mismatch |
 | 16 kHz mono PCM | `audio/capture.rs` resamples to 16 kHz mono. | Implemented |
-| 120 second cap | `MAX_RECORDING_SAMPLES` and elapsed guard cap recording at 120 seconds. | Implemented |
-| Warning at 105 seconds | Frontend overlay timer switches to `stopping-soon`; backend does not emit this state. | Partial |
+| 120 second cap | `MAX_RECORDING_SAMPLES` caps the buffer and `hotkey/manager.rs` auto-stops active hotkey sessions at 120 seconds. | Implemented |
+| Warning at 105 seconds | `hotkey/manager.rs` emits `stopping-soon` at 105 seconds and the overlay starts the final countdown from the backend event duration. | Implemented |
 | Clipboard save/paste/restore | `injection/injector.rs` implements save -> paste -> restore. | Implemented |
 | Injection failure shows text in overlay | Backend error events include the transcript after paste failure; the overlay keeps it visible and copyable with a paste-failed indicator. | Pass |
 | Overlay five states | Current states include hidden, listening, stopping-soon, processing, long-recording, transcribed, no-speech. | Implemented with extra states |
@@ -278,11 +278,12 @@ rules.
 
 ### P2: Overlay timer authority is split
 
-The backend emits high-level pipeline state events, while the frontend owns
-elapsed timers, warning transition, processing estimates, and auto-hide. This
-matches the current code but not the older prompt. A backend-only overlay event
-model would be a larger refactor and is not required for the current
-speech-only release unless product direction changes.
+The backend now emits the 105-second `stopping-soon` event and auto-stops active
+hotkey sessions at the 120-second cap. The frontend still owns display timers,
+processing estimates, and auto-hide. This matches the current product behavior
+but not the older prompt's backend-only timer model. Moving every display timer
+behind backend events would be a larger refactor and is not required for the
+current speech-only release unless product direction changes.
 
 ## Completed Release Hardening
 
@@ -312,6 +313,8 @@ speech-only release unless product direction changes.
 23. Added an ignored microphone transcription smoke test for default mic -> VAD -> STT validation.
 24. Added optional Windows TTS prompting and RMS/peak diagnostics to the microphone transcription smoke.
 25. Added and ran an ignored Windows synthetic speech-file smoke test for VAD -> STT validation.
+26. Added a backend recording watchdog that emits the 105-second warning state
+    and auto-stops/processes active hotkey sessions at the 120-second cap.
 
 Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25938753998` for

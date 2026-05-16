@@ -31,6 +31,8 @@ disk.
 - Parakeet speech recognition through `sherpa-onnx`.
 - Floating overlay for listening, stopping soon, processing, long recording,
   transcribed, and no-speech feedback.
+- Backend recording watchdog emits the 105-second stopping-soon warning and
+  automatically stops/processes active hotkey recordings at the 120-second cap.
 - Clipboard-based cross-platform text injection.
 - Paste-failure recovery: if text injection fails after a successful
   transcription, the overlay keeps the transcript visible and copyable.
