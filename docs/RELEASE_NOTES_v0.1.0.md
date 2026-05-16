@@ -45,6 +45,8 @@ disk.
   tag release runs are preserved.
 - Unsupported legacy speech model settings fall back to the current Parakeet
   default.
+- Speech model downloads validate completed temp files and recover from stale
+  incomplete destination files before installing the downloaded file.
 - Dashboard, History, Hotkeys, Speech, and Wizard setup operations show inline
   errors when user-facing actions fail.
 - The History empty-state action opens Hotkeys instead of doing nothing.

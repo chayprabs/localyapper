@@ -8,6 +8,14 @@ use crate::models::{DownloadProgress, ModelsStatus, SpeechModelFileStatus};
 use crate::state::AppState;
 use crate::stt::whisper::WhisperEngine;
 
+fn minimum_valid_model_file_size(filename: &str) -> u64 {
+    if filename == "tokens.txt" {
+        100
+    } else {
+        1_000_000
+    }
+}
+
 fn selected_speech_model_name(state: &AppState) -> String {
     let model = state
         .db
@@ -100,11 +108,7 @@ pub async fn download_speech_model(
 
     for (filename, url) in &model_files {
         let dest_path = model_dir.join(filename);
-        let min_size = if *filename == "tokens.txt" {
-            100
-        } else {
-            1_000_000
-        };
+        let min_size = minimum_valid_model_file_size(filename);
 
         if dest_path.exists() {
             let size = std::fs::metadata(&dest_path).map(|m| m.len()).unwrap_or(0);
@@ -205,10 +209,33 @@ pub async fn download_speech_model(
         }
 
         drop(file);
+        let downloaded_size = std::fs::metadata(&temp_path)
+            .map_err(|e| format!("Failed to inspect downloaded {}: {e}", filename))?
+            .len();
+        if downloaded_size <= min_size {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(format!(
+                "Downloaded {} was incomplete ({} bytes)",
+                filename, downloaded_size
+            ));
+        }
+        if dest_path.exists() {
+            let metadata = std::fs::metadata(&dest_path)
+                .map_err(|e| format!("Failed to inspect existing {}: {e}", filename))?;
+            if metadata.is_file() {
+                std::fs::remove_file(&dest_path)
+                    .map_err(|e| format!("Failed to replace existing {}: {e}", filename))?;
+            } else {
+                return Err(format!(
+                    "Cannot replace {} because the destination path is not a file",
+                    filename
+                ));
+            }
+        }
         std::fs::rename(&temp_path, &dest_path)
             .map_err(|e| format!("Failed to rename {}: {e}", filename))?;
 
-        cumulative_downloaded += file_downloaded;
+        cumulative_downloaded += downloaded_size;
         log::info!(
             "STT file {} downloaded to {}",
             filename,
@@ -420,4 +447,15 @@ pub async fn check_models_status(
     Ok(ModelsStatus {
         speech_model_loaded,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::minimum_valid_model_file_size;
+
+    #[test]
+    fn minimum_valid_model_file_size_accepts_small_token_files() {
+        assert_eq!(minimum_valid_model_file_size("tokens.txt"), 100);
+        assert_eq!(minimum_valid_model_file_size("model.onnx"), 1_000_000);
+    }
 }
