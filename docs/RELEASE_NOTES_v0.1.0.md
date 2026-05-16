@@ -131,7 +131,7 @@ Results:
 - Windows NSIS installer build: passed.
 - Linux AppImage build in WSL: passed.
 - GitHub Actions release workflow: passed for workflow-enforcement checkpoint
-  `747fae5` in run `25959323267`, including production audit, all-targets
+  `1025593` in run `25959625219`, including production audit, all-targets
   clippy, Verify, Windows, Linux, macOS Intel, and macOS Apple Silicon jobs.
 - Most recent local gates at release-note time passed: `npm audit --omit=dev`,
   ESLint, TypeScript, Rust clippy with `--all-targets -- -D warnings`, Rust
