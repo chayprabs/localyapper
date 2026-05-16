@@ -7,11 +7,11 @@ Reference code-bearing verification run: `25938753998`
 Verified code-bearing commit: `6c5e82d`
 Result: success for verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
-Latest docs-only evidence refresh run: `25939963745`
-Latest docs-only evidence refresh commit: `26b1a3d`
-Recent completed workflow checkpoint run: `25942731189`
-Recent completed workflow checkpoint commit: `6e49f2e`
-Latest local source verification commit: `6c5e82d`
+Docs-only evidence refresh run: `25939963745`
+Docs-only evidence refresh commit: `26b1a3d`
+Completed workflow checkpoint run: `25942731189`
+Completed workflow checkpoint commit: `6e49f2e`
+Local source verification commit: `6c5e82d`
 Ignore-policy checkpoint: `aa8eb8a`
 
 ## Source-Of-Truth Decision
@@ -284,42 +284,42 @@ matches the current code but not the older prompt. A backend-only overlay event
 model would be a larger refactor and is not required for the current
 speech-only release unless product direction changes.
 
-## Next Implementation Steps
+## Completed Release Hardening
 
-1. Remove production `.expect()` calls from `lib.rs`.
-2. Remove global dead-code suppressions and fix any fallout.
-3. Preserve transcribed text on injection failure so the overlay can still show
+1. Removed production `.expect()` calls from `lib.rs`.
+2. Removed global dead-code suppressions and fixed the fallout.
+3. Preserved transcribed text on injection failure so the overlay can still show
    the user something copyable.
-4. Update public docs for the current product direction.
-5. Add build and release notes docs.
-6. Rerun lint, typecheck, clippy, tests, frontend build, and Tauri build.
-7. Remove stale placeholder IPC/update-check surfaces.
-8. Remove production-only overlay debug logging.
-9. Remove stale auto-inject setting and clarify overlay dismiss progress.
-10. Route backend diagnostics through the logger without logging transcript text.
-11. Remove unused Tauri FS/Shell plugin surface.
-12. Apply non-breaking npm audit fixes for production dependencies.
-13. Prune stale DB settings and honor `auto_start` at startup.
-14. Add release-workflow concurrency for frequent branch checkpoints.
-15. Remove unused frontend dependencies while keeping the declared Recharts 2 stack dependency.
-16. Normalize stale speech model settings to the current Parakeet default.
-17. Make page and wizard operation failures visible inline.
-18. Wire the History empty-state action to real navigation.
-19. Report hotkey registration failures and roll back failed updates.
-20. Harden `.gitignore` for local-only release, cloud, model, secret, and agent artifacts.
-21. Add a manual desktop QA checklist for real microphone and external-app injection validation.
-22. Add and run an ignored Windows Notepad injection smoke test for clipboard save -> paste -> restore.
-23. Add an ignored microphone transcription smoke test for default mic -> VAD -> STT validation.
-24. Add optional Windows TTS prompting and RMS/peak diagnostics to the microphone transcription smoke.
-25. Add and run an ignored Windows synthetic speech-file smoke test for VAD -> STT validation.
+4. Updated public docs for the current product direction.
+5. Added build and release notes docs.
+6. Reran lint, typecheck, clippy, tests, frontend build, and Tauri build.
+7. Removed stale placeholder IPC/update-check surfaces.
+8. Removed production-only overlay debug logging.
+9. Removed stale auto-inject setting and clarified overlay dismiss progress.
+10. Routed backend diagnostics through the logger without logging transcript text.
+11. Removed unused Tauri FS/Shell plugin surface.
+12. Applied non-breaking npm audit fixes for production dependencies.
+13. Pruned stale DB settings and honored `auto_start` at startup.
+14. Added release-workflow concurrency for frequent branch checkpoints.
+15. Removed unused frontend dependencies while keeping the declared Recharts 2 stack dependency.
+16. Normalized stale speech model settings to the current Parakeet default.
+17. Made page and wizard operation failures visible inline.
+18. Wired the History empty-state action to real navigation.
+19. Reported hotkey registration failures and rolled back failed updates.
+20. Hardened `.gitignore` for local-only release, cloud, model, secret, and agent artifacts.
+21. Added a manual desktop QA checklist for real microphone and external-app injection validation.
+22. Added and ran an ignored Windows Notepad injection smoke test for clipboard save -> paste -> restore.
+23. Added an ignored microphone transcription smoke test for default mic -> VAD -> STT validation.
+24. Added optional Windows TTS prompting and RMS/peak diagnostics to the microphone transcription smoke.
+25. Added and ran an ignored Windows synthetic speech-file smoke test for VAD -> STT validation.
 
-Completed in this run: items 1 through 25. Windows NSIS and Linux AppImage
+Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25938753998` for
 code-bearing commit `6c5e82d` completed successfully for verify plus Windows,
 Linux, macOS Intel, and macOS Apple Silicon build jobs, and uploaded all four
 platform artifacts. The later docs-only evidence refresh commit `26b1a3d` also
-passed the full release workflow in run `25939963745`. The recent completed
-workflow checkpoint commit `6e49f2e` passed the full release workflow in run
+passed the full release workflow in run `25939963745`. The completed workflow
+checkpoint commit `6e49f2e` passed the full release workflow in run
 `25942731189`, including verify plus Windows, Linux, macOS Intel, and macOS
 Apple Silicon build jobs. The latest local source gates passed with 25 Rust
 tests, 3 ignored manual desktop smokes, Rust formatting, and
