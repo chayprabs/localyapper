@@ -3,17 +3,18 @@
 Date: 2026-05-16
 Branch: main
 
-Reference code-bearing verification checkpoint: `229a669`
-Reference verification run: `25962071164`
+Reference code-bearing verification checkpoint: `b545f5f`
+Reference verification run: `25962865906`
 Result: success for Verify plus Windows, Linux, macOS Intel, and macOS Apple
 Silicon build jobs.
 Artifacts: `localyapper-windows-x64`, `localyapper-linux-x64`,
 `localyapper-macos-x64`, and `localyapper-macos-aarch64`.
-Earlier reference code-bearing verification runs include `25961358640` for
-checkpoint `c7be818` via empty retry checkpoint `322df92`, `25960350839` for
-checkpoint `ea0ba6d`, `25959625219` for checkpoint `1025593`, `25959323267`
-for checkpoint `747fae5`, `25956466390` for checkpoint `ecd543a`, and
-`25938753998` for checkpoint `6c5e82d`.
+Earlier reference code-bearing verification runs include `25962071164` for
+checkpoint `229a669`, `25961358640` for checkpoint `c7be818` via empty retry
+checkpoint `322df92`, `25960350839` for checkpoint `ea0ba6d`, `25959625219`
+for checkpoint `1025593`, `25959323267` for checkpoint `747fae5`,
+`25956466390` for checkpoint `ecd543a`, and `25938753998` for checkpoint
+`6c5e82d`.
 Ignore-policy checkpoint: `aa8eb8a`.
 
 ## Source-Of-Truth Decision
@@ -98,7 +99,7 @@ but it does not justify adding LLM features back into this release.
 | Verification | lint, production audit, typecheck, fmt check, all-targets clippy, tests, frontend build, dev-launch smoke, synthetic speech STT smoke, and GitHub Actions passed after fixes. | Pass |
 | Tauri dev launch | Hidden smoke test reached Vite, compiled Rust, started `target/debug/localyapper.exe`, loaded STT/VAD, registered hotkeys, and initialized tray. | Pass |
 | Tauri build | Windows NSIS bundle and Linux AppImage bundle passed locally. | Pass |
-| CI/CD workflow | `.github/workflows/release.yml` run `25962071164` enforced production audit and all-targets clippy, then built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts for code-bearing checkpoint `229a669`. | Pass |
+| CI/CD workflow | `.github/workflows/release.yml` run `25962865906` enforced production audit and all-targets clippy, then built Windows NSIS, Linux DEB/AppImage, macOS Intel DMG, and macOS Apple Silicon DMG artifacts for code-bearing checkpoint `b545f5f`. | Pass |
 | CI queue behavior | Branch workflows now cancel older in-progress runs for the same ref; tag release runs are preserved. | Pass |
 | Model download recovery | Speech model downloads validate completed temp files and replace stale incomplete destination files before rename, avoiding Windows overwrite failures. Startup and model status now report installed only when both ONNX and tokens files are valid. | Pass |
 | Hotkey registration failures | Backend hotkey updates reject empty/duplicate values, report OS registration failures, and restore previous settings if reload fails. | Pass |
@@ -392,8 +393,8 @@ current speech-only release unless product direction changes.
     file save, and clipboard restoration in one interactive check.
 
 Windows NSIS and Linux AppImage bundling were verified locally earlier in the
-release run. GitHub Actions run `25962071164` for code-bearing checkpoint
-`229a669` completed successfully for Verify plus Windows, Linux, macOS Intel,
+release run. GitHub Actions run `25962865906` for code-bearing checkpoint
+`b545f5f` completed successfully for Verify plus Windows, Linux, macOS Intel,
 and macOS Apple Silicon build jobs, and uploaded all four platform artifacts.
 That Verify job includes `npm audit --omit=dev` and
 `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`.
