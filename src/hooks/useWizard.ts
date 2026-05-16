@@ -37,7 +37,19 @@ export function useWizard(onComplete: () => void) {
 
     try {
       await downloadSpeechModel();
-      await reloadModels();
+      try {
+        await reloadModels();
+      } catch (error) {
+        const message =
+          typeof error === "string"
+            ? error
+            : error instanceof Error
+              ? error.message
+              : "The speech engine did not start";
+        setSetupError(
+          `Download finished, but the speech engine needs attention. ${message}`,
+        );
+      }
       setStep("download-complete");
     } catch (error) {
       const message =

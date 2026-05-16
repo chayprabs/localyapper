@@ -52,6 +52,8 @@ disk.
   instead of ready.
 - Dashboard, History, Hotkeys, Speech, and Wizard setup operations show inline
   errors when user-facing actions fail.
+- Speech model setup distinguishes failed downloads from successful downloads
+  that need engine-start attention.
 - The History empty-state action opens Hotkeys instead of doing nothing.
 - Repository ignore rules exclude local agent state, private progress/PRD/source
   notes, cloud provider state, signing keys, model binaries, databases, build

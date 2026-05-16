@@ -132,7 +132,18 @@ export function useModels() {
 
     try {
       await downloadSpeechModel();
-      await reloadModels();
+
+      let reloadError: string | null = null;
+      try {
+        await reloadModels();
+      } catch (error) {
+        reloadError =
+          error instanceof Error
+            ? error.message
+            : typeof error === "string"
+              ? error
+              : "The speech engine did not start";
+      }
 
       const [fileResult, statusResult] = await Promise.allSettled([
         checkSpeechModelFileExists(),
@@ -140,7 +151,7 @@ export function useModels() {
       ]);
 
       let nextFileStatus: SpeechModelFileStatus = {
-        exists: true,
+        exists: false,
         size_mb: 0,
         model_name: speechModel,
       };
@@ -157,9 +168,13 @@ export function useModels() {
 
       updateCaches(speechModel, nextFileStatus, nextLoaded);
 
-      if (!nextLoaded) {
+      if (reloadError !== null) {
         setSpeechModelError(
-          "Download finished, but the speech engine did not start. Try clicking Load Engine.",
+          `Download finished, but the speech engine did not start. ${reloadError}`,
+        );
+      } else if (!nextLoaded) {
+        setSpeechModelError(
+          "Download finished, but the speech engine did not start. Try clicking Start Engine.",
         );
       }
     } catch (error) {

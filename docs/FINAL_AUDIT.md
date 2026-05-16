@@ -86,6 +86,7 @@ but it does not justify adding LLM features back into this release.
 | Frontend dependency surface | Unused `lucide-react` and `class-variance-authority` dependencies were removed; the required Recharts 2 stack dependency was left in place. | Pass |
 | Speech model setting normalization | Removed legacy Whisper directory mapping from active model resolution; old DB values still migrate/fall back to the current Parakeet default. | Pass |
 | User-visible errors | Dashboard, History, Hotkeys, Speech, and Wizard setup actions now surface operation failures inline instead of only logging to DevTools. | Pass |
+| Post-download recovery UI | Speech model download flows distinguish file download failure from successful download followed by engine-start failure. | Pass |
 | Inert UI controls | History empty-state action now navigates to Hotkeys instead of being a no-op. | Pass |
 | Build docs | `docs/BUILD.md` added for Windows, macOS, and Linux build paths. | Done |
 | Release notes | `docs/RELEASE_NOTES_v0.1.0.md` added for the current release candidate. | Done |
@@ -247,6 +248,18 @@ finish/skip failures were not consistently visible to the user.
 Remediation: those flows now show compact inline error messages in the relevant
 page or wizard step while preserving existing logging for diagnostics.
 
+### P2: Speech model download success could be mislabeled as download failure - Fixed
+
+The first-launch wizard and Speech settings page awaited model reload directly
+after file download. If file download succeeded but engine startup failed, the
+UI could label the whole operation as "Download failed" instead of showing that
+the files were present but the engine needed attention.
+
+Remediation: both flows now distinguish download errors from post-download
+engine-start errors. Settings still refreshes file/status state after download,
+and the wizard advances after a successful download while preserving the engine
+attention message for setup completion.
+
 ### P2: History empty-state action was inert - Fixed
 
 The History empty-state button said "Start Dictating" but had no handler.
@@ -336,6 +349,8 @@ current speech-only release unless product direction changes.
     without valid ONNX and token files are reported as not installed.
 29. Reused the same speech model completeness checks for startup preload,
     on-demand load resolution, model status, and model deletion decisions.
+30. Split speech model download errors from post-download engine-start errors
+    in Settings and first-launch wizard flows.
 
 Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25938753998` for
