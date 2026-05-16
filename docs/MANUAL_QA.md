@@ -97,6 +97,20 @@ cargo test --manifest-path src-tauri/Cargo.toml manual_windows_notepad_injection
 This does not replace the real microphone dictation pass, but it gives a
 repeatable check for the external-app clipboard injection layer.
 
+## Optional Windows Textbox Injection Smoke
+
+On an interactive Windows desktop, this ignored test launches a separate
+PowerShell WinForms textbox process, calls the real clipboard injector, verifies
+the pasted text through an output file written by that external process, and
+confirms the original clipboard text is restored:
+
+```powershell
+cargo test --manifest-path src-tauri/Cargo.toml manual_windows_textbox_injection_smoke -- --ignored --nocapture
+```
+
+This is useful when modern Notepad focus is blocked by the desktop session, but
+it still exercises paste into a separate focused GUI process.
+
 ## Optional Microphone Transcription Smoke
 
 On a machine with the speech model installed, this ignored test records from the
@@ -206,6 +220,25 @@ Optional prompt-tuning variables are
 This is the narrowest repeatable Windows signoff for microphone capture -> VAD
 -> local STT -> external-app injection. It still requires a real human speaker
 or a proven physical speaker-to-microphone setup.
+
+## Optional Windows Microphone To Textbox Smoke
+
+This ignored Windows-only test records from the selected or default microphone,
+runs VAD and the installed speech model, injects the resulting transcript into a
+separate PowerShell WinForms textbox process, verifies the pasted text through
+an output file written by that external process, and checks clipboard
+restoration:
+
+```powershell
+$env:LOCALYAPPER_MIC_SMOKE_WAIT_FOR_ENTER='true'
+$env:LOCALYAPPER_MIC_SMOKE_RECORD_SECS='7'
+$env:LOCALYAPPER_MIC_SMOKE_EXPECTED_WORDS='local yapper microphone release smoke'
+cargo test --manifest-path src-tauri/Cargo.toml manual_windows_microphone_to_textbox_pipeline_smoke -- --ignored --nocapture
+```
+
+The same microphone and optional Windows speech prompt environment variables
+apply. This is a fallback external-target signoff when Notepad focus is blocked
+in the current desktop session.
 
 ## Hotkey Pass
 

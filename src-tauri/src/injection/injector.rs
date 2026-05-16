@@ -233,6 +233,12 @@ mod manual_tests {
         title_fragment: String,
     }
 
+    struct TextBoxGuard {
+        child: Child,
+        output_path: PathBuf,
+        title_fragment: String,
+    }
+
     impl Drop for NotepadGuard {
         fn drop(&mut self) {
             if let Ok(hwnd) = find_window_by_title(&self.title_fragment) {
@@ -249,6 +255,14 @@ mod manual_tests {
             let _ = self.child.kill();
             let _ = self.child.wait();
             let _ = fs::remove_file(&self.path);
+        }
+    }
+
+    impl Drop for TextBoxGuard {
+        fn drop(&mut self) {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+            let _ = fs::remove_file(&self.output_path);
         }
     }
 
@@ -515,6 +529,50 @@ mod manual_tests {
         }
     }
 
+    fn app_activate_window_by_title(title_fragment: &str) -> Result<(), String> {
+        let script = "$shell = New-Object -ComObject WScript.Shell; \
+            if ($shell.AppActivate($env:LOCALYAPPER_WINDOW_TITLE_FRAGMENT)) { exit 0 } \
+            exit 1";
+        let status = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                script,
+            ])
+            .env("LOCALYAPPER_WINDOW_TITLE_FRAGMENT", title_fragment)
+            .status()
+            .map_err(|e| format!("Failed to run AppActivate fallback: {e}"))?;
+
+        if status.success() {
+            thread::sleep(Duration::from_millis(250));
+            Ok(())
+        } else {
+            Err(format!(
+                "AppActivate did not focus title fragment {title_fragment:?}"
+            ))
+        }
+    }
+
+    fn app_activate_when_available(title_fragment: &str) -> Result<(), String> {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            if find_window_by_title(title_fragment).is_ok()
+                && app_activate_window_by_title(title_fragment).is_ok()
+            {
+                return Ok(());
+            }
+
+            if Instant::now() >= deadline {
+                return Err(format!(
+                    "Failed to activate window with title fragment {title_fragment:?}"
+                ));
+            }
+            thread::sleep(Duration::from_millis(250));
+        }
+    }
+
     fn save_focused_document() -> Result<(), String> {
         let mut enigo =
             Enigo::new(&Settings::default()).map_err(|e| format!("Enigo init failed: {e}"))?;
@@ -568,6 +626,55 @@ mod manual_tests {
         };
         thread::sleep(Duration::from_secs(2));
         focus_window_by_title(&guard.title_fragment)?;
+
+        Ok(guard)
+    }
+
+    fn open_external_textbox_target(prefix: &str) -> Result<TextBoxGuard, String> {
+        let marker = chrono::Utc::now().timestamp_millis();
+        let output_path = std::env::temp_dir().join(format!("{prefix}-output-{marker}.txt"));
+        let title_fragment = format!("{prefix}-{marker}");
+        fs::write(&output_path, "").map_err(|e| format!("Temp file setup failed: {e}"))?;
+
+        let script = "Add-Type -AssemblyName System.Windows.Forms; \
+            Add-Type -AssemblyName System.Drawing; \
+            [System.Windows.Forms.Application]::EnableVisualStyles(); \
+            $form = New-Object System.Windows.Forms.Form; \
+            $form.Text = $env:LOCALYAPPER_TEXTBOX_TITLE; \
+            $form.Width = 900; \
+            $form.Height = 500; \
+            $textBox = New-Object System.Windows.Forms.TextBox; \
+            $textBox.Multiline = $true; \
+            $textBox.AcceptsReturn = $true; \
+            $textBox.AcceptsTab = $true; \
+            $textBox.Dock = [System.Windows.Forms.DockStyle]::Fill; \
+            $textBox.Font = New-Object System.Drawing.Font('Consolas', 12); \
+            $writeText = { Set-Content -LiteralPath $env:LOCALYAPPER_TEXTBOX_OUTPUT_PATH -Value $textBox.Text -Encoding UTF8 }; \
+            $textBox.Add_TextChanged($writeText); \
+            $form.Controls.Add($textBox); \
+            $form.Add_Shown({ $form.Activate(); $textBox.Focus() }); \
+            [System.Windows.Forms.Application]::Run($form)";
+
+        let child = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-STA",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                script,
+            ])
+            .env("LOCALYAPPER_TEXTBOX_TITLE", &title_fragment)
+            .env("LOCALYAPPER_TEXTBOX_OUTPUT_PATH", &output_path)
+            .spawn()
+            .map_err(|e| format!("Failed to launch external textbox target: {e}"))?;
+
+        let guard = TextBoxGuard {
+            child,
+            output_path,
+            title_fragment,
+        };
+        app_activate_when_available(&guard.title_fragment)?;
 
         Ok(guard)
     }
@@ -873,6 +980,40 @@ mod manual_tests {
     }
 
     #[test]
+    #[ignore = "requires an interactive Windows desktop and opens an external textbox target"]
+    fn manual_windows_textbox_injection_smoke() -> Result<(), String> {
+        let marker = format!(
+            "LocalYapper textbox injection smoke {}",
+            chrono::Utc::now().timestamp_millis()
+        );
+        let injected_text = format!("{marker} pasted through injector");
+        let original_clipboard = format!("{marker} original clipboard");
+        let guard = open_external_textbox_target("localyapper-textbox-injection-smoke")?;
+
+        let mut clipboard = Clipboard::new().map_err(|e| format!("Clipboard init failed: {e}"))?;
+        clipboard
+            .set_text(original_clipboard.clone())
+            .map_err(|e| format!("Clipboard setup failed: {e}"))?;
+
+        inject(&injected_text, false)?;
+        let saved_text = wait_for_file_text(&guard.output_path, &injected_text)?;
+
+        let restored_clipboard = clipboard
+            .get_text()
+            .map_err(|e| format!("Clipboard read failed: {e}"))?;
+        if restored_clipboard != original_clipboard {
+            return Err(format!(
+                "Clipboard was not restored. Expected {original_clipboard:?}, got {restored_clipboard:?}"
+            ));
+        }
+        if !saved_text.contains(&injected_text) {
+            return Err(format!("Saved text did not contain {injected_text:?}"));
+        }
+
+        Ok(())
+    }
+
+    #[test]
     #[ignore = "requires Windows SAPI, installed speech model files, and opens Notepad"]
     fn manual_windows_tts_to_notepad_pipeline_smoke() -> Result<(), String> {
         let phrase = std::env::var("LOCALYAPPER_TTS_TO_NOTEPAD_TEXT").unwrap_or_else(|_| {
@@ -901,6 +1042,43 @@ mod manual_tests {
         thread::sleep(Duration::from_millis(200));
         save_focused_document()?;
         let saved_text = wait_for_file_text(&guard.path, &injected_text)?;
+
+        let restored_clipboard = clipboard
+            .get_text()
+            .map_err(|e| format!("Clipboard read failed: {e}"))?;
+        if restored_clipboard != original_clipboard {
+            return Err(format!(
+                "Clipboard was not restored. Expected {original_clipboard:?}, got {restored_clipboard:?}"
+            ));
+        }
+        if !saved_text.contains(&injected_text) {
+            return Err(format!("Saved text did not contain {injected_text:?}"));
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "requires an interactive Windows desktop, microphone, spoken audio, installed speech model files, and opens an external textbox target"]
+    fn manual_windows_microphone_to_textbox_pipeline_smoke() -> Result<(), String> {
+        let marker = format!(
+            "LocalYapper microphone to textbox smoke {}",
+            chrono::Utc::now().timestamp_millis()
+        );
+        let original_clipboard = format!("{marker} original clipboard");
+        let guard = open_external_textbox_target("localyapper-mic-to-textbox-smoke")?;
+
+        let mut clipboard = Clipboard::new().map_err(|e| format!("Clipboard init failed: {e}"))?;
+        clipboard
+            .set_text(original_clipboard.clone())
+            .map_err(|e| format!("Clipboard setup failed: {e}"))?;
+
+        let transcript = transcribe_microphone_input()?;
+        let injected_text = format!("{marker}: {transcript}");
+
+        app_activate_when_available(&guard.title_fragment)?;
+        inject(&injected_text, false)?;
+        let saved_text = wait_for_file_text(&guard.output_path, &injected_text)?;
 
         let restored_clipboard = clipboard
             .get_text()
