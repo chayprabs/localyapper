@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { HistoryEntry } from "@/types/commands";
+import type { PipelineEvent } from "@/types/overlay";
 import {
   getHistory,
   deleteHistoryEntry,
@@ -28,6 +29,10 @@ function toErrorMessage(error: unknown, fallback: string): string {
     : typeof error === "string"
       ? error
       : fallback;
+}
+
+function eventShouldRefreshHistory(event: PipelineEvent): boolean {
+  return event.state === "injected" || (event.state === "error" && Boolean(event.text));
 }
 
 export function useHistory(): HistoryData {
@@ -59,8 +64,8 @@ export function useHistory(): HistoryData {
 
   // Auto-refresh when a new dictation completes
   useEffect(() => {
-    const unlisten = listen<{ state: string }>("pipeline-state", (event) => {
-      if (event.payload.state === "injected") {
+    const unlisten = listen<PipelineEvent>("pipeline-state", (event) => {
+      if (eventShouldRefreshHistory(event.payload)) {
         void fetchInitial();
       }
     });

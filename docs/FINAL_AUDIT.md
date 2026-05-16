@@ -70,6 +70,7 @@ but it does not justify adding LLM features back into this release.
 | Warning at 105 seconds | `hotkey/manager.rs` emits `stopping-soon` at 105 seconds and the overlay starts the final countdown from the backend event duration. | Implemented |
 | Clipboard save/paste/restore | `injection/injector.rs` implements save -> paste -> restore. | Implemented |
 | Injection failure shows text in overlay | Backend error events include the transcript after paste failure; the overlay keeps it visible and copyable with a paste-failed indicator. | Pass |
+| Paste-failure history refresh | Dashboard and History refresh when a paste-failure event includes saved transcript text, not only on successful injection. | Pass |
 | Overlay five states | Current states include hidden, listening, stopping-soon, processing, long-recording, transcribed, no-speech. | Implemented with extra states |
 | Backend-only overlay timers | Current overlay uses frontend timers for elapsed, warning, processing countdown, and auto-hide. | Product mismatch |
 | First-launch onboarding | Current wizard is keyed by `settings.setup_complete`, not an onboarding table. | Implemented differently |
@@ -130,7 +131,9 @@ for the overlay. For a dictation app, losing the visible transcript after a
 successful transcription is a serious user-facing failure mode.
 
 Remediation: injection failure events now include the transcript, and the
-overlay keeps it visible and copyable with a paste-failed indicator.
+overlay keeps it visible and copyable with a paste-failed indicator. Dashboard
+and History also refresh on paste-failure events with transcript text because
+the history entry is saved before injection is attempted.
 
 ### P1: Build and release documentation are missing - Fixed
 
@@ -351,6 +354,8 @@ current speech-only release unless product direction changes.
     on-demand load resolution, model status, and model deletion decisions.
 30. Split speech model download errors from post-download engine-start errors
     in Settings and first-launch wizard flows.
+31. Refreshed Dashboard and History after paste-failure events that still save
+    a completed transcript.
 
 Windows NSIS and Linux AppImage
 bundling were verified locally. GitHub Actions run `25938753998` for

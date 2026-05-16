@@ -36,6 +36,8 @@ disk.
 - Clipboard-based cross-platform text injection.
 - Paste-failure recovery: if text injection fails after a successful
   transcription, the overlay keeps the transcript visible and copyable.
+- Dashboard and History refresh after paste-failure recovery when the transcript
+  has still been saved.
 - Best-effort system permission checks and OS settings shortcuts for microphone
   and accessibility/injection setup.
 - Release logging uses the configured logger and does not include transcript
