@@ -47,6 +47,8 @@ disk.
   default.
 - Speech model downloads validate completed temp files and recover from stale
   incomplete destination files before installing the downloaded file.
+- Speech model status requires both a valid ONNX file and `tokens.txt`, so
+  partial model directories are reported as not installed instead of ready.
 - Dashboard, History, Hotkeys, Speech, and Wizard setup operations show inline
   errors when user-facing actions fail.
 - The History empty-state action opens Hotkeys instead of doing nothing.

@@ -1,4 +1,5 @@
 // IPC command handlers -- speech model download, status, and lifecycle
+use std::path::Path;
 use std::sync::atomic::Ordering;
 
 use futures_util::StreamExt;
@@ -14,6 +15,27 @@ fn minimum_valid_model_file_size(filename: &str) -> u64 {
     } else {
         1_000_000
     }
+}
+
+fn model_file_size(model_dir: &Path, filename: &str) -> Option<u64> {
+    let path = model_dir.join(filename);
+    let size = std::fs::metadata(path).ok()?.len();
+    if size > minimum_valid_model_file_size(filename) {
+        Some(size)
+    } else {
+        None
+    }
+}
+
+fn valid_onnx_model_size(model_dir: &Path) -> Option<u64> {
+    model_file_size(model_dir, "model.int8.onnx")
+        .or_else(|| model_file_size(model_dir, "model.onnx"))
+}
+
+fn is_valid_speech_model_dir(model_dir: &Path) -> bool {
+    model_dir.is_dir()
+        && valid_onnx_model_size(model_dir).is_some()
+        && model_file_size(model_dir, "tokens.txt").is_some()
 }
 
 fn selected_speech_model_name(state: &AppState) -> String {
@@ -296,31 +318,21 @@ pub async fn check_speech_model_file_exists(
 
     let model_dir = models_dir.join(&dir_name);
 
-    if model_dir.is_dir() {
-        let has_onnx = std::fs::read_dir(&model_dir)
+    if is_valid_speech_model_dir(&model_dir) {
+        let total_size: u64 = std::fs::read_dir(&model_dir)
             .map(|entries| {
                 entries
                     .filter_map(|e| e.ok())
-                    .any(|e| e.file_name().to_string_lossy().ends_with(".onnx"))
+                    .map(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
+                    .sum()
             })
-            .unwrap_or(false);
+            .unwrap_or(0);
 
-        if has_onnx {
-            let total_size: u64 = std::fs::read_dir(&model_dir)
-                .map(|entries| {
-                    entries
-                        .filter_map(|e| e.ok())
-                        .map(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
-                        .sum()
-                })
-                .unwrap_or(0);
-
-            return Ok(SpeechModelFileStatus {
-                exists: true,
-                size_mb: total_size / (1024 * 1024),
-                model_name,
-            });
-        }
+        return Ok(SpeechModelFileStatus {
+            exists: true,
+            size_mb: total_size / (1024 * 1024),
+            model_name,
+        });
     }
 
     Ok(SpeechModelFileStatus {
@@ -360,11 +372,9 @@ pub async fn delete_speech_model(
 
     let has_other_models = std::fs::read_dir(&models_dir)
         .map(|entries| {
-            entries.filter_map(|entry| entry.ok()).any(|entry| {
-                let path = entry.path();
-                path.is_dir()
-                    && (path.join("model.int8.onnx").exists() || path.join("model.onnx").exists())
-            })
+            entries
+                .filter_map(|entry| entry.ok())
+                .any(|entry| is_valid_speech_model_dir(&entry.path()))
         })
         .unwrap_or(false);
 
@@ -451,11 +461,37 @@ pub async fn check_models_status(
 
 #[cfg(test)]
 mod tests {
-    use super::minimum_valid_model_file_size;
+    use super::{is_valid_speech_model_dir, minimum_valid_model_file_size};
+    use std::fs;
 
     #[test]
     fn minimum_valid_model_file_size_accepts_small_token_files() {
         assert_eq!(minimum_valid_model_file_size("tokens.txt"), 100);
         assert_eq!(minimum_valid_model_file_size("model.onnx"), 1_000_000);
+    }
+
+    #[test]
+    fn speech_model_dir_requires_valid_onnx_and_tokens() {
+        let dir = std::env::temp_dir().join(format!(
+            "localyapper-model-status-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        fs::create_dir_all(&dir).expect("test model dir");
+
+        fs::write(dir.join("model.onnx"), vec![0_u8; 512]).expect("tiny model");
+        fs::write(dir.join("tokens.txt"), vec![b'a'; 256]).expect("tokens");
+        assert!(!is_valid_speech_model_dir(&dir));
+
+        fs::write(
+            dir.join("model.onnx"),
+            vec![0_u8; minimum_valid_model_file_size("model.onnx") as usize + 1],
+        )
+        .expect("valid model");
+        assert!(is_valid_speech_model_dir(&dir));
+
+        fs::remove_file(dir.join("tokens.txt")).expect("remove tokens");
+        assert!(!is_valid_speech_model_dir(&dir));
+
+        fs::remove_dir_all(&dir).expect("cleanup");
     }
 }
