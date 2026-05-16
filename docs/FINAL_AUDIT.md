@@ -110,7 +110,7 @@ but it does not justify adding LLM features back into this release.
 | Microphone transcription smoke | Ignored test `manual_microphone_transcription_smoke` records from the selected or default microphone after a configurable countdown, can optionally wait for Enter, can optionally require expected transcript words, can optionally play a Windows speech prompt, prints all input devices plus RMS/peak diagnostics, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Added; requires human speaker or speaker-to-mic setup to execute |
 | Windows synthetic speech STT smoke | Ignored test `manual_windows_tts_file_transcription_smoke` generates a Windows SAPI WAV, runs VAD, loads the installed speech model, and requires a non-empty transcript. | Passed locally on Windows |
 | Windows generated speech to Notepad smoke | Ignored test `manual_windows_tts_to_notepad_pipeline_smoke` generates Windows SAPI speech, runs VAD and STT, injects the transcript into Notepad with the real injector, saves the file, and verifies clipboard restoration. | Passed locally on Windows; still not a substitute for real microphone QA |
-| Windows microphone to Notepad smoke | Ignored test `manual_windows_microphone_to_notepad_pipeline_smoke` records from the selected or default microphone, can optionally play a Windows speech prompt during recording, runs VAD and STT, validates optional expected words, injects the transcript into Notepad with the real injector, saves the file, and verifies clipboard restoration. | Added; requires human speaker or speaker-to-mic setup to execute |
+| Windows microphone to Notepad smoke | Ignored test `manual_windows_microphone_to_notepad_pipeline_smoke` records from the selected or default microphone, can optionally play a tunable Windows speech prompt during recording, runs VAD and STT, validates optional expected words, injects the transcript into Notepad with the real injector, saves the file, and verifies clipboard restoration. | Added; requires human speaker or speaker-to-mic setup to execute |
 
 ## Findings To Fix Before Release
 
@@ -433,6 +433,13 @@ so this was not caused by low system volume. Longer repeated prompts through
 the USB condenser reached STT with RMS up to `0.005834` / peak `0.117552`, but
 expected-word validation still failed because transcripts were distorted, for
 example `Hello world visits a microbone test`.
+After adding prompt rate and voice controls, a physical speaker-to-microphone
+run with `Microsoft Zira Desktop` at rate `-4` produced transcripts containing
+the expected words `world` and `microphone`, but the combined Notepad smoke
+still did not pass because this desktop session could not reliably focus
+Notepad for Enigo paste injection. The standalone Notepad injection smoke also
+failed to focus Notepad in the same session, so this is recorded as an
+interactive desktop focus limitation rather than release-completing evidence.
 The synthetic Windows speech-file smoke validates VAD plus STT against
 generated spoken audio, and the generated speech to Notepad smoke validates the
 same generated-speech transcript through the real Notepad injector and passed

@@ -198,6 +198,10 @@ including `LOCALYAPPER_MIC_SMOKE_INPUT_DEVICE` and `LOCALYAPPER_APP_DATA_DIR`.
 For a physical speaker-to-microphone setup on Windows, set
 `LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT` to the same phrase; the test plays it
 at full synthesizer volume while recording is active.
+Optional prompt-tuning variables are
+`LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_RATE` (`-10` to `10`),
+`LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_VOLUME` (`0` to `100`), and
+`LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_VOICE` (installed SAPI voice name).
 
 This is the narrowest repeatable Windows signoff for microphone capture -> VAD
 -> local STT -> external-app injection. It still requires a real human speaker

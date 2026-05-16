@@ -132,10 +132,11 @@ Results:
   on Windows.
 - Ignored Windows microphone to Notepad smoke: available with
   `cargo test --manifest-path src-tauri/Cargo.toml manual_windows_microphone_to_notepad_pipeline_smoke -- --ignored --nocapture`.
-  It chains selected microphone capture, an optional Windows speech prompt, VAD,
-  local STT, optional expected-word validation, real Notepad injection, file
-  save, and clipboard restoration in one interactive check. It is the remaining
-  human-spoken or physical speaker-to-microphone release signoff path.
+  It chains selected microphone capture, an optional tunable Windows speech
+  prompt, VAD, local STT, optional expected-word validation, real Notepad
+  injection, file save, and clipboard restoration in one interactive check. It
+  is the remaining human-spoken or physical speaker-to-microphone release
+  signoff path.
 - Frontend production build: passed.
 - Tauri release build on Windows: passed.
 - Windows artifact produced:

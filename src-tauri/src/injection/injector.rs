@@ -264,6 +264,23 @@ mod manual_tests {
         }
     }
 
+    fn env_i32_range(key: &str, default: i32, min: i32, max: i32) -> Result<i32, String> {
+        match std::env::var(key) {
+            Ok(value) => {
+                let parsed = value
+                    .parse::<i32>()
+                    .map_err(|_| format!("{key} must be an integer, got {value:?}"))?;
+                if parsed < min || parsed > max {
+                    return Err(format!(
+                        "{key} must be between {min} and {max}, got {parsed}"
+                    ));
+                }
+                Ok(parsed)
+            }
+            Err(_) => Ok(default),
+        }
+    }
+
     fn env_bool(key: &str) -> bool {
         std::env::var(key)
             .map(|value| {
@@ -384,11 +401,19 @@ mod manual_tests {
             Ok(value) if !value.trim().is_empty() => value,
             _ => return Ok(false),
         };
+        let rate = env_i32_range("LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_RATE", 0, -10, 10)?;
+        let volume = env_i32_range("LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_VOLUME", 100, 0, 100)?;
+        let voice = std::env::var("LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_VOICE")
+            .ok()
+            .filter(|value| !value.trim().is_empty());
 
         let script = "Add-Type -AssemblyName System.Speech; \
             $speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer; \
-            $speaker.Rate = 0; \
-            $speaker.Volume = 100; \
+            if ($env:LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_VOICE) { \
+                $speaker.SelectVoice($env:LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_VOICE); \
+            } \
+            $speaker.Rate = [int]$env:LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_RATE; \
+            $speaker.Volume = [int]$env:LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_VOLUME; \
             $speaker.Speak($env:LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT); \
             $speaker.Dispose()";
         let status = Command::new("powershell")
@@ -400,6 +425,15 @@ mod manual_tests {
                 script,
             ])
             .env("LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_TEXT", &text)
+            .env("LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_RATE", rate.to_string())
+            .env(
+                "LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_VOLUME",
+                volume.to_string(),
+            )
+            .env(
+                "LOCALYAPPER_MIC_SMOKE_WINDOWS_TTS_VOICE",
+                voice.as_deref().unwrap_or(""),
+            )
             .status()
             .map_err(|e| format!("Failed to run Windows speech prompt: {e}"))?;
 
@@ -886,12 +920,10 @@ mod manual_tests {
     #[test]
     #[ignore = "requires an interactive Windows desktop, microphone, spoken audio, installed speech model files, and opens Notepad"]
     fn manual_windows_microphone_to_notepad_pipeline_smoke() -> Result<(), String> {
-        let transcript = transcribe_microphone_input()?;
         let marker = format!(
             "LocalYapper microphone to Notepad smoke {}",
             chrono::Utc::now().timestamp_millis()
         );
-        let injected_text = format!("{marker}: {transcript}");
         let original_clipboard = format!("{marker} original clipboard");
         let guard = open_empty_notepad_file("localyapper-mic-to-notepad-smoke")?;
 
@@ -899,6 +931,9 @@ mod manual_tests {
         clipboard
             .set_text(original_clipboard.clone())
             .map_err(|e| format!("Clipboard setup failed: {e}"))?;
+
+        let transcript = transcribe_microphone_input()?;
+        let injected_text = format!("{marker}: {transcript}");
 
         inject(&injected_text, false)?;
         thread::sleep(Duration::from_millis(200));
