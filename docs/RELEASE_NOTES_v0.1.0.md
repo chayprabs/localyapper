@@ -136,9 +136,10 @@ Results:
   `src-tauri/target/release/localyapper.exe`
 - Windows NSIS installer build: passed.
 - Linux AppImage build in WSL: passed.
-- GitHub Actions release workflow: passed for QA-hardening checkpoint
-  `ea0ba6d` in run `25960350839`, including production audit, all-targets
-  clippy, Verify, Windows, Linux, macOS Intel, and macOS Apple Silicon jobs.
+- GitHub Actions release workflow: passed for generated-speech smoke checkpoint
+  `c7be818` via retry checkpoint `322df92` in run `25961358640`, including
+  production audit, all-targets clippy, Verify, Windows, Linux, macOS Intel,
+  and macOS Apple Silicon jobs.
 - Most recent local gates at release-note time passed: `npm audit --omit=dev`,
   ESLint, TypeScript, Rust clippy with `--all-targets -- -D warnings`, Rust
   tests, controlled `npm run tauri dev` launch smoke, and generated speech STT
