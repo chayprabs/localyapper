@@ -37,3 +37,14 @@ futures-util = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Threading"] }
+
+# Release profile tuned for a small, fast binary. Panics are aborts because
+# the app does not unwind across the sherpa-onnx FFI boundary; aborting is
+# safer and shrinks the binary by removing unwind tables.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+incremental = false
