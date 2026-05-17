@@ -10,6 +10,10 @@ export async function checkPermissions(): Promise<PermissionsStatus> {
   return invoke<PermissionsStatus>("check_permissions");
 }
 
+export async function getPausedState(): Promise<boolean> {
+  return invoke<boolean>("get_paused_state");
+}
+
 // OS settings deep links
 
 export async function openAccessibilitySettings(): Promise<void> {

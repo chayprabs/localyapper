@@ -1,11 +1,14 @@
 // Custom window title bar with minimize, maximize, and close controls
+import { useAtomValue } from "jotai";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import logoImg from "@/assets/logo-nobg.png";
+import { pausedAtom } from "@/stores/appStore";
 
 export function TitleBar() {
   const handleMinimize = () => getCurrentWindow().minimize();
   const handleMaximize = () => getCurrentWindow().toggleMaximize();
   const handleClose = () => getCurrentWindow().close();
+  const paused = useAtomValue(pausedAtom);
 
   return (
     <div
@@ -14,12 +17,22 @@ export function TitleBar() {
     >
       <div
         data-tauri-drag-region
-        className="pl-4 flex items-center gap-1.5"
+        className="pl-4 flex items-center gap-2"
       >
         <img src={logoImg} alt="LocalYapper" className="w-[14px] h-[14px]" draggable={false} />
         <span data-tauri-drag-region className="text-[13px] font-semibold text-[#1C1C1E]">
           LocalYapper
         </span>
+        {paused === true && (
+          <span
+            data-tauri-drag-region
+            className="ml-1 inline-flex h-5 items-center gap-1 rounded-full border border-[#ff9500]/30 bg-[#ff9500]/[0.12] px-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#9a5a00]"
+            title="Dictation is paused. Resume from the tray menu to use the hotkey again."
+          >
+            <span className="material-symbols-outlined text-[12px]">pause</span>
+            Paused
+          </span>
+        )}
       </div>
 
       <div className="flex items-center">

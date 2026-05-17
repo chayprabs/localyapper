@@ -3,10 +3,19 @@ use std::sync::atomic::Ordering;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 use crate::state::AppState;
+
+/// Tauri event emitted when the dictation paused state flips.
+const PAUSED_EVENT: &str = "paused-state-changed";
+
+fn emit_paused_state(app: &tauri::AppHandle, paused: bool) {
+    if let Err(e) = app.emit(PAUSED_EVENT, paused) {
+        log::warn!("Failed to emit {PAUSED_EVENT}: {e}");
+    }
+}
 
 /// Set up the system tray icon with context menu.
 /// Called from lib.rs setup() after AppState is managed and hotkeys are registered.
@@ -51,6 +60,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     }
                     let _ = pause_i.set_text("Pause Dictation");
                     log::info!("Dictation resumed");
+                    emit_paused_state(app, false);
                 } else {
                     // Pause: unregister hotkeys
                     state.paused.store(true, Ordering::SeqCst);
@@ -59,6 +69,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     }
                     let _ = pause_i.set_text("Resume Dictation");
                     log::info!("Dictation paused");
+                    emit_paused_state(app, true);
                 }
             }
             "quit" => {

@@ -1,8 +1,11 @@
 // IPC command handlers -- system utilities and permission checks
+use std::sync::atomic::Ordering;
+
 use crate::context::detector;
 #[cfg(target_os = "linux")]
 use crate::injection::platform::{self, Platform};
 use crate::models::PermissionsStatus;
+use crate::state::AppState;
 use cpal::traits::HostTrait;
 #[cfg(target_os = "linux")]
 use std::env;
@@ -23,6 +26,12 @@ pub async fn check_permissions() -> Result<PermissionsStatus, String> {
         microphone: microphone_available(),
         accessibility: accessibility_available(),
     })
+}
+
+/// Returns whether dictation is currently paused via the tray menu.
+#[tauri::command]
+pub async fn get_paused_state(state: tauri::State<'_, AppState>) -> Result<bool, String> {
+    Ok(state.paused.load(Ordering::SeqCst))
 }
 
 /// Opens the OS accessibility settings panel.

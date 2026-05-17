@@ -8,9 +8,11 @@ import { TitleBar } from "@/components/settings/TitleBar";
 import { Wizard } from "@/components/wizard/Wizard";
 import { setupCompleteAtom } from "@/stores/wizardStore";
 import { getSetting } from "@/lib/commands/settings";
+import { usePausedState } from "@/hooks/usePausedState";
 
 function MainWindow() {
   const [setupComplete, setSetupComplete] = useAtom(setupCompleteAtom);
+  usePausedState();
 
   useEffect(() => {
     getSetting("setup_complete")
