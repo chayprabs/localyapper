@@ -159,10 +159,7 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
         move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
                 log::info!("HOTKEY: Open-app triggered");
-                if let Some(window) = app_handle.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
+                crate::show_or_create_main_window(&app_handle);
             }
         },
     ) {

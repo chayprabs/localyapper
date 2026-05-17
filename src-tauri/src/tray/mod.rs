@@ -42,11 +42,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .tooltip("LocalYapper")
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "open" => {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.unminimize();
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
+                crate::show_or_create_main_window(app);
             }
             "pause_toggle" => {
                 let state = app.state::<AppState>();
@@ -85,14 +81,11 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             } = event
             {
                 let app = tray.app_handle();
-                if let Some(window) = app.get_webview_window("main") {
-                    if window.is_visible().unwrap_or(false) {
+                match app.get_webview_window("main") {
+                    Some(window) if window.is_visible().unwrap_or(false) => {
                         let _ = window.hide();
-                    } else {
-                        let _ = window.unminimize();
-                        let _ = window.show();
-                        let _ = window.set_focus();
                     }
+                    _ => crate::show_or_create_main_window(app),
                 }
             }
         })

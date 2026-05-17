@@ -71,6 +71,35 @@ pub(crate) fn load_speech_model_from_setting(
         .map_err(|e| format!("Failed to load STT from {}: {e}", candidate.display()))
 }
 
+/// Show the main settings window, building a new WebView when it does not
+/// exist. The main window is destroyed on user close to free its WebView
+/// process; this helper recreates it on demand from the tray and the
+/// open-app hotkey.
+pub(crate) fn show_or_create_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+        return;
+    }
+
+    match tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
+        .title("LocalYapper")
+        .inner_size(900.0, 650.0)
+        .center()
+        .resizable(true)
+        .decorations(false)
+        .visible(true)
+        .build()
+    {
+        Ok(window) => {
+            let _ = window.set_focus();
+            log::info!("Main settings window created on demand");
+        }
+        Err(e) => log::error!("Failed to recreate main window: {e}"),
+    }
+}
+
 /// Send a system notification via tauri-plugin-notification.
 fn send_notification(handle: &tauri::AppHandle, title: &str, body: &str) {
     use tauri_plugin_notification::NotificationExt;
@@ -178,10 +207,12 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if window.label() == "main" {
-                    api.prevent_close();
-                    let _ = window.hide();
+                    // Allow the close to destroy the WebView and free its
+                    // renderer process. The tray + open-app hotkey rebuild
+                    // it on demand via show_or_create_main_window.
+                    log::info!("Main window closed; WebView will be released");
                 }
             }
         })
