@@ -41,7 +41,6 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
 fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     let seeds = [
         ("hotkey_record", "F8"),
-        ("hotkey_hands_free", "Ctrl+F8"),
         ("hotkey_cancel", "Escape"),
         ("hotkey_paste_last", "Ctrl+Alt+J"),
         ("hotkey_open_app", "Ctrl+Alt+O"),
@@ -70,7 +69,7 @@ fn migrate_removed_features(conn: &Connection) -> Result<(), LocalYapperError> {
     conn.execute("DROP TABLE IF EXISTS corrections", [])?;
     conn.execute("DROP TABLE IF EXISTS personal_dictionary", [])?;
     conn.execute(
-        "DELETE FROM settings WHERE key IN ('confidence_threshold', 'correction_decay_days', 'training_paragraph_index', 'auto_inject_delay_ms', 'sound_effects', 'mute_media', 'language', 'max_recording_seconds')",
+        "DELETE FROM settings WHERE key IN ('confidence_threshold', 'correction_decay_days', 'training_paragraph_index', 'auto_inject_delay_ms', 'sound_effects', 'mute_media', 'language', 'max_recording_seconds', 'hotkey_hands_free')",
         [],
     )?;
     Ok(())
@@ -91,10 +90,6 @@ fn migrate_hotkey_defaults(conn: &Connection) -> Result<(), LocalYapperError> {
     for old_val in &legacy_record_values {
         conn.execute(
             "UPDATE settings SET value = 'F8', updated_at = datetime('now') WHERE key = 'hotkey_record' AND value = ?1",
-            rusqlite::params![old_val],
-        )?;
-        conn.execute(
-            "UPDATE settings SET value = 'Ctrl+F8', updated_at = datetime('now') WHERE key = 'hotkey_hands_free' AND value = ?1",
             rusqlite::params![old_val],
         )?;
     }
@@ -157,15 +152,39 @@ mod tests {
         assert_eq!(queries::get_setting(&conn, "setup_complete")?, "false");
         assert_eq!(queries::get_setting(&conn, "setup_step")?, "welcome");
         assert_eq!(queries::get_setting(&conn, "hotkey_record")?, "F8");
-        assert_eq!(queries::get_setting(&conn, "hotkey_hands_free")?, "Ctrl+F8");
+        assert_eq!(queries::get_setting(&conn, "hotkey_cancel")?, "Escape");
         assert_eq!(
             queries::get_setting(&conn, "speech_model")?,
             "parakeet-110m"
         );
+        // hotkey_hands_free is no longer a separate hotkey -- hands-free is a
+        // double-tap of the record hotkey.
+        assert!(queries::get_setting(&conn, "hotkey_hands_free").is_err());
 
         let settings_count: i64 =
             conn.query_row("SELECT COUNT(*) FROM settings", [], |row| row.get(0))?;
-        assert_eq!(settings_count, 11);
+        assert_eq!(settings_count, 10);
+
+        Ok(())
+    }
+
+    #[test]
+    fn initialize_database_removes_legacy_hands_free_hotkey() -> Result<(), LocalYapperError> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(
+            "
+            CREATE TABLE settings (
+                key         TEXT PRIMARY KEY,
+                value       TEXT NOT NULL,
+                updated_at  DATETIME DEFAULT (datetime('now'))
+            );
+            INSERT INTO settings (key, value) VALUES ('hotkey_hands_free', 'Ctrl+F8');
+            ",
+        )?;
+
+        initialize_database(&conn)?;
+
+        assert!(queries::get_setting(&conn, "hotkey_hands_free").is_err());
 
         Ok(())
     }

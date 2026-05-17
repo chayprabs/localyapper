@@ -7,10 +7,10 @@ use crate::db::queries;
 use crate::hotkey::manager;
 use crate::state::AppState;
 
-/// Valid hotkey setting keys.
+/// Valid hotkey setting keys. Hands-free is no longer a separate hotkey -- it
+/// is engaged by double-tapping the record hotkey.
 const HOTKEY_KEYS: &[&str] = &[
     "hotkey_record",
-    "hotkey_hands_free",
     "hotkey_cancel",
     "hotkey_paste_last",
     "hotkey_open_app",
@@ -19,7 +19,6 @@ const HOTKEY_KEYS: &[&str] = &[
 /// Default hotkey values.
 const HOTKEY_DEFAULTS: &[(&str, &str)] = &[
     ("hotkey_record", "F8"),
-    ("hotkey_hands_free", "Ctrl+F8"),
     ("hotkey_cancel", "Escape"),
     ("hotkey_paste_last", "Ctrl+Alt+J"),
     ("hotkey_open_app", "Ctrl+Alt+O"),
@@ -28,7 +27,6 @@ const HOTKEY_DEFAULTS: &[(&str, &str)] = &[
 fn hotkey_label(key: &str) -> &str {
     match key {
         "hotkey_record" => "Record",
-        "hotkey_hands_free" => "Hands-free",
         "hotkey_cancel" => "Cancel",
         "hotkey_paste_last" => "Paste Last",
         "hotkey_open_app" => "Open App",
@@ -169,12 +167,12 @@ mod tests {
     fn hotkey_uniqueness_is_case_insensitive() {
         let conn = test_connection();
 
-        let result = ensure_hotkey_is_unique(&conn, "hotkey_record", "ctrl+f8");
+        let result = ensure_hotkey_is_unique(&conn, "hotkey_record", "ctrl+alt+j");
 
         assert!(result.is_err());
         assert_eq!(
             result.err().as_deref(),
-            Some("Hands-free is already using ctrl+f8")
+            Some("Paste Last is already using ctrl+alt+j")
         );
     }
 
@@ -189,13 +187,14 @@ mod tests {
             Some("F8")
         );
         assert_eq!(
-            settings.get("hotkey_hands_free").map(String::as_str),
-            Some("Ctrl+F8")
-        );
-        assert_eq!(
             settings.get("hotkey_cancel").map(String::as_str),
             Some("Escape")
         );
+        assert_eq!(
+            settings.get("hotkey_paste_last").map(String::as_str),
+            Some("Ctrl+Alt+J")
+        );
+        assert!(!settings.contains_key("hotkey_hands_free"));
     }
 
     #[test]

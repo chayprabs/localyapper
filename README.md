@@ -68,9 +68,9 @@ If the speech model is not present yet, the app will prompt you to open Settings
 
 ## Default Hotkeys
 
-- Record: `F8`
-- Hands-free: `Ctrl+F8`
-- Cancel: `Escape`
+- Record: `F8` (hold to dictate)
+- Hands-free: double-tap the record hotkey to start, single tap to stop
+- Cancel: `Escape` (only active while recording)
 - Paste last dictation: `Ctrl+Alt+J`
 - Open app: `Ctrl+Alt+O`
 
