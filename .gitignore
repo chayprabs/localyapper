@@ -12,11 +12,19 @@ build/
 .vite/
 src-tauri/target/
 target/
+target-linux/
 *.tsbuildinfo
 vite.config.d.ts
 .eslintcache
 coverage/
 .nyc_output/
+
+# Throwaway diagnostics / scratch
+job_log.txt
+job_log.zip
+job_html.txt
+jobs.json
+diff_manager.txt
 
 # Release artifacts
 *.msi

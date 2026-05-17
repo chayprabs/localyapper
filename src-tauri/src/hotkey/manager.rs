@@ -317,10 +317,11 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
             state.press_time_ms.store(now_ms(), Ordering::SeqCst);
             start_recording_session(&app, &state).await;
         }
-        MODE_TAP_PENDING => {
-            // Second tap of a double-tap. The recorder is still running from the
-            // first tap; we just promote the state machine to hands-free so
-            // releases stop being a "stop" gesture.
+        // Second tap of a double-tap. The recorder is still running from the
+        // first tap; we just promote the state machine to hands-free so
+        // releases stop being a "stop" gesture. If the CAS fails the mode
+        // moved out from under us; fall through to the catch-all arm.
+        MODE_TAP_PENDING
             if state
                 .mode
                 .compare_exchange(
@@ -329,13 +330,13 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
                     Ordering::SeqCst,
                     Ordering::SeqCst,
                 )
-                .is_ok()
-            {
-                log::info!("HOTKEY: Double-tap detected, hands-free engaged");
-            }
+                .is_ok() =>
+        {
+            log::info!("HOTKEY: Double-tap detected, hands-free engaged");
         }
-        MODE_HANDS_FREE => {
-            // Single tap inside hands-free stops the session.
+        // Single tap inside hands-free stops the session. Same fall-through
+        // behaviour if another thread already transitioned us out.
+        MODE_HANDS_FREE
             if state
                 .mode
                 .compare_exchange(
@@ -344,12 +345,11 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
                     Ordering::SeqCst,
                     Ordering::SeqCst,
                 )
-                .is_ok()
-            {
-                log::info!("HOTKEY: Hands-free toggle off");
-                unregister_cancel_hotkey(&app);
-                run_pipeline_and_inject(app, state).await;
-            }
+                .is_ok() =>
+        {
+            log::info!("HOTKEY: Hands-free toggle off");
+            unregister_cancel_hotkey(&app);
+            run_pipeline_and_inject(app, state).await;
         }
         _ => {
             // Ignore presses while the pipeline is running or while the recorder
