@@ -1,19 +1,30 @@
-// Dashboard hook -- stats, last dictation, and speech model status with auto-refresh
+// Dashboard hook -- stats, last dictation, model status with auto-refresh
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import type { HistoryEntry, ModelsStatus, Stats } from "@/types/commands";
+import type {
+  HistoryEntry,
+  ModelsStatus,
+  SpeechModelFileStatus,
+  Stats,
+} from "@/types/commands";
 import type { PipelineEvent } from "@/types/overlay";
 import {
   deleteHistoryEntry,
   getHistory,
   getStats,
 } from "@/lib/commands/history";
-import { checkModelsStatus } from "@/lib/commands/models";
+import {
+  checkModelsStatus,
+  checkSpeechModelFileExists,
+} from "@/lib/commands/models";
+import { getSetting } from "@/lib/commands/settings";
 
 interface DashboardData {
   stats: Stats | null;
   lastDictation: HistoryEntry | null;
   modelStatus: ModelsStatus | null;
+  modelFileStatus: SpeechModelFileStatus | null;
+  recordHotkey: string;
   isLoading: boolean;
   error: string | null;
   refresh: () => void;
@@ -36,15 +47,26 @@ export function useDashboard(): DashboardData {
   const [stats, setStats] = useState<Stats | null>(null);
   const [lastDictation, setLastDictation] = useState<HistoryEntry | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelsStatus | null>(null);
+  const [modelFileStatus, setModelFileStatus] =
+    useState<SpeechModelFileStatus | null>(null);
+  const [recordHotkey, setRecordHotkey] = useState("F8");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true);
-    const [statsResult, historyResult, modelsResult] = await Promise.allSettled([
+    const [
+      statsResult,
+      historyResult,
+      modelsResult,
+      filesResult,
+      hotkeyResult,
+    ] = await Promise.allSettled([
       getStats(),
       getHistory(1, 0),
       checkModelsStatus(),
+      checkSpeechModelFileExists(),
+      getSetting("hotkey_record"),
     ]);
 
     if (statsResult.status === "fulfilled") {
@@ -56,7 +78,18 @@ export function useDashboard(): DashboardData {
     if (modelsResult.status === "fulfilled") {
       setModelStatus(modelsResult.value);
     }
-    const failed = [statsResult, historyResult, modelsResult].find(
+    if (filesResult.status === "fulfilled") {
+      setModelFileStatus(filesResult.value);
+    }
+    if (
+      hotkeyResult.status === "fulfilled" &&
+      typeof hotkeyResult.value === "string" &&
+      hotkeyResult.value.length > 0
+    ) {
+      setRecordHotkey(hotkeyResult.value);
+    }
+
+    const failed = [statsResult, historyResult, modelsResult, filesResult].find(
       (result) => result.status === "rejected",
     );
     setError(
@@ -103,6 +136,8 @@ export function useDashboard(): DashboardData {
     stats,
     lastDictation,
     modelStatus,
+    modelFileStatus,
+    recordHotkey,
     isLoading,
     error,
     refresh: fetchAll,
