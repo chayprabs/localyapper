@@ -63,14 +63,12 @@ src-tauri/resources/models/
 *.jks
 *.keystore
 
-# Local agent and assistant state
+# Local agent and assistant state — only the per-tool state directories are
+# ignored. AGENTS.md and CLAUDE.md are tracked as contributor/agent
+# contracts so all collaborators (human or AI) see the same direction.
 .claude/
 .codex/
 .agents/
-AGENTS.md
-CLAUDE.md
-**/AGENTS.md
-**/CLAUDE.md
 
 # Internal planning docs
 docs/PROGRESS.md
