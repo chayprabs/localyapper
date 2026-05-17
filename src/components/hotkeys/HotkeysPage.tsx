@@ -1,6 +1,7 @@
 // Hotkeys page -- remappable keyboard shortcuts with live key capture
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useHotkeys } from "@/hooks/useHotkeys";
+import { reservedHotkeyMessage } from "@/lib/hotkeyReservations";
 
 // Platform detection for key symbol display
 const isMac =
@@ -232,34 +233,45 @@ export function HotkeysPage() {
       </div>
 
       <div className="overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-sm">
-        {entries.map((entry, index) => (
-          <div
-            key={entry.key}
-            className={`grid gap-4 px-5 py-4 md:grid-cols-[minmax(0,1fr)_minmax(240px,320px)] md:items-center ${
-              index < entries.length - 1 ? "border-b border-black/[0.07]" : ""
-            }`}
-          >
-            <div className="min-w-0">
-              <span className="text-[13px] font-semibold text-black/85">
-                {entry.label}
-              </span>
-              <span className="mt-1 block text-[12px] text-black/[0.40]">
-                {entry.description}
-              </span>
-            </div>
+        {entries.map((entry, index) => {
+          const reservedMessage = reservedHotkeyMessage(entry.value);
+          return (
+            <div
+              key={entry.key}
+              className={`grid gap-4 px-5 py-4 md:grid-cols-[minmax(0,1fr)_minmax(240px,320px)] md:items-center ${
+                index < entries.length - 1 ? "border-b border-black/[0.07]" : ""
+              }`}
+            >
+              <div className="min-w-0">
+                <span className="text-[13px] font-semibold text-black/85">
+                  {entry.label}
+                </span>
+                <span className="mt-1 block text-[12px] text-black/[0.40]">
+                  {entry.description}
+                </span>
+              </div>
 
-            <div className="w-full md:justify-self-end">
-              <KeySelector
-                value={entry.value}
-                isEditing={editingKey === entry.key}
-                readOnly={entry.readOnly}
-                onStartEdit={() => startEditing(entry.key)}
-                onCapture={(shortcut) => handleCapture(entry.key, shortcut)}
-                onCancel={stopEditing}
-              />
+              <div className="w-full md:justify-self-end">
+                <KeySelector
+                  value={entry.value}
+                  isEditing={editingKey === entry.key}
+                  readOnly={entry.readOnly}
+                  onStartEdit={() => startEditing(entry.key)}
+                  onCapture={(shortcut) => handleCapture(entry.key, shortcut)}
+                  onCancel={stopEditing}
+                />
+                {reservedMessage && (
+                  <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-[#9a5a00]">
+                    <span className="material-symbols-outlined text-[14px]">
+                      warning
+                    </span>
+                    {reservedMessage}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
