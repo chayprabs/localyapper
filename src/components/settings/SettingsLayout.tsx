@@ -1,13 +1,26 @@
 // Main settings layout -- sidebar navigation with page content area
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { activePageAtom, sidebarCollapsedAtom } from "@/stores/appStore";
 import { getSetting, setSetting } from "@/lib/commands/settings";
 import { Sidebar } from "./Sidebar";
-import { DashboardPage } from "@/components/dashboard/DashboardPage";
-import { HistoryPage } from "@/components/history/HistoryPage";
-import { HotkeysPage } from "@/components/hotkeys/HotkeysPage";
-import { ModelsPage } from "@/components/models/ModelsPage";
+
+// Settings pages are lazy-loaded so the main bundle stays small.
+// Each page imports its own data hooks and command wrappers; pulling them
+// only when the user navigates means the dashboard's initial paint is
+// faster and unused pages never touch the parse/compile budget.
+const DashboardPage = lazy(() =>
+  import("@/components/dashboard/DashboardPage").then((m) => ({ default: m.DashboardPage })),
+);
+const HistoryPage = lazy(() =>
+  import("@/components/history/HistoryPage").then((m) => ({ default: m.HistoryPage })),
+);
+const HotkeysPage = lazy(() =>
+  import("@/components/hotkeys/HotkeysPage").then((m) => ({ default: m.HotkeysPage })),
+);
+const ModelsPage = lazy(() =>
+  import("@/components/models/ModelsPage").then((m) => ({ default: m.ModelsPage })),
+);
 
 /** Page ID → React component lookup table for content area rendering. */
 const pages = {
@@ -16,6 +29,16 @@ const pages = {
   hotkeys: HotkeysPage,
   models: ModelsPage,
 } as const;
+
+function PageFallback() {
+  return (
+    <div className="h-full w-full flex items-center justify-center">
+      <span className="material-symbols-outlined text-[24px] text-black/[0.30] animate-spin">
+        progress_activity
+      </span>
+    </div>
+  );
+}
 
 export function SettingsLayout() {
   const activePage = useAtomValue(activePageAtom);
@@ -39,7 +62,9 @@ export function SettingsLayout() {
       <Sidebar />
       <main className="flex-1 bg-[#eeeeee] p-3">
         <div className="bg-white rounded-2xl h-full overflow-y-auto overflow-x-hidden">
-          <PageComponent />
+          <Suspense fallback={<PageFallback />}>
+            <PageComponent />
+          </Suspense>
         </div>
       </main>
       {/* Toggle button — fixed position at bottom-left */}
