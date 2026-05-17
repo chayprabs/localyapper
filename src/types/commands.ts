@@ -42,6 +42,12 @@ export interface ModelsStatus {
   speech_model_loaded: boolean;
 }
 
+export interface ModelState {
+  loaded: boolean;
+  /** "loaded" | "unloaded" | "loading" */
+  state: string;
+}
+
 export interface SpeechModelFileStatus {
   exists: boolean;
   size_mb: number;

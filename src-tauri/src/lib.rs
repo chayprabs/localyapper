@@ -196,6 +196,7 @@ pub fn run() {
             commands::models::cancel_model_download,
             commands::models::reload_models,
             commands::models::check_models_status,
+            commands::models::get_model_state,
             commands::models::check_speech_model_file_exists,
             commands::models::delete_speech_model,
             commands::history::get_history,

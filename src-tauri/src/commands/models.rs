@@ -29,10 +29,20 @@ pub(crate) async fn ensure_speech_model_loaded(
         }
     }
 
+    // First touch since startup or eviction: tell the frontend so it can
+    // surface a brief "loading" indicator instead of looking frozen.
+    let _ = app_handle.emit(
+        crate::stt::lifecycle::MODEL_STATE_EVENT,
+        crate::stt::lifecycle::ModelStatePayload {
+            loaded: false,
+            state: "loading".to_string(),
+        },
+    );
+
     let model_name = selected_speech_model_name(state);
-    let app_handle = app_handle.clone();
+    let load_handle = app_handle.clone();
     let loaded_engine = tokio::task::spawn_blocking(move || {
-        crate::load_speech_model_from_setting(&app_handle, &model_name)
+        crate::load_speech_model_from_setting(&load_handle, &model_name)
     })
     .await
     .map_err(|e| format!("STT load task panicked: {e}"))??;
@@ -44,8 +54,16 @@ pub(crate) async fn ensure_speech_model_loaded(
     if guard.is_none() {
         *guard = Some(loaded_engine.clone());
     }
+    drop(guard);
 
-    Ok(guard.as_ref().cloned().unwrap_or(loaded_engine))
+    state.lifecycle.emit_state(app_handle, true);
+
+    if let Ok(guard) = state.whisper.lock() {
+        if let Some(engine) = guard.as_ref() {
+            return Ok(engine.clone());
+        }
+    }
+    Ok(loaded_engine)
 }
 
 /// Lazily load the Silero VAD model if a model file is present on disk.
@@ -463,5 +481,18 @@ pub async fn check_models_status(
 
     Ok(ModelsStatus {
         speech_model_loaded,
+    })
+}
+
+/// Return the current model load state for the frontend `model-state`
+/// listener to hydrate on mount.
+#[tauri::command]
+pub async fn get_model_state(
+    state: tauri::State<'_, AppState>,
+) -> Result<crate::stt::lifecycle::ModelStatePayload, String> {
+    let loaded = state.whisper.lock().map(|g| g.is_some()).unwrap_or(false);
+    Ok(crate::stt::lifecycle::ModelStatePayload {
+        loaded,
+        state: if loaded { "loaded" } else { "unloaded" }.to_string(),
     })
 }
