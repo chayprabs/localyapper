@@ -172,6 +172,7 @@ pub fn run() {
                 // Preload the recognizer at startup when speech files are installed.
                 whisper: Arc::new(Mutex::new(speech_engine)),
                 vad: Arc::new(Mutex::new(silero_vad)),
+                lifecycle: stt::lifecycle::ModelLifecycle::new(),
                 last_injection: Arc::new(Mutex::new(None)),
                 download_cancel: Arc::new(AtomicBool::new(false)),
                 paused: Arc::new(AtomicBool::new(false)),

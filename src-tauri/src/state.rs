@@ -1,6 +1,7 @@
 // Application state -- shared Tauri state container
 use crate::audio::capture::AudioRecorder;
 use crate::audio::vad::SileroVad;
+use crate::stt::lifecycle::ModelLifecycle;
 use crate::stt::whisper::WhisperEngine;
 use rusqlite::Connection;
 use std::sync::atomic::AtomicBool;
@@ -16,6 +17,10 @@ pub struct AppState {
     pub whisper: Arc<Mutex<Option<Arc<WhisperEngine>>>>,
     /// Silero VAD engine — loaded from models dir, optional (falls back to energy-based).
     pub vad: Arc<Mutex<Option<SileroVad>>>,
+    /// Idle-driven model eviction coordinator. Wired in by the recording
+    /// pipeline; held here so it is reachable from any IPC handler.
+    #[allow(dead_code)]
+    pub lifecycle: ModelLifecycle,
     /// Most recent injected text, used by paste_last command.
     pub last_injection: Arc<Mutex<Option<String>>>,
     /// Signal flag to abort an in-progress model download.
