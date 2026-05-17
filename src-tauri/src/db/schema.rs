@@ -50,6 +50,7 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
         ("overlay_y", "100"),
         ("setup_complete", "false"),
         ("setup_step", "welcome"),
+        ("idle_unload_seconds", "60"),
     ];
 
     let tx = conn.unchecked_transaction()?;
@@ -163,7 +164,8 @@ mod tests {
 
         let settings_count: i64 =
             conn.query_row("SELECT COUNT(*) FROM settings", [], |row| row.get(0))?;
-        assert_eq!(settings_count, 10);
+        assert_eq!(settings_count, 11);
+        assert_eq!(queries::get_setting(&conn, "idle_unload_seconds")?, "60");
 
         Ok(())
     }
