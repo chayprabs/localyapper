@@ -11,7 +11,6 @@ mod stt;
 mod tray;
 
 use audio::capture::AudioRecorder;
-use audio::vad::SileroVad;
 use state::AppState;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -114,85 +113,32 @@ pub fn run() {
                 .unwrap_or(true);
             let speech_model_installed =
                 resolve_speech_model_dir(app.handle(), &speech_model_setting).is_some();
-            let speech_engine = if speech_model_installed {
-                match load_speech_model_from_setting(app.handle(), &speech_model_setting) {
-                    Ok(engine) => {
-                        log::info!("Speech engine preloaded at startup");
-                        Some(engine)
-                    }
-                    Err(e) => {
-                        log::warn!("Speech model files found, but preload failed: {e}");
-                        None
-                    }
-                }
-            } else {
-                None
-            };
-            let speech_engine_ready = speech_engine.is_some();
 
             if speech_model_installed {
-                if speech_engine_ready {
-                    log::info!("Speech model files found at startup; engine is ready");
-                } else {
-                    log::warn!("Speech model files found at startup, but engine is not ready");
-                }
+                log::info!(
+                    "Speech model files found at startup; engine will load on first dictation"
+                );
             } else {
                 log::warn!(
                     "Speech model files not found at startup - STT unavailable until downloaded"
                 );
             }
 
-            let silero_vad = {
-                let vad_path = app_data_dir
-                    .join("models")
-                    .join(stt::whisper::SILERO_VAD_FILENAME);
-                if vad_path.exists() {
-                    match SileroVad::new(&vad_path) {
-                        Ok(vad) => {
-                            log::info!("VAD: Silero VAD loaded successfully");
-                            Some(vad)
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to load Silero VAD: {e}");
-                            None
-                        }
-                    }
-                } else {
-                    log::info!(
-                        "VAD: Silero model not found at {}, using energy fallback",
-                        vad_path.display()
-                    );
-                    None
-                }
-            };
-
             app.manage(AppState {
                 db: Arc::new(Mutex::new(conn)),
                 recorder: Arc::new(AudioRecorder::new()),
-                // Preload the recognizer at startup when speech files are installed.
-                whisper: Arc::new(Mutex::new(speech_engine)),
-                vad: Arc::new(Mutex::new(silero_vad)),
+                // Lazy-loaded by ensure_speech_model_loaded on first use. Models are
+                // dropped after idle_unload_seconds by ModelLifecycle to keep idle
+                // RAM low; reloading from disk-cached weights costs ~1s.
+                whisper: Arc::new(Mutex::new(None)),
+                vad: Arc::new(Mutex::new(None)),
                 lifecycle: stt::lifecycle::ModelLifecycle::new(),
                 last_injection: Arc::new(Mutex::new(None)),
                 download_cancel: Arc::new(AtomicBool::new(false)),
                 paused: Arc::new(AtomicBool::new(false)),
             });
 
-            if speech_model_installed {
-                if speech_engine_ready {
-                    send_notification(
-                        app.handle(),
-                        "LocalYapper",
-                        "Speech engine loaded and ready for dictation",
-                    );
-                } else {
-                    send_notification(
-                        app.handle(),
-                        "LocalYapper",
-                        "Speech files are installed, but the engine needs attention",
-                    );
-                }
-            } else {
+            if !speech_model_installed {
                 send_notification(
                     app.handle(),
                     "LocalYapper",

@@ -15,6 +15,13 @@ pub(crate) async fn execute_pipeline(
     state: &AppState,
     app_handle: &tauri::AppHandle,
 ) -> Result<PipelineResult, String> {
+    // Lazily load Silero VAD if its model file is present and we don't have
+    // it in memory yet (e.g. after idle eviction). If the file is missing
+    // we silently fall through to energy VAD.
+    if let Err(e) = crate::commands::models::ensure_vad_loaded(app_handle, state).await {
+        log::warn!("VAD lazy load skipped: {e}");
+    }
+
     // Run VAD synchronously — extract Silero ref briefly, then drop the lock
     let vad_result = {
         let silero_guard = state.vad.lock().ok();

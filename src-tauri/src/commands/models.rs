@@ -48,6 +48,48 @@ pub(crate) async fn ensure_speech_model_loaded(
     Ok(guard.as_ref().cloned().unwrap_or(loaded_engine))
 }
 
+/// Lazily load the Silero VAD model if a model file is present on disk.
+/// Returns Ok(()) if Silero is loaded or unavailable (energy fallback is
+/// always usable). Idempotent and cheap to call repeatedly.
+pub(crate) async fn ensure_vad_loaded(
+    app_handle: &tauri::AppHandle,
+    state: &AppState,
+) -> Result<(), String> {
+    if state.vad.lock().map(|g| g.is_some()).unwrap_or(false) {
+        return Ok(());
+    }
+
+    let vad_path = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("models")
+        .join(crate::stt::whisper::SILERO_VAD_FILENAME);
+
+    if !vad_path.exists() {
+        return Ok(());
+    }
+
+    let vad_mutex = state.vad.clone();
+    tokio::task::spawn_blocking(move || -> Result<(), String> {
+        match crate::audio::vad::SileroVad::new(&vad_path) {
+            Ok(vad) => {
+                if let Ok(mut g) = vad_mutex.lock() {
+                    if g.is_none() {
+                        *g = Some(vad);
+                    }
+                }
+                Ok(())
+            }
+            Err(e) => Err(format!("Failed to load Silero VAD: {e}")),
+        }
+    })
+    .await
+    .map_err(|e| format!("VAD load task panicked: {e}"))??;
+
+    Ok(())
+}
+
 /// Cancel an in-progress model download.
 #[tauri::command]
 pub async fn cancel_model_download(state: tauri::State<'_, AppState>) -> Result<(), String> {
