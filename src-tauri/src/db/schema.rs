@@ -33,7 +33,11 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
     Ok(())
 }
 
-/// Inserts default settings (10 rows). Uses INSERT OR IGNORE for idempotency.
+/// Inserts default settings. Uses INSERT OR IGNORE for idempotency.
+///
+/// `setup_step` tracks the active wizard step so the user resumes where they
+/// left off if they quit the app mid-onboarding. Valid values:
+/// `welcome | microphone | hotkey | files | done`.
 fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
     let seeds = [
         ("hotkey_record", "F8"),
@@ -46,6 +50,7 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
         ("overlay_x", "100"),
         ("overlay_y", "100"),
         ("setup_complete", "false"),
+        ("setup_step", "welcome"),
     ];
 
     let tx = conn.unchecked_transaction()?;
@@ -150,6 +155,7 @@ mod tests {
         initialize_database(&conn)?;
 
         assert_eq!(queries::get_setting(&conn, "setup_complete")?, "false");
+        assert_eq!(queries::get_setting(&conn, "setup_step")?, "welcome");
         assert_eq!(queries::get_setting(&conn, "hotkey_record")?, "F8");
         assert_eq!(queries::get_setting(&conn, "hotkey_hands_free")?, "Ctrl+F8");
         assert_eq!(
@@ -159,7 +165,7 @@ mod tests {
 
         let settings_count: i64 =
             conn.query_row("SELECT COUNT(*) FROM settings", [], |row| row.get(0))?;
-        assert_eq!(settings_count, 10);
+        assert_eq!(settings_count, 11);
 
         Ok(())
     }
