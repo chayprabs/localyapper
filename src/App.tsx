@@ -1,8 +1,9 @@
-// Root application component -- routes between overlay and main window
+// Root application component for the main settings window. The overlay
+// has its own entry point (`src/overlay-main.tsx`) so the overlay WebView
+// does not download or parse the settings/wizard module graph.
 import { useEffect } from "react";
 import { useAtom } from "jotai";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Overlay } from "@/components/overlay/Overlay";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import { TitleBar } from "@/components/settings/TitleBar";
 import { Wizard } from "@/components/wizard/Wizard";
@@ -10,7 +11,7 @@ import { setupCompleteAtom } from "@/stores/wizardStore";
 import { getSetting } from "@/lib/commands/settings";
 import { usePausedState } from "@/hooks/usePausedState";
 
-function MainWindow() {
+export function App() {
   const [setupComplete, setSetupComplete] = useAtom(setupCompleteAtom);
   usePausedState();
 
@@ -45,14 +46,4 @@ function MainWindow() {
       </div>
     </div>
   );
-}
-
-export function App() {
-  const isOverlay = window.location.pathname === "/overlay";
-
-  if (isOverlay) {
-    return <Overlay />;
-  }
-
-  return <MainWindow />;
 }

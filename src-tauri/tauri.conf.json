@@ -48,7 +48,7 @@
         "skipTaskbar": true,
         "visible": false,
         "focus": false,
-        "url": "/overlay"
+        "url": "/overlay.html"
       }
     ]
   }

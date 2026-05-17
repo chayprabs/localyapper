@@ -33,5 +33,14 @@ export default defineConfig({
       process.env.TAURI_PLATFORM === "windows" ? "chrome105" : "safari13",
     minify: !process.env.TAURI_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_DEBUG,
+    rollupOptions: {
+      input: {
+        // Settings + wizard live behind index.html
+        main: path.resolve(__dirname, "index.html"),
+        // Overlay pill loads a tiny separate bundle so the floating
+        // window does not parse the settings module graph.
+        overlay: path.resolve(__dirname, "overlay.html"),
+      },
+    },
   },
 });
