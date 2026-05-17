@@ -1,4 +1,4 @@
-// Wizard welcome step -- app introduction with Get Started action
+// Wizard welcome step -- product introduction with Get Started action
 export function WelcomeStep({
   onGetStarted,
   onSkip,
@@ -10,31 +10,32 @@ export function WelcomeStep({
 }) {
   return (
     <div className="flex flex-col items-center text-center">
-      {/* Logo */}
-      <div className="w-16 h-16 bg-gradient-to-b from-[#0062d0] to-[#0058bc] rounded-2xl flex items-center justify-center mb-5 shadow-lg">
-        <span className="material-symbols-outlined text-white text-[32px]">
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-b from-[#0062d0] to-[#0058bc] shadow-lg">
+        <span className="material-symbols-outlined text-[32px] text-white">
           mic
         </span>
       </div>
 
-      <h1 className="text-[22px] font-semibold text-black/85 mb-2">
+      <h1 className="mb-2 text-[22px] font-semibold text-black/85">
         Welcome to LocalYapper
       </h1>
-      <p className="text-[14px] text-black/50 mb-8 max-w-[340px] leading-relaxed">
-        Voice dictation that runs entirely on your device. We will download the
-        speech files, set your hotkey, and keep everything local.
+      <p className="mb-8 max-w-[360px] text-[14px] leading-relaxed text-black/50">
+        Press a key, speak, let go. Your words appear wherever your cursor is.
+        Everything happens on this device.
       </p>
 
       <button
+        type="button"
         onClick={onGetStarted}
-        className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 active:brightness-95 transition-all"
+        className="h-9 w-full rounded-[8px] bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-[13px] font-medium text-white transition-all hover:brightness-110 active:brightness-95"
       >
-        Get Started
+        Get started
       </button>
 
       <button
+        type="button"
         onClick={onSkip}
-        className="mt-3 text-[13px] text-black/[0.40] hover:text-black/60 transition-colors"
+        className="mt-3 text-[13px] text-black/[0.40] transition-colors hover:text-black/60"
       >
         Skip setup
       </button>
