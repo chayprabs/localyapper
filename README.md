@@ -5,122 +5,114 @@
 <h1 align="center">LocalYapper</h1>
 
 <p align="center">
-  <strong>Fully offline desktop voice dictation.</strong><br/>
-  Open-source alternative to Wispr Flow and SuperWhisper. No cloud. No subscription. No audio leaves your machine.
+  <strong>Fully offline voice dictation for your desktop.</strong><br/>
+  A privacy-first, open-source alternative to Wispr Flow and SuperWhisper.<br/>
+  No cloud. No subscription. No audio ever leaves your machine.
+</p>
+
+<p align="center">
+  <em>Press a key. Speak. Your words appear in whatever app you were using.</em>
 </p>
 
 ---
 
-## Overview
+## How it works
 
-LocalYapper is a local-first desktop dictation app for Windows, macOS, and Linux.
-Press a global hotkey, speak, and the app will:
+```
+hotkey -> microphone capture -> VAD -> Parakeet speech model -> clipboard paste
+                                       (everything stays on this machine)
+```
 
-- capture microphone audio locally
-- remove silence with VAD
-- transcribe speech with a local speech model
-- paste the result into the focused app
+1. You press (or hold, or double-tap) the global record hotkey.
+2. LocalYapper captures 16 kHz mono audio from your default microphone into RAM.
+3. Silero VAD trims silence; if the VAD model is unavailable an energy-based fallback is used.
+4. Parakeet (via `sherpa-onnx`) transcribes the audio to text.
+5. The text is briefly placed on the clipboard, pasted into the window you were just using, and the original clipboard contents are restored.
 
-The current app is speech-only by design. There is no dictionary training flow, no Ollama integration, no BYOK providers, and no local LLM cleanup step in the pipeline.
+Audio is **never written to disk**. There is no telemetry, no cloud STT, and no LLM cleanup stage — the recognised text is the final text.
 
-## Current Features
+## Features
 
-- Fully offline dictation
-- First-launch wizard that downloads the speech model and sets your hotkey
-- Floating overlay with listening, processing, transcribed, and no-speech states
-- Global hotkeys for record, cancel, paste last, and open app
-- History page for previous dictations
-- Models page for downloading, deleting, and reloading the local speech model
-- Tray app with open, pause dictation, and quit actions
-- Local SQLite storage for settings and history
-- Clipboard-based text injection across platforms
+- **Offline-only dictation.** Parakeet 110M runs fully on-device.
+- **Three recording gestures from a single hotkey:**
+  - **Hold** the record key — release to send.
+  - **Double-tap** the record key (within ~350 ms) to enter hands-free mode; tap once more to stop.
+  - Each session has a 120-second hard cap, with a red 15-second countdown starting at 105 s.
+- **Floating overlay** that shows the live state: listening, processing, transcribed, no-speech, stopping-soon.
+- **First-run wizard with granular resume.** Welcome → Microphone permission → Hotkey → Speech files → Done. The active step is persisted so quitting mid-setup picks up where you left off.
+- **Customisable hotkeys** for record, cancel, paste-last, and open-app, with a soft warning when you bind a combo the OS commonly reserves.
+- **System tray** with Open, Pause Dictation, Quit. The main-window title bar shows a *Paused* chip whenever dictation is paused from the tray.
+- **Local dictation history** with copy, delete per entry, and clear-all.
+- **Local SQLite storage** (`rusqlite`, bundled). Two active tables: `transcription_history` and `settings`. Nothing else.
+- **Cross-platform.** Windows 10+, macOS 12+, Linux on X11 and Wayland.
 
-## Current Pipeline
+## Default hotkeys
 
-`hotkey -> audio capture -> VAD -> local speech recognition -> text injection`
+| Action       | Default       | Notes                                                |
+|--------------|---------------|------------------------------------------------------|
+| Record       | `F8`          | Hold to dictate; double-tap to toggle hands-free     |
+| Cancel       | `Escape`      | Only registered while a recording is active          |
+| Paste last   | `Ctrl+Alt+J`  | Re-injects the most recent transcription             |
+| Open app     | `Ctrl+Alt+O`  | Brings the LocalYapper main window to focus          |
 
-Notes:
+All four are rebindable from the **Hotkeys** page.
 
-- Audio stays in memory only
-- Silero VAD is used when available, with an energy-based fallback
-- The default speech model is Parakeet 110M, downloaded on first launch
-- The current download size is about 458 MB
+## App pages
 
-## What Is Not In The App Anymore
+- **Dashboard** — today / week / all-time stats, the last dictation, model status (name + on-disk size), a *speech files missing* banner if the model isn't installed, and a welcoming empty state when you haven't dictated anything yet.
+- **History** — paginated list with copy and delete per entry, plus clear-all.
+- **Hotkeys** — rebind any shortcut via key-listening mode and reset to defaults. Soft warning if your binding overlaps a known OS-reserved combo.
+- **Speech** — manage the local Parakeet model: download, load, or remove.
 
-- Dictionary page and training flow
-- learned correction cleanup
-- Ollama integration
-- local LLM cleanup
-- API-key cleanup providers
-- processing modes
-- app profile routing
+There is intentionally no Dictionary page, no Training tab, no remote-model picker, and no LLM settings.
 
-## First Launch
+## Privacy
 
-On first launch, LocalYapper opens a setup wizard that:
-
-1. downloads the local speech model
-2. lets you confirm your hotkey
-3. marks setup complete and enables normal dictation flow
-
-If the speech model is not present yet, the app will prompt you to open Settings and download it.
-
-## Default Hotkeys
-
-- Record: `F8` (hold to dictate)
-- Hands-free: double-tap the record hotkey to start, single tap to stop
-- Cancel: `Escape` (only active while recording)
-- Paste last dictation: `Ctrl+Alt+J`
-- Open app: `Ctrl+Alt+O`
-
-These can be changed in the Hotkeys page.
-
-## Current Status
-
-LocalYapper is currently a v0.1.0 release candidate.
-
-- Core dictation flow is implemented
-- Cross-platform CI builds are green for Windows, macOS, and Linux
-- Release workflow uploads Windows NSIS, macOS DMG, Linux DEB/AppImage artifacts
-- The current product direction is speech recognition only
+- Audio is captured into RAM and discarded as soon as the pipeline finishes.
+- The only outbound network calls are the one-time downloads of the Parakeet speech model and the Silero VAD model. After that, the app is fully offline.
+- No analytics, no crash reporting, no remote logging, no autoupdate ping.
+- All settings and history live in a single SQLite file in your platform's app-data directory.
 
 ## Stack
 
-| Layer | Tech |
-|:------|:-----|
-| Desktop shell | Tauri 2 |
-| Backend | Rust |
-| Frontend | React 19 + TypeScript 5 + Vite 5 |
-| Audio capture | cpal |
-| VAD | Silero VAD + energy fallback |
-| Speech recognition | sherpa-onnx + Parakeet |
-| Storage | rusqlite (bundled SQLite) |
-| Injection | enigo + clipboard flow |
+| Layer               | Tech                                                |
+|---------------------|-----------------------------------------------------|
+| Desktop shell       | Tauri 2                                             |
+| Backend             | Rust (stable 1.95+)                                 |
+| Frontend            | React 19 + TypeScript 5 + Vite 5 + Tailwind CSS 3   |
+| State               | Jotai 2                                             |
+| Charts / icons      | Recharts 2 + Material Symbols                       |
+| Audio capture       | `cpal` 0.15 at 16 kHz mono                          |
+| VAD                 | Silero VAD, with an energy-based fallback           |
+| Speech recognition  | `sherpa-onnx` 1.12 + Parakeet 110M (default)        |
+| Storage             | `rusqlite` 0.31 (bundled SQLite)                    |
+| Text injection      | `enigo` 0.2 + clipboard save → set → paste → restore|
 
-## Repo Layout
+On Linux the injector dispatches between X11 (`xclip` + `xdotool`) and Wayland (`wl-clipboard` + `wtype`) automatically.
 
-```text
+## Repo layout
+
+```
 src-tauri/
   src/
-    audio/
-    commands/
-    context/
-    db/
-    hotkey/
-    injection/
-    models/
-    stt/
-    tray/
-    lib.rs
-    state.rs
-
+    audio/        cpal capture, Silero VAD, energy fallback
+    commands/     #[tauri::command] IPC handlers
+    context/      focused-window detection
+    db/           rusqlite schema + queries
+    hotkey/       global shortcuts + state machine (hold / tap / double-tap)
+    injection/    clipboard-paste-restore injector + per-platform helpers
+    models/       data types shared with the frontend
+    stt/          Parakeet wrapper around sherpa-onnx
+    tray/         system tray menu + paused-state event
+    lib.rs        entrypoint, setup(), generate_handler!
+    state.rs      Tauri-managed AppState
 src/
-  components/
-  hooks/
-  lib/
-  stores/
-  types/
+  components/     dashboard, history, hotkeys, models, overlay, wizard, settings, ui
+  hooks/          useWizard, useHotkeys, useDashboard, usePausedState, ...
+  lib/            typed wrappers around invoke() in lib/commands/*
+  stores/         Jotai atoms
+  types/          shared TypeScript types
+docs/             BUILD, MANUAL_QA, FINAL_AUDIT, PRODUCT_AUDIT, RELEASE_NOTES
 ```
 
 ## Development
@@ -131,7 +123,7 @@ Install dependencies:
 npm install
 ```
 
-Run the frontend only:
+Run the frontend only (no native window):
 
 ```bash
 npm run dev
@@ -143,38 +135,68 @@ Run the full Tauri app:
 npm run tauri dev
 ```
 
-Build the frontend bundle:
+Build the frontend bundle (also runs `tsc -b`):
 
 ```bash
 npm run build
 ```
 
-## Verification
-
-Run these after changes:
+Build a real installer for your platform:
 
 ```bash
-npm run lint
-npm audit --omit=dev
-npx tsc --noEmit
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path src-tauri/Cargo.toml
+npm run tauri build
 ```
 
-Before tagging a release, also run the manual desktop QA checklist in
-`docs/MANUAL_QA.md` for real microphone capture and external-app injection.
+See `docs/BUILD.md` for platform-specific prerequisites (notably the Linux apt packages and macOS code-signing flow).
 
-## Source Of Truth
+## Verification
 
-Some older local planning docs may describe an earlier LLM/Ollama architecture.
-For the current public app, use these as the main references:
+These are the same checks GitHub Actions runs on every push to `main`. Run them locally before pushing:
 
-- `README.md`
-- `DESIGN_SYSTEM.md`
-- `docs/FINAL_AUDIT.md`
-- `docs/MANUAL_QA.md`
-- the live code in `src/` and `src-tauri/`
+```bash
+npm audit --omit=dev
+npm run lint
+npx tsc --noEmit
+cargo fmt --manifest-path src-tauri/Cargo.toml --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path src-tauri/Cargo.toml
+npm run build
+```
+
+Keep your toolchain on the latest stable Rust (`rustup update stable`). CI does, and the clippy lint set tightens between releases.
+
+Before tagging a release, also run the manual desktop QA checklist in `docs/MANUAL_QA.md` (real microphone capture, real external-app injection on each OS).
+
+## Release status
+
+LocalYapper is currently a **v0.1.0 release candidate**.
+
+- The core pipeline (capture → VAD → Parakeet → injection) is implemented and shipping.
+- Onboarding, hotkeys, history, dashboard, and the system tray are feature-complete for v0.1.0.
+- The GitHub Actions `Release` workflow builds cross-platform installers — Windows NSIS, macOS Apple Silicon + Intel DMG, and Linux DEB + AppImage — on every push to `main`.
+- See `docs/RELEASE_NOTES_v0.1.0.md` for the candidate notes.
+
+## What is intentionally NOT in the app
+
+These were considered, prototyped, or previously present, and have been deliberately removed. Please don't reintroduce them in a PR without opening an issue first:
+
+- Cloud or BYOK STT providers of any kind.
+- A local LLM cleanup stage (e.g. `mistral.rs`, `llama-cpp-rs`, Candle).
+- Whisper / `whisper-rs` (the app uses Parakeet via `sherpa-onnx`).
+- Ollama integration, processing modes, or app-profile routing.
+- Correction engine, confidence-decay learning, personal dictionary, training paragraphs, the Dictionary page, the Training tab.
+- An auto-inject-delay setting beyond the fixed transcribed-overlay window.
+
+## Documentation
+
+- `AGENTS.md` and `CLAUDE.md` — guidance for human contributors and AI agents working in this repo.
+- `DESIGN_SYSTEM.md` — colours, typography, spacing, component specs.
+- `docs/BUILD.md` — per-platform build instructions.
+- `docs/MANUAL_QA.md` — pre-release manual QA checklist.
+- `docs/FINAL_AUDIT.md` — release-hardening audit.
+- `docs/PRODUCT_AUDIT.md` — current spec-vs-code reconciliation.
+- `docs/RELEASE_NOTES_v0.1.0.md` — current release notes.
 
 ## License
 
-MIT
+MIT — see `LICENSE`.
