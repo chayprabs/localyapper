@@ -1,13 +1,14 @@
 # LocalYapper Product Audit
 
 Date: 2026-05-17
-Branch: `main` (synced with `origin/main` at `e531ead`)
+Branch: `main`
 Reviewer: codebase-vs-spec reconciliation
 
 This document compares the long-form product spec ("LocalYapper — What This App
-Should Be") against the live code. It does not change any code. The goal is to
-agree on what the spec says, what the codebase actually is, and which items are
-real gaps that still need to be closed before shipping v0.1.0.
+Should Be") against the live code. The original audit produced the gap list
+below; phases A–F have since been implemented in this repo and are marked
+complete. The "Direction reconciliation" section is unchanged because those
+items were intentionally superseded and remain out of scope.
 
 ---
 
@@ -211,11 +212,20 @@ press the hotkey, get nothing, and have no idea why. Either:
 
 ---
 
-## 4. Recommended phased plan
+## 4. Phased plan and status
 
-This is the proposed order of work. Each phase ends in green
-lint + typecheck + clippy + tests, plus a commit cluster that is easy to
-review on its own.
+All six phases below have been implemented. Each phase ended in green
+lint + typecheck + clippy + tests, and the repository is at parity with the
+reconciled spec.
+
+| Phase | Description | Status |
+|---|---|---|
+| A | Documentation and direction | Done — `AGENTS.md`/`CLAUDE.md` re-tracked at the repo root with current direction |
+| B | Onboarding refresh (mic step, indicator, back, summary, granular resume) | Done — wizard now follows Welcome → Microphone → Hotkey → Speech files → Done |
+| C | Hands-free unification | Done — double-tap of the record key replaces the separate `Ctrl+F8` hotkey |
+| D | Dashboard polish | Done — empty state, model name + size, privacy line, missing-files banner |
+| E | Tray pause reflection | Done — `paused-state-changed` event + `Paused` chip in `TitleBar` |
+| F | Hotkey reservation warnings | Done — soft-warning under each hotkey row for OS-reserved combos |
 
 ### Phase A — Documentation and direction
 
@@ -287,18 +297,13 @@ captured combo matches.
 
 ---
 
-## 5. Open product questions for the user
+## 5. Resolved product questions
 
-Before Phase B/C start, please confirm:
-
-1. **Hands-free model**: double-tap of dictation hotkey (spec) vs separate
-   `Ctrl+F8` hotkey (current). Recommendation: adopt double-tap.
-2. **Skip setup button**: remove it from the wizard, or keep it as an
-   escape hatch? Recommendation: remove.
-3. **Spec text** ("LocalYapper — What This App Should Be"): update it in
-   place to remove Ollama / BYOK / Dictionary / Training, or keep it as a
-   historical artifact and let `README.md` + this audit be the source of
-   truth?
+| Question | Resolution |
+|---|---|
+| Hands-free model — double-tap or separate hotkey? | Double-tap of the record hotkey. The separate `Ctrl+F8` was removed and the legacy setting is migrated out. |
+| Skip setup button? | Kept as an escape hatch. Users who skip see a "Speech files aren't installed" banner on the Dashboard with a one-click install CTA. |
+| Long product spec? | Treated as a historical artifact. `README.md` + `docs/PRODUCT_AUDIT.md` are the source of truth. |
 
 ---
 
