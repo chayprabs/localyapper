@@ -260,12 +260,7 @@ fn spawn_recording_limit_watchdog(app: AppHandle, hotkey_state: Arc<HotkeyState>
             }
             if hotkey_state
                 .mode
-                .compare_exchange(
-                    current,
-                    MODE_PROCESSING,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
+                .compare_exchange(current, MODE_PROCESSING, Ordering::SeqCst, Ordering::SeqCst)
                 .is_ok()
             {
                 break;
