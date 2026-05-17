@@ -19,7 +19,6 @@ pub struct AppState {
     pub vad: Arc<Mutex<Option<SileroVad>>>,
     /// Idle-driven model eviction coordinator. Wired in by the recording
     /// pipeline; held here so it is reachable from any IPC handler.
-    #[allow(dead_code)]
     pub lifecycle: ModelLifecycle,
     /// Most recent injected text, used by paste_last command.
     pub last_injection: Arc<Mutex<Option<String>>>,

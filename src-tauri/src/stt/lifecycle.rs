@@ -14,7 +14,6 @@
 // happened since, and drops the engines from `AppState`. If a new
 // transcription begins before the timer fires, `mark_used()` invalidates
 // the pending run by bumping a generation counter.
-#![allow(dead_code)]
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};

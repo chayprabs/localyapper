@@ -15,6 +15,10 @@ pub(crate) async fn execute_pipeline(
     state: &AppState,
     app_handle: &tauri::AppHandle,
 ) -> Result<PipelineResult, String> {
+    // Cancel any pending idle-eviction before we touch the models so we
+    // don't race with the eviction task during transcription.
+    state.lifecycle.mark_used();
+
     // Lazily load Silero VAD if its model file is present and we don't have
     // it in memory yet (e.g. after idle eviction). If the file is missing
     // we silently fall through to energy VAD.
@@ -65,6 +69,10 @@ pub(crate) async fn execute_pipeline(
     };
 
     let final_text = raw_text.clone();
+
+    // Schedule idle-eviction now that the heavy work is done. If another
+    // dictation begins inside the idle window, mark_used() will cancel it.
+    state.lifecycle.schedule_evict(app_handle.clone());
 
     Ok(PipelineResult {
         final_text,

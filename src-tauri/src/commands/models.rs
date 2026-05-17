@@ -362,12 +362,7 @@ pub async fn delete_speech_model(
 ) -> Result<(), String> {
     let model = selected_speech_model_name(state.inner());
 
-    if let Ok(mut g) = state.whisper.lock() {
-        *g = None;
-    }
-    if let Ok(mut g) = state.vad.lock() {
-        *g = None;
-    }
+    state.lifecycle.evict_now(&app_handle);
 
     let dir_name = crate::stt::whisper::stt_model_dir_name(&model);
     let models_dir = app_handle
