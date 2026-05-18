@@ -295,6 +295,27 @@ Lower priority. Can land in a later patch release. Add a curated reserved
 list per platform and render a soft warning under the rebind input when the
 captured combo matches.
 
+### Phase G — Idle memory and CPU footprint (complete)
+
+Cut idle RAM from ~500MB toward ~30-80MB without hurting the dictation hot
+path:
+
+- Parakeet + Silero VAD are lazy-loaded on first dictation and evicted from
+  `AppState` 60s after the last use via `stt::lifecycle::ModelLifecycle`.
+  Configurable via the `idle_unload_seconds` setting.
+- The main settings WebView is destroyed on close and rebuilt on demand by
+  `show_or_create_main_window()`.
+- Overlay window has its own Vite entry (`overlay.html` →
+  `src/overlay-main.tsx`) so it never parses the settings/wizard graph.
+- Material Symbols woff2 (3.9 MB) replaced with tree-shaken lucide-react
+  SVGs behind `src/components/ui/Icon.tsx`.
+- Release profile tuned (`lto = "fat"`, `codegen-units = 1`,
+  `strip = "symbols"`, `panic = "abort"`).
+- mimalloc replaces the system allocator to avoid sherpa-onnx
+  fragmentation. Tokio, chrono, reqwest features narrowed to what we
+  actually use; unused `recharts` dropped.
+- SQLite cache capped at 2 MB; `mmap_size = 0`.
+
 ---
 
 ## 5. Resolved product questions
