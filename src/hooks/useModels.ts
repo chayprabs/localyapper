@@ -6,7 +6,7 @@ import type {
   DownloadProgress,
   SpeechModelFileStatus,
 } from "@/types/commands";
-import { getAllSettings } from "@/lib/commands/settings";
+import { getAllSettings, setSetting } from "@/lib/commands/settings";
 import {
   cancelModelDownload,
   checkModelsStatus,
@@ -21,6 +21,9 @@ import {
 } from "@/stores/appStore";
 
 const DEFAULT_SPEECH_MODEL = "parakeet-110m";
+/** Idle window after which the recognizer is dropped from RAM. */
+const DEFAULT_IDLE_UNLOAD_SECONDS = 60;
+const IDLE_UNLOAD_SETTING_KEY = "idle_unload_seconds";
 
 export function useModels() {
   const [settingsCache, setSettingsCache] = useAtom(modelsSettingsCacheAtom);
@@ -49,6 +52,16 @@ export function useModels() {
   const [speechModelError, setSpeechModelError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!hasCached);
 
+  // Idle eviction config. Persisted in the `idle_unload_seconds` setting:
+  // any positive value enables eviction; 0 keeps the model resident.
+  const [idleUnloadSeconds, setIdleUnloadSeconds] = useState(
+    DEFAULT_IDLE_UNLOAD_SECONDS,
+  );
+  const [originalIdleUnloadSeconds, setOriginalIdleUnloadSeconds] = useState(
+    DEFAULT_IDLE_UNLOAD_SECONDS,
+  );
+  const [idleUnloadError, setIdleUnloadError] = useState<string | null>(null);
+
   const updateCaches = useCallback(
     (model: string, fileStatus: SpeechModelFileStatus, loaded: boolean) => {
       setSettingsCache({ speechModel: model });
@@ -69,6 +82,14 @@ export function useModels() {
         nextModel =
           settings["speech_model"] ?? DEFAULT_SPEECH_MODEL;
         setSpeechModel(nextModel);
+
+        const rawIdle = settings[IDLE_UNLOAD_SETTING_KEY];
+        const parsedIdle = rawIdle != null ? Number.parseInt(rawIdle, 10) : NaN;
+        const nextIdle = Number.isFinite(parsedIdle) && parsedIdle >= 0
+          ? parsedIdle
+          : DEFAULT_IDLE_UNLOAD_SECONDS;
+        setIdleUnloadSeconds(nextIdle);
+        setOriginalIdleUnloadSeconds(nextIdle);
       } catch (error) {
         setSpeechModelError(
           error instanceof Error
@@ -226,6 +247,31 @@ export function useModels() {
     }
   }, [speechModel, updateStatusCache]);
 
+  const setIdleUnloadEnabled = useCallback(
+    async (enabled: boolean) => {
+      const next = enabled ? DEFAULT_IDLE_UNLOAD_SECONDS : 0;
+      setIdleUnloadError(null);
+
+      // Optimistic update so the switch responds instantly.
+      setIdleUnloadSeconds(next);
+
+      try {
+        await setSetting(IDLE_UNLOAD_SETTING_KEY, String(next));
+      } catch (error) {
+        // Roll back on failure so the UI matches what's actually persisted.
+        setIdleUnloadSeconds(next === 0 ? DEFAULT_IDLE_UNLOAD_SECONDS : 0);
+        const message =
+          error instanceof Error
+            ? error.message
+            : typeof error === "string"
+              ? error
+              : "Failed to save preference";
+        setIdleUnloadError(message);
+      }
+    },
+    [],
+  );
+
   const loadSpeechModel = useCallback(async () => {
     setSpeechModelLoading(true);
     setSpeechModelError(null);
@@ -273,5 +319,11 @@ export function useModels() {
     deleteSpeechModelAction,
     loadSpeechModel,
     isLoading,
+    /** Current persisted idle-unload window in seconds. 0 = never unload. */
+    idleUnloadSeconds,
+    /** True when the user has changed the toggle this session. */
+    idleUnloadDirty: idleUnloadSeconds !== originalIdleUnloadSeconds,
+    idleUnloadError,
+    setIdleUnloadEnabled,
   };
 }

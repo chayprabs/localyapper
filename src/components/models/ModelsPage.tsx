@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { useModels } from "@/hooks/useModels";
 import { Icon } from "@/components/ui/Icon";
+import { Switch } from "@/components/ui/Switch";
 
 function formatSpeechModelName(modelName: string): string {
   switch (modelName) {
@@ -119,7 +120,13 @@ export function ModelsPage() {
     deleteSpeechModelAction,
     loadSpeechModel,
     isLoading,
+    idleUnloadSeconds,
+    idleUnloadDirty,
+    idleUnloadError,
+    setIdleUnloadEnabled,
   } = useModels();
+
+  const idleUnloadEnabled = idleUnloadSeconds > 0;
 
   if (isLoading) {
     return (
@@ -261,6 +268,52 @@ export function ModelsPage() {
           {speechModelError && (
             <div className="px-5 py-4">
               <p className="text-[11px] text-[#ba1a1a]">{speechModelError}</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-[10px] uppercase font-medium text-black/[0.40] tracking-[0.06em] mb-2 px-1">
+          MEMORY &amp; PERFORMANCE
+        </h2>
+
+        <div className="bg-white rounded-[10px] border border-black/[0.07] shadow-sm overflow-hidden">
+          <div className="px-5 py-4 flex items-start justify-between gap-4">
+            <div className="min-w-0 max-w-[440px]">
+              <p className="text-[13px] font-semibold text-black/85">
+                Free memory when idle
+              </p>
+              <p className="mt-1 text-[12px] text-black/[0.50] leading-relaxed">
+                Drops the speech engine from RAM about a minute after your last
+                dictation. The first dictation afterward takes ~1 second longer
+                while it reloads. Turn this off to keep the engine resident at
+                all times for instant first-dictation latency.
+              </p>
+            </div>
+            <div className="shrink-0 pt-0.5">
+              <Switch
+                checked={idleUnloadEnabled}
+                onChange={(next) => {
+                  void setIdleUnloadEnabled(next);
+                }}
+                ariaLabel="Free memory when idle"
+              />
+            </div>
+          </div>
+
+          {idleUnloadDirty && (
+            <div className="border-t border-black/[0.07] bg-[#0058bc]/[0.04] px-5 py-3 flex items-center gap-2">
+              <Icon name="sync" size={14} className="text-[#0058bc] shrink-0" />
+              <p className="text-[12px] font-medium text-[#0058bc]">
+                Restart LocalYapper to apply this change.
+              </p>
+            </div>
+          )}
+
+          {idleUnloadError && (
+            <div className="border-t border-black/[0.07] px-5 py-3">
+              <p className="text-[11px] text-[#ba1a1a]">{idleUnloadError}</p>
             </div>
           )}
         </div>
