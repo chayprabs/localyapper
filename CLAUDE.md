@@ -37,8 +37,24 @@ Notes:
 - VAD uses Silero VAD when present, energy fallback otherwise.
 - STT is Parakeet via `sherpa-onnx`.
 - Injection is clipboard save -> set -> paste -> restore. The previously
-  focused window is captured before the overlay shows.
+ focused window is captured before the overlay shows.
 - There is no correction pass and no LLM cleanup stage.
+
+## Memory / lifecycle
+
+- Parakeet and Silero VAD are NOT preloaded at startup. The pipeline lazy-
+ loads them on the first dictation and `stt::lifecycle::ModelLifecycle`
+ schedules them to be dropped from `AppState` after the idle window
+ (default 60s, override via the `idle_unload_seconds` setting).
+- The frontend can listen for `model-state` events
+ (`{ loaded: bool, state: "loaded" | "unloaded" | "loading" }`) or call
+ the `get_model_state` IPC command to render a loading hint.
+- The main settings window is **destroyed** on close (not hidden). It is
+ rebuilt on demand by `show_or_create_main_window()` when the tray icon,
+ tray menu, or open-app hotkey asks for it. The overlay window stays
+ alive so hotkey response is instant.
+- mimalloc is the global allocator. sherpa-onnx's alloc/free pattern
+ fragments badly under the Windows system allocator.
 
 ## Models
 

@@ -52,10 +52,35 @@ Notes:
 ## Session limits
 
 - Hard cap on a single recording: 120 seconds. Backend stops and processes the
-  active session at the cap.
+ active session at the cap.
 - Warning state at 105 seconds. The overlay turns red and counts down 15 to 0.
 - Pipeline safety timeout: 30 seconds.
 - Transcribed overlay stays visible for ~3 seconds, then auto-dismisses.
+
+## Idle model eviction
+
+Parakeet (`sherpa-onnx::OfflineRecognizer`) and Silero VAD pin hundreds of
+megabytes when loaded. To keep idle RAM low we:
+
+- Lazy-load both on first dictation (no preload at startup).
+- Drop them from `AppState` after `idle_unload_seconds` of inactivity.
+ Default 60 seconds; override via the setting key of the same name.
+- Cancel any pending eviction the moment a new dictation starts via a
+ generation counter in `stt::lifecycle::ModelLifecycle`.
+- Emit `model-state` events (`loaded` / `loading` / `unloaded`) so the
+ overlay can show a brief loading hint on the first dictation after
+ eviction. Frontend can also call `get_model_state` to hydrate on mount.
+
+## Window lifecycle
+
+- The main settings window is destroyed (not hidden) on close. Tray and
+ the open-app hotkey both call `show_or_create_main_window()` to rebuild
+ it on demand. Reopening from tray costs ~250-400ms.
+- The overlay window stays alive at all times so the dictation hotkey
+ has zero perceived latency. Its bundle is loaded from `overlay.html`
+ (separate Vite entry); it does not pull the settings or wizard graph.
+- mimalloc is the global allocator. Without it, sherpa-onnx's alloc/free
+ pattern fragments badly on Windows and partially undoes the eviction.
 
 ## Default hotkeys
 
