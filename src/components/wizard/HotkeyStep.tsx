@@ -1,5 +1,6 @@
 // Wizard hotkey configuration -- set primary recording shortcut
 import { useEffect, useRef, useState, useCallback } from "react";
+import { Icon } from "@/components/ui/Icon";
 
 const isMac =
   typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent);
@@ -108,9 +109,7 @@ export function HotkeyStep({
   return (
     <div className="flex flex-col items-center text-center">
       <div className="w-14 h-14 bg-[#0058bc]/[0.08] rounded-full flex items-center justify-center mb-5">
-        <span className="material-symbols-outlined text-[28px] text-[#0058bc]">
-          keyboard
-        </span>
+        <Icon name="keyboard" size={28} className="text-[#0058bc]" />
       </div>
 
       <h2 className="text-[20px] font-semibold text-black/85 mb-1">

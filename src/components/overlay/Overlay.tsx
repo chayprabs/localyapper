@@ -3,6 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useOverlayState } from "@/hooks/useOverlayState";
 import { CopyButton } from "@/components/ui/CopyButton";
+import { Icon } from "@/components/ui/Icon";
 import { Waveform } from "./Waveform";
 import { CountdownTimer } from "./CountdownTimer";
 import { YappingEmoji } from "./YappingEmoji";
@@ -142,9 +143,7 @@ export function Overlay() {
 
         {visualState === "error" && (
           <div className="flex items-center gap-3 h-full">
-            <span className="material-symbols-outlined text-[20px] text-destructive shrink-0">
-              error
-            </span>
+            <Icon name="error" size={20} className="text-destructive shrink-0" />
             <div className="min-w-0">
               <p className="text-[11px] font-semibold text-destructive">
                 Dictation failed

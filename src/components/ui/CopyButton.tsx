@@ -1,5 +1,6 @@
 // Reusable copy-to-clipboard button with check animation feedback
 import { useState, useCallback, useRef } from "react";
+import { Icon } from "@/components/ui/Icon";
 
 interface CopyButtonProps {
   /** Text content to write to clipboard on click. */
@@ -59,16 +60,16 @@ export function CopyButton({
     <button onClick={handleCopy} className={className}>
       <span className="relative inline-flex items-center justify-center" style={{ width: iconSize, height: iconSize }}>
         <span
-          className="material-symbols-outlined absolute inset-0 flex items-center justify-center transition-opacity duration-150"
-          style={{ fontSize: iconSize, opacity: copied ? 0 : 1 }}
+          className="absolute inset-0 flex items-center justify-center transition-opacity duration-150"
+          style={{ opacity: copied ? 0 : 1 }}
         >
-          content_copy
+          <Icon name="content_copy" size={iconSize} />
         </span>
         <span
-          className="material-symbols-outlined absolute inset-0 flex items-center justify-center transition-opacity duration-150"
-          style={{ fontSize: iconSize, opacity: copied ? 1 : 0 }}
+          className="absolute inset-0 flex items-center justify-center transition-opacity duration-150"
+          style={{ opacity: copied ? 1 : 0 }}
         >
-          check
+          <Icon name="check" size={iconSize} />
         </span>
       </span>
     </button>

@@ -1,6 +1,7 @@
 // Wizard microphone step -- request permission and verify a default input device
 import { useEffect } from "react";
 import type { PermissionsStatus } from "@/types/commands";
+import { Icon, type IconName } from "@/components/ui/Icon";
 
 interface MicrophoneStepProps {
   permissions: PermissionsStatus | null;
@@ -27,9 +28,7 @@ export function MicrophoneStep({
   return (
     <div className="flex flex-col items-center text-center">
       <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0058bc]/[0.10] shadow-[0_0_24px_rgba(0,88,188,0.10)]">
-        <span className="material-symbols-outlined text-[32px] text-[#0058bc]">
-          mic
-        </span>
+        <Icon name="mic" size={32} className="text-[#0058bc]" />
       </div>
 
       <h2 className="mb-2 text-[22px] font-semibold text-black/85">
@@ -50,23 +49,25 @@ export function MicrophoneStep({
         }`}
       >
         <div className="flex items-center gap-3">
-          <span
-            className={`material-symbols-outlined text-[20px] ${
+          <Icon
+            name={
+              (loading
+                ? "sync"
+                : micGranted
+                  ? "check_circle"
+                  : micDenied
+                    ? "error"
+                    : "help") as IconName
+            }
+            size={20}
+            className={
               micGranted
                 ? "text-[#006b19]"
                 : micDenied
                   ? "text-[#ba1a1a]"
                   : "text-black/40"
-            }`}
-          >
-            {loading
-              ? "sync"
-              : micGranted
-                ? "check_circle"
-                : micDenied
-                  ? "error"
-                  : "help"}
-          </span>
+            }
+          />
           <div className="flex-1">
             <p
               className={`text-[13px] font-semibold ${
@@ -100,9 +101,7 @@ export function MicrophoneStep({
           onClick={openSettings}
           className="mb-3 inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-black/[0.10] bg-white px-4 text-[13px] font-medium text-black/85 shadow-sm transition-colors hover:bg-black/[0.02]"
         >
-          <span className="material-symbols-outlined text-[16px]">
-            open_in_new
-          </span>
+          <Icon name="open_in_new" size={16} />
           Open microphone settings
         </button>
       )}

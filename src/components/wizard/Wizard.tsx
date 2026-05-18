@@ -9,6 +9,7 @@ import { ReadyStep } from "./ReadyStep";
 import { SpeechFilesStep } from "./SpeechFilesStep";
 import { WelcomeStep } from "./WelcomeStep";
 import { WizardChrome } from "./WizardChrome";
+import { Icon } from "@/components/ui/Icon";
 
 export function Wizard() {
   const setSetupComplete = useSetAtom(setupCompleteAtom);
@@ -21,9 +22,7 @@ export function Wizard() {
   if (!wizard.hydrated) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[#F2F2F4]">
-        <span className="material-symbols-outlined animate-spin text-[28px] text-black/[0.30]">
-          progress_activity
-        </span>
+        <Icon name="progress_activity" size={28} className="animate-spin text-black/[0.30]" />
       </div>
     );
   }

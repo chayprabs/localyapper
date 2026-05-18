@@ -1,5 +1,6 @@
 // Wizard chrome -- consistent layout with step indicator and back navigation
 import type { ReactNode } from "react";
+import { Icon } from "@/components/ui/Icon";
 
 interface WizardChromeProps {
   stepNumber: number;
@@ -26,9 +27,7 @@ export function WizardChrome({
             className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-medium text-black/55 transition-colors hover:bg-black/[0.04] hover:text-black/85"
             aria-label="Go back to the previous step"
           >
-            <span className="material-symbols-outlined text-[16px]">
-              arrow_back
-            </span>
+            <Icon name="arrow_back" size={16} />
             Back
           </button>
         ) : (

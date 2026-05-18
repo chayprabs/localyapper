@@ -2,6 +2,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { reservedHotkeyMessage } from "@/lib/hotkeyReservations";
+import { Icon } from "@/components/ui/Icon";
 
 // Platform detection for key symbol display
 const isMac =
@@ -149,9 +150,7 @@ function KeySelector({
         </div>
       )}
       {!readOnly && (
-        <span className="material-symbols-outlined ml-3 shrink-0 text-[14px] text-[rgba(0,0,0,0.30)]">
-          expand_more
-        </span>
+        <Icon name="expand_more" size={14} className="ml-3 shrink-0 text-[rgba(0,0,0,0.30)]" />
       )}
     </div>
   );
@@ -262,9 +261,7 @@ export function HotkeysPage() {
                 />
                 {reservedMessage && (
                   <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-[#9a5a00]">
-                    <span className="material-symbols-outlined text-[14px]">
-                      warning
-                    </span>
+                    <Icon name="warning" size={14} />
                     {reservedMessage}
                   </p>
                 )}

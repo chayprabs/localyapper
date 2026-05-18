@@ -1,6 +1,7 @@
 // Models page -- speech recognition configuration only
 import type { ReactNode } from "react";
 import { useModels } from "@/hooks/useModels";
+import { Icon } from "@/components/ui/Icon";
 
 function formatSpeechModelName(modelName: string): string {
   switch (modelName) {
@@ -243,9 +244,7 @@ export function ModelsPage() {
                 <StatusLine tone="success" label="Ready for dictation" />
               ) : speechModelLoading ? (
                 <div className="flex items-center justify-end gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-[#0058bc] animate-spin">
-                    progress_activity
-                  </span>
+                  <Icon name="progress_activity" size={16} className="text-[#0058bc] animate-spin" />
                   <span className="text-[13px] text-black/50">Starting...</span>
                 </div>
               ) : (

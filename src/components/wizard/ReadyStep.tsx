@@ -1,5 +1,6 @@
 // Wizard ready step -- summary of choices made before completing setup
 import type { PermissionsStatus } from "@/types/commands";
+import { Icon, type IconName } from "@/components/ui/Icon";
 
 const isMac =
   typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent);
@@ -27,7 +28,7 @@ function parseHotkeyParts(hotkey: string): string[] {
 }
 
 interface SummaryRowProps {
-  icon: string;
+  icon: IconName;
   label: string;
   value: string;
   tone: "ok" | "warn" | "neutral";
@@ -44,11 +45,7 @@ function SummaryRow({ icon, label, value, tone, detail }: SummaryRowProps) {
 
   return (
     <div className="flex items-start gap-3 border-b border-black/[0.06] py-3 last:border-b-0">
-      <span
-        className={`material-symbols-outlined text-[18px] ${toneClass} mt-[2px] shrink-0`}
-      >
-        {icon}
-      </span>
+      <Icon name={icon} size={18} className={`${toneClass} mt-[2px] shrink-0`} />
       <div className="min-w-0 flex-1 text-left">
         <p className="text-[12px] font-semibold uppercase tracking-[0.06em] text-black/[0.40]">
           {label}
@@ -83,9 +80,7 @@ export function ReadyStep({
   return (
     <div className="flex flex-col items-center text-center">
       <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#006b19]/[0.08] shadow-[0_0_24px_rgba(40,205,65,0.20)]">
-        <span className="material-symbols-outlined text-[32px] text-[#006b19]">
-          check_circle
-        </span>
+        <Icon name="check_circle" size={32} className="text-[#006b19]" />
       </div>
 
       <h2 className="mb-2 text-[22px] font-semibold text-black/85">

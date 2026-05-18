@@ -1,4 +1,6 @@
 // Wizard welcome step -- product introduction with Get Started action
+import { Icon } from "@/components/ui/Icon";
+
 export function WelcomeStep({
   onGetStarted,
   onSkip,
@@ -11,9 +13,7 @@ export function WelcomeStep({
   return (
     <div className="flex flex-col items-center text-center">
       <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-b from-[#0062d0] to-[#0058bc] shadow-lg">
-        <span className="material-symbols-outlined text-[32px] text-white">
-          mic
-        </span>
+        <Icon name="mic" size={32} className="text-white" />
       </div>
 
       <h1 className="mb-2 text-[22px] font-semibold text-black/85">

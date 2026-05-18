@@ -6,6 +6,7 @@ import { formatNumber } from "@/lib/formatters";
 import { StatCard } from "./StatCard";
 import { ModelStatusCard } from "./ModelStatusCard";
 import { LastDictationCard } from "./LastDictationCard";
+import { Icon } from "@/components/ui/Icon";
 
 interface SpeechFilesMissingBannerProps {
   onInstall: () => void;
@@ -15,9 +16,7 @@ function SpeechFilesMissingBanner({ onInstall }: SpeechFilesMissingBannerProps) 
   return (
     <div className="mt-3 flex items-center justify-between gap-4 rounded-[10px] border border-[#ff9500]/30 bg-[#ff9500]/[0.08] px-4 py-3">
       <div className="flex items-center gap-3">
-        <span className="material-symbols-outlined text-[20px] text-[#9a5a00]">
-          download
-        </span>
+        <Icon name="download" size={20} className="text-[#9a5a00]" />
         <div>
           <p className="text-[13px] font-semibold text-[#7a4500]">
             Speech files aren't installed
@@ -47,9 +46,7 @@ function DashboardEmptyState({ recordHotkey }: DashboardEmptyStateProps) {
   return (
     <section className="flex min-h-[260px] flex-col items-center justify-center rounded-xl border border-black/[0.07] bg-white p-10 text-center shadow-sm">
       <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#0058bc]/[0.10]">
-        <span className="material-symbols-outlined text-[28px] text-[#0058bc]">
-          mic
-        </span>
+        <Icon name="mic" size={28} className="text-[#0058bc]" />
       </div>
       <p className="mb-1 text-[15px] font-semibold text-black/85">
         You haven't dictated anything yet

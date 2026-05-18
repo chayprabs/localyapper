@@ -4,6 +4,7 @@ import { useAtom, useAtomValue } from "jotai";
 import { activePageAtom, sidebarCollapsedAtom } from "@/stores/appStore";
 import { getSetting, setSetting } from "@/lib/commands/settings";
 import { Sidebar } from "./Sidebar";
+import { Icon } from "@/components/ui/Icon";
 
 // Settings pages are lazy-loaded so the main bundle stays small.
 // Each page imports its own data hooks and command wrappers; pulling them
@@ -33,9 +34,7 @@ const pages = {
 function PageFallback() {
   return (
     <div className="h-full w-full flex items-center justify-center">
-      <span className="material-symbols-outlined text-[24px] text-black/[0.30] animate-spin">
-        progress_activity
-      </span>
+      <Icon name="progress_activity" size={24} className="text-black/[0.30] animate-spin" />
     </div>
   );
 }
@@ -73,11 +72,14 @@ export function SettingsLayout() {
         className="absolute bottom-3 left-[8px] w-8 h-8 flex items-center justify-center text-black/35 hover:bg-black/[0.08] rounded-md transition-colors z-10"
         title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
-        <span className="material-symbols-outlined text-[18px]">
-          {isCollapsed
-            ? "keyboard_double_arrow_right"
-            : "keyboard_double_arrow_left"}
-        </span>
+        <Icon
+          name={
+            isCollapsed
+              ? "keyboard_double_arrow_right"
+              : "keyboard_double_arrow_left"
+          }
+          size={18}
+        />
       </button>
     </div>
   );

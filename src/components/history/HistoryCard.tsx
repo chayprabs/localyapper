@@ -1,6 +1,7 @@
 // History entry card -- timestamp, word count, app badge, and text preview
 import type { HistoryEntry } from "@/types/commands";
 import { CopyButton } from "@/components/ui/CopyButton";
+import { Icon } from "@/components/ui/Icon";
 import { formatHistoryTimestamp } from "@/lib/formatters";
 
 interface HistoryCardProps {
@@ -43,7 +44,7 @@ export function HistoryCard({ entry, onDelete }: HistoryCardProps) {
             onClick={() => onDelete(entry.id)}
             className="w-8 h-8 flex items-center justify-center rounded-md text-black/[0.26] hover:bg-[#fff1f1] hover:text-[#ba1a1a] transition-colors"
           >
-            <span className="material-symbols-outlined text-[18px]">delete</span>
+            <Icon name="delete" size={18} />
           </button>
         </div>
       </div>

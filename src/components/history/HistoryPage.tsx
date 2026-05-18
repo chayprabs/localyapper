@@ -1,16 +1,16 @@
 // History page -- paginated list of all past dictations
+import { useEffect, useState } from "react";
 import { useSetAtom } from "jotai";
 import { useHistory } from "@/hooks/useHistory";
 import { activePageAtom } from "@/stores/appStore";
 import { HistoryCard } from "./HistoryCard";
+import { Icon } from "@/components/ui/Icon";
 
 function EmptyState({ onOpenHotkeys }: { onOpenHotkeys: () => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center -mt-16">
       <div className="w-[56px] h-[56px] rounded-full bg-[rgba(0,0,0,0.05)] flex items-center justify-center mb-4">
-        <span className="material-symbols-outlined text-[24px] text-[rgba(0,0,0,0.20)]">
-          history
-        </span>
+        <Icon name="history" size={24} className="text-[rgba(0,0,0,0.20)]" />
       </div>
       <p className="text-[14px] font-medium text-[#1C1C1E] mb-1">
         No dictations yet
@@ -32,17 +32,23 @@ export function HistoryPage() {
   const { entries, isLoading, hasMore, error, loadMore, deleteEntry, clearAll } =
     useHistory();
   const setActivePage = useSetAtom(activePageAtom);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const isEmpty = !isLoading && entries.length === 0;
+
+  useEffect(() => {
+    if (isEmpty && showClearConfirm) {
+      setShowClearConfirm(false);
+    }
+  }, [isEmpty, showClearConfirm]);
 
   const handleDelete = (id: string) => {
     void deleteEntry(id);
   };
 
-  const handleClearAll = () => {
-    if (window.confirm("Delete all history? This cannot be undone.")) {
-      void clearAll();
-    }
+  const handleConfirmClearAll = () => {
+    setShowClearConfirm(false);
+    void clearAll();
   };
 
   return (
@@ -56,17 +62,35 @@ export function HistoryPage() {
             </p>
           )}
         </div>
-        <button
-          onClick={handleClearAll}
-          disabled={isEmpty}
-          className={
-            isEmpty
-              ? "text-[13px] font-medium text-black/[0.20] cursor-default"
-              : "text-[13px] font-medium text-[#ba1a1a] hover:underline transition-all"
-          }
-        >
-          Clear All
-        </button>
+        {showClearConfirm ? (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="text-[13px] text-black/50">Clear all history?</span>
+            <button
+              onClick={() => setShowClearConfirm(false)}
+              className="h-8 rounded-lg border border-black/[0.15] bg-white px-3 text-[13px] font-medium shadow-sm transition-colors hover:bg-black/[0.02]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmClearAll}
+              className="h-8 rounded-lg bg-[#ba1a1a] px-3 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-[#a01616]"
+            >
+              Clear All
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowClearConfirm(true)}
+            disabled={isEmpty}
+            className={
+              isEmpty
+                ? "text-[13px] font-medium text-black/[0.20] cursor-default"
+                : "text-[13px] font-medium text-[#ba1a1a] hover:underline transition-all"
+            }
+          >
+            Clear All
+          </button>
+        )}
       </header>
 
       {isEmpty ? (

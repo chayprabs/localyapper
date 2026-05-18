@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { DownloadProgress } from "@/types/commands";
+import { Icon } from "@/components/ui/Icon";
 
 const TOTAL_SIZE_MB = 458;
 
@@ -51,9 +52,7 @@ export function SpeechFilesStep({
     return (
       <div className="flex flex-col items-center text-center">
         <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#006b19]/[0.10] shadow-[0_0_24px_rgba(40,205,65,0.18)]">
-          <span className="material-symbols-outlined text-[32px] text-[#006b19]">
-            check_circle
-          </span>
+          <Icon name="check_circle" size={32} className="text-[#006b19]" />
         </div>
         <h2 className="mb-2 text-[22px] font-semibold text-black/85">
           Speech files ready
@@ -83,9 +82,7 @@ export function SpeechFilesStep({
     return (
       <div className="flex flex-col items-center text-center">
         <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0058bc]/[0.10]">
-          <span className="material-symbols-outlined text-[32px] text-[#0058bc] animate-pulse">
-            download
-          </span>
+          <Icon name="download" size={32} className="text-[#0058bc] animate-pulse" />
         </div>
 
         <h2 className="mb-2 text-[22px] font-semibold text-black/85">
@@ -125,9 +122,7 @@ export function SpeechFilesStep({
   return (
     <div className="flex flex-col items-center text-center">
       <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0058bc]/[0.10]">
-        <span className="material-symbols-outlined text-[32px] text-[#0058bc]">
-          cloud_download
-        </span>
+        <Icon name="cloud_download" size={32} className="text-[#0058bc]" />
       </div>
 
       <h2 className="mb-2 text-[22px] font-semibold text-black/85">

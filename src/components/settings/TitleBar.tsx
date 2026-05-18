@@ -3,6 +3,7 @@ import { useAtomValue } from "jotai";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import logoImg from "@/assets/logo-nobg.png";
 import { pausedAtom } from "@/stores/appStore";
+import { Icon } from "@/components/ui/Icon";
 
 export function TitleBar() {
   const handleMinimize = () => getCurrentWindow().minimize();
@@ -29,7 +30,7 @@ export function TitleBar() {
             className="ml-1 inline-flex h-5 items-center gap-1 rounded-full border border-[#ff9500]/30 bg-[#ff9500]/[0.12] px-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#9a5a00]"
             title="Dictation is paused. Resume from the tray menu to use the hotkey again."
           >
-            <span className="material-symbols-outlined text-[12px]">pause</span>
+            <Icon name="pause" size={12} />
             Paused
           </span>
         )}

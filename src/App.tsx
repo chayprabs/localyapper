@@ -9,6 +9,7 @@ import { TitleBar } from "@/components/settings/TitleBar";
 import { setupCompleteAtom } from "@/stores/wizardStore";
 import { getSetting } from "@/lib/commands/settings";
 import { usePausedState } from "@/hooks/usePausedState";
+import { Icon } from "@/components/ui/Icon";
 
 // The Wizard renders only on first launch. Lazy-importing it keeps the
 // returning-user path off the wizard module graph entirely.
@@ -39,17 +40,13 @@ export function App() {
       <div className="flex-1 min-h-0">
         {setupComplete === null ? (
           <div className="h-full bg-[#f9f9f9] flex items-center justify-center">
-            <span className="material-symbols-outlined text-[32px] text-black/[0.30] animate-spin">
-              progress_activity
-            </span>
+            <Icon name="progress_activity" size={32} className="text-black/[0.30] animate-spin" />
           </div>
         ) : !setupComplete ? (
           <Suspense
             fallback={
               <div className="h-full bg-[#f9f9f9] flex items-center justify-center">
-                <span className="material-symbols-outlined text-[32px] text-black/[0.30] animate-spin">
-                  progress_activity
-                </span>
+                <Icon name="progress_activity" size={32} className="text-black/[0.30] animate-spin" />
               </div>
             }
           >

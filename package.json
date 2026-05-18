@@ -15,7 +15,7 @@
     "@tauri-apps/api": "^2",
     "clsx": "^2.1.1",
     "jotai": "^2",
-    "material-symbols": "^0.42.3",
+    "lucide-react": "^1.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.5.0"

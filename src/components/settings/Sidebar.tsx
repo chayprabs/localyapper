@@ -1,15 +1,16 @@
-// Navigation sidebar -- main app pages with Material Symbols icons
+// Navigation sidebar -- main app pages with inline SVG icons
 import { useAtomValue, useSetAtom } from "jotai";
 import { activePageAtom, sidebarCollapsedAtom, type PageId } from "@/stores/appStore";
 import { cn } from "@/lib/utils";
+import { Icon, type IconName } from "@/components/ui/Icon";
 
 interface NavItem {
   id: PageId;
   label: string;
-  icon: string;
+  icon: IconName;
 }
 
-/** Sidebar navigation entries — order defines visual arrangement, icons are Material Symbols names. */
+/** Sidebar navigation entries — order defines visual arrangement. */
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
   { id: "history", label: "History", icon: "history" },
@@ -51,16 +52,12 @@ export function Sidebar() {
                   : "text-black/55 font-normal hover:bg-black/5"
               )}
             >
-              <span
-                className="material-symbols-outlined text-[20px] shrink-0"
-                style={
-                  isActive
-                    ? { fontVariationSettings: "'FILL' 1" }
-                    : undefined
-                }
-              >
-                {item.icon}
-              </span>
+              <Icon
+                name={item.icon}
+                size={20}
+                strokeWidth={isActive ? 2.25 : 1.75}
+                className="shrink-0"
+              />
               {!isCollapsed && <span>{item.label}</span>}
             </button>
           );

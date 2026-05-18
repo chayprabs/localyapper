@@ -1,6 +1,7 @@
 // Last dictation preview -- shows most recent transcription with actions
 import type { HistoryEntry } from "@/types/commands";
 import { CopyButton } from "@/components/ui/CopyButton";
+import { Icon } from "@/components/ui/Icon";
 import { formatRelativeTime } from "@/lib/formatters";
 
 interface LastDictationCardProps {
@@ -11,9 +12,7 @@ interface LastDictationCardProps {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center text-center">
-      <span className="material-symbols-outlined text-[40px] text-[rgba(0,0,0,0.15)] mb-4">
-        mic
-      </span>
+      <Icon name="mic" size={40} className="text-[rgba(0,0,0,0.15)] mb-4" />
       <p className="text-[14px] font-medium text-black/85 mb-1">No dictations yet</p>
       <p className="text-[12px] text-black/[0.26]">
         Use your record hotkey to start your first dictation.
@@ -63,9 +62,7 @@ export function LastDictationCard({ entry, onDelete }: LastDictationCardProps) {
 
       <div className="flex items-center justify-between pt-4 border-t border-black/[0.07]">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-black/50 text-[18px]">
-            description
-          </span>
+          <Icon name="description" size={18} className="text-black/50" />
           <span className="text-[13px] font-medium text-black/50">
             {entry.word_count ?? 0} words
           </span>
@@ -74,7 +71,7 @@ export function LastDictationCard({ entry, onDelete }: LastDictationCardProps) {
           onClick={() => onDelete(entry.id)}
           className="text-black/50 hover:bg-[#f9f9f9] p-1.5 rounded-md transition-colors"
         >
-          <span className="material-symbols-outlined text-[18px]">delete</span>
+          <Icon name="delete" size={18} />
         </button>
       </div>
     </div>
