@@ -34,6 +34,10 @@ sherpa-onnx = "1.12"
 arboard = "3"
 enigo = "0.2"
 futures-util = "0.3"
+# mimalloc tames fragmentation from sherpa-onnx's short-burst alloc/free
+# pattern. The system allocator on Windows in particular tends to hold on
+# to freed ONNX scratch space, which would defeat the idle-unload work.
+mimalloc = { version = "0.1", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Threading"] }

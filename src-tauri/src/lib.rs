@@ -10,6 +10,13 @@ mod state;
 mod stt;
 mod tray;
 
+// Replace the system allocator with mimalloc. sherpa-onnx allocates and
+// frees large scratch buffers during transcription; the Windows system
+// allocator tends to retain those pages instead of returning them to the
+// OS, which would partially undo our idle-unload work.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use audio::capture::AudioRecorder;
 use state::AppState;
 use std::path::PathBuf;
