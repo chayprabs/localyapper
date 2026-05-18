@@ -28,11 +28,17 @@ export default defineConfig({
     },
   },
   envPrefix: ["VITE_", "TAURI_"],
+  esbuild: {
+    // Strip dev-only diagnostics from production bundles. Keep them in
+    // TAURI_DEBUG builds so console.error/warn remain visible.
+    drop: process.env.TAURI_DEBUG ? [] : ["console", "debugger"],
+  },
   build: {
     target:
       process.env.TAURI_PLATFORM === "windows" ? "chrome105" : "safari13",
     minify: !process.env.TAURI_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_DEBUG,
+    cssCodeSplit: true,
     rollupOptions: {
       input: {
         // Settings + wizard live behind index.html
@@ -40,6 +46,18 @@ export default defineConfig({
         // Overlay pill loads a tiny separate bundle so the floating
         // window does not parse the settings module graph.
         overlay: path.resolve(__dirname, "overlay.html"),
+      },
+      output: {
+        // Pull React + ReactDOM into their own vendor chunk so the
+        // bundle hash stays stable across app changes (better cache
+        // hit rate across releases) and the parse cost is paid once
+        // even if both WebViews boot.
+        manualChunks(id) {
+          if (id.includes("node_modules/react/")) return "react-vendor";
+          if (id.includes("node_modules/react-dom/")) return "react-vendor";
+          if (id.includes("node_modules/scheduler/")) return "react-vendor";
+          return undefined;
+        },
       },
     },
   },
