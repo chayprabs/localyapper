@@ -44,6 +44,7 @@ Audio is **never written to disk**. There is no telemetry, no cloud STT, and no 
 - **System tray** with Open, Pause Dictation, Quit. The main-window title bar shows a *Paused* chip whenever dictation is paused from the tray.
 - **Local dictation history** with copy, delete per entry, and clear-all.
 - **Local SQLite storage** (`rusqlite`, bundled). Two active tables: `transcription_history` and `settings`. Nothing else.
+- **Low idle footprint by design.** The recognizer and VAD are lazy-loaded on first dictation, the settings WebView is freed when its window is closed, and the speech engine is dropped from RAM after ~60 s of inactivity. Idle memory drops from ~500 MB to ~30 MB; CPU sits near 0 % when you're not dictating.
 - **Cross-platform.** Windows 10+, macOS 12+, Linux on X11 and Wayland.
 
 ## Default hotkeys
@@ -62,7 +63,7 @@ All four are rebindable from the **Hotkeys** page.
 - **Dashboard** — today / week / all-time stats, the last dictation, model status (name + on-disk size), a *speech files missing* banner if the model isn't installed, and a welcoming empty state when you haven't dictated anything yet.
 - **History** — paginated list with copy and delete per entry, plus clear-all.
 - **Hotkeys** — rebind any shortcut via key-listening mode and reset to defaults. Soft warning if your binding overlaps a known OS-reserved combo.
-- **Speech** — manage the local Parakeet model: download, load, or remove.
+- **Speech** — manage the local Parakeet model: download, load, or remove. Includes a **Memory & Performance** toggle to keep the engine resident at all times if you'd rather trade ~30 MB of idle RAM for instant first-dictation latency.
 
 There is intentionally no Dictionary page, no Training tab, no remote-model picker, and no LLM settings.
 
@@ -73,15 +74,35 @@ There is intentionally no Dictionary page, no Training tab, no remote-model pick
 - No analytics, no crash reporting, no remote logging, no autoupdate ping.
 - All settings and history live in a single SQLite file in your platform's app-data directory.
 
+## Resource footprint
+
+LocalYapper is built to disappear when you're not using it.
+
+| State                                            | RAM       | CPU        |
+|--------------------------------------------------|-----------|------------|
+| Cold start, before first dictation               | ~30 MB    | ~0 %       |
+| Actively dictating (capture + Parakeet + paste)  | ~400 MB   | ~5–10 %    |
+| Idle ≥ 60 s after a dictation                    | ~30 MB    | ~0 %       |
+| Settings window closed                           | ~30 MB    | ~0 %       |
+
+How this is achieved:
+
+- **Lazy model loading.** Parakeet and Silero VAD are not loaded at startup. The first dictation pulls them into memory; subsequent dictations reuse the warm engine.
+- **Idle eviction.** A lifecycle controller drops the recognizer ~60 s after the last dictation finishes. The next hotkey press reloads it (~0.8–1.5 s extra) and emits a `model-state: loading` event so the overlay can show a subtle hint. The window is configurable in **Speech → Memory & Performance** — toggle it off to stay always-resident.
+- **Two separate WebView bundles.** The settings UI and the floating overlay each have their own Vite entry, so the overlay WebView only loads the ~10 kB it actually needs instead of the full settings module graph.
+- **Settings WebView is freed on close.** Closing the main window destroys its WebView; reopening from the tray or `Ctrl+Alt+O` rebuilds it on demand. The overlay WebView stays alive so the hotkey response stays instant.
+- **`mimalloc` global allocator.** Returns memory to the OS more aggressively than the system allocator does after `sherpa-onnx` runs, especially on Windows.
+- **Trimmed dependencies and a tuned release profile.** `tokio`, `chrono`, and `reqwest` are stripped to the features actually used; `recharts` and Material Symbols (a ~3.9 MB icon font) were replaced with tree-shakable `lucide-react`; the release build runs with `lto = "fat"`, `codegen-units = 1`, and `strip = "symbols"`.
+
 ## Stack
 
 | Layer               | Tech                                                |
 |---------------------|-----------------------------------------------------|
-| Desktop shell       | Tauri 2                                             |
-| Backend             | Rust (stable 1.95+)                                 |
+| Desktop shell       | Tauri 2 (two windows: main + overlay, each with its own JS bundle) |
+| Backend             | Rust (stable 1.95+), `mimalloc` global allocator    |
 | Frontend            | React 19 + TypeScript 5 + Vite 5 + Tailwind CSS 3   |
 | State               | Jotai 2                                             |
-| Charts / icons      | Recharts 2 + Material Symbols                       |
+| Icons               | `lucide-react` (tree-shakable SVGs)                 |
 | Audio capture       | `cpal` 0.15 at 16 kHz mono                          |
 | VAD                 | Silero VAD, with an energy-based fallback           |
 | Speech recognition  | `sherpa-onnx` 1.12 + Parakeet 110M (default)        |
@@ -103,12 +124,16 @@ src-tauri/
     injection/    clipboard-paste-restore injector + per-platform helpers
     models/       data types shared with the frontend
     stt/          Parakeet wrapper around sherpa-onnx
+      lifecycle.rs idle-eviction controller (mark_used / schedule_evict)
     tray/         system tray menu + paused-state event
-    lib.rs        entrypoint, setup(), generate_handler!
+    lib.rs        entrypoint, setup(), generate_handler!, mimalloc allocator
     state.rs      Tauri-managed AppState
+index.html        main settings-window entry  (-> src/main.tsx)
+overlay.html      overlay-window entry        (-> src/overlay-main.tsx)
 src/
   components/     dashboard, history, hotkeys, models, overlay, wizard, settings, ui
-  hooks/          useWizard, useHotkeys, useDashboard, usePausedState, ...
+                  ui/Icon.tsx + ui/Switch.tsx are the shared primitives
+  hooks/          useWizard, useHotkeys, useDashboard, usePausedState, useModels, ...
   lib/            typed wrappers around invoke() in lib/commands/*
   stores/         Jotai atoms
   types/          shared TypeScript types
