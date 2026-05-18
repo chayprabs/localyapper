@@ -1,5 +1,5 @@
 // Wizard speech files step -- download progress and ready confirmation
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { DownloadProgress } from "@/types/commands";
 import { Icon } from "@/components/ui/Icon";
@@ -27,23 +27,29 @@ export function SpeechFilesStep({
   onCancel,
   onContinue,
 }: SpeechFilesStepProps) {
-  const subscribedRef = useRef(false);
-
   useEffect(() => {
-    if (subscribedRef.current) return;
-    subscribedRef.current = true;
-
+    // Guard against the cleanup running before the async listen()
+    // resolves (fast unmount during navigation). If `cancelled` is true
+    // by the time we have the unlisten handle, call it immediately so
+    // we don't leak a dead subscription.
+    let cancelled = false;
     let unlisten: (() => void) | null = null;
-    void (async () => {
-      unlisten = await listen<DownloadProgress>(
-        "speech_model_download_progress",
-        (event) => {
-          onProgress(event.payload);
-        },
-      );
-    })();
+
+    void listen<DownloadProgress>(
+      "speech_model_download_progress",
+      (event) => {
+        onProgress(event.payload);
+      },
+    ).then((dispose) => {
+      if (cancelled) {
+        dispose();
+      } else {
+        unlisten = dispose;
+      }
+    });
 
     return () => {
+      cancelled = true;
       unlisten?.();
     };
   }, [onProgress]);
