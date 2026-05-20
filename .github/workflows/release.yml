@@ -24,10 +24,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -86,12 +86,12 @@ jobs:
       matrix:
         include:
           - name: macOS Apple Silicon
-            platform: macos-latest
+            platform: macos-15
             rust_targets: aarch64-apple-darwin
             args: --target aarch64-apple-darwin --bundles dmg
             artifact: macos-aarch64
           - name: macOS Intel
-            platform: macos-latest
+            platform: macos-15-intel
             rust_targets: x86_64-apple-darwin
             args: --target x86_64-apple-darwin --bundles dmg
             artifact: macos-x64
@@ -108,10 +108,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
