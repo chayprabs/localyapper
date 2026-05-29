@@ -4,7 +4,7 @@ use crate::audio::vad::SileroVad;
 use crate::stt::lifecycle::ModelLifecycle;
 use crate::stt::whisper::WhisperEngine;
 use rusqlite::Connection;
-use std::sync::atomic::{AtomicI64, AtomicU8, AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 
 /// State machine mode: no active recording, ready for input.

@@ -10,7 +10,10 @@ use crate::commands::recording::{execute_pipeline, save_history_entry};
 use crate::context::detector;
 use crate::db::queries;
 use crate::models::PipelineEvent;
-use crate::state::{AppState, HotkeyState, HOTKEY_MODE_HANDS_FREE, HOTKEY_MODE_HOLD_RECORDING, HOTKEY_MODE_IDLE, HOTKEY_MODE_PROCESSING, HOTKEY_MODE_TAP_PENDING};
+use crate::state::{
+    AppState, HotkeyState, HOTKEY_MODE_HANDS_FREE, HOTKEY_MODE_HOLD_RECORDING, HOTKEY_MODE_IDLE,
+    HOTKEY_MODE_PROCESSING, HOTKEY_MODE_TAP_PENDING,
+};
 
 /// State machine mode: no active recording, ready for input.
 const MODE_IDLE: u8 = HOTKEY_MODE_IDLE;
@@ -82,7 +85,10 @@ pub fn abort_active_recording(app: &AppHandle) {
     if let Err(e) = app_state.recorder.cancel() {
         log::warn!("Failed to cancel recording during abort: {e}");
     }
-    app_state.hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
+    app_state
+        .hotkey_state
+        .mode
+        .store(MODE_IDLE, Ordering::SeqCst);
     unregister_cancel_hotkey(app);
     emit_pipeline_event(app, "cancelled", None, None, None, None);
     log::info!("HOTKEY: Active recording aborted");
