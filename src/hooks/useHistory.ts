@@ -91,6 +91,7 @@ export function useHistory(): HistoryData {
     async (id: string) => {
       setError(null);
       setEntries((prev) => prev.filter((e) => e.id !== id));
+      offsetRef.current = Math.max(0, offsetRef.current - 1);
       try {
         await deleteHistoryEntry(id);
       } catch (deleteError) {

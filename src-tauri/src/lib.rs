@@ -93,6 +93,7 @@ pub(crate) fn show_or_create_main_window(app: &tauri::AppHandle) {
     match tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
         .title("LocalYapper")
         .inner_size(900.0, 650.0)
+        .min_inner_size(560.0, 480.0)
         .center()
         .resizable(true)
         .decorations(false)
@@ -160,6 +161,8 @@ pub fn run() {
                 );
             }
 
+            let hotkey_state = Arc::new(state::HotkeyState::new());
+
             app.manage(AppState {
                 db: Arc::new(Mutex::new(conn)),
                 recorder: Arc::new(AudioRecorder::new()),
@@ -172,6 +175,9 @@ pub fn run() {
                 last_injection: Arc::new(Mutex::new(None)),
                 download_cancel: Arc::new(AtomicBool::new(false)),
                 paused: Arc::new(AtomicBool::new(false)),
+                recording_target_app: Arc::new(Mutex::new(None)),
+                loaded_speech_model: Arc::new(Mutex::new(None)),
+                hotkey_state,
             });
 
             if !speech_model_installed {

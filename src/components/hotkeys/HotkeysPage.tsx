@@ -127,7 +127,7 @@ function KeySelector({
     <div
       ref={containerRef}
       onClick={readOnly ? undefined : onStartEdit}
-      className={`w-full max-w-[320px] min-h-[46px] rounded-[10px] border bg-white px-3 py-2 shadow-sm transition-colors ${
+      className={`flex w-full max-w-[320px] min-h-[46px] items-center rounded-[10px] border bg-white px-3 py-2 shadow-sm transition-colors ${
         readOnly
           ? "cursor-default border-black/[0.08] bg-black/[0.015]"
           : "cursor-pointer hover:border-black/20"

@@ -33,6 +33,7 @@ export function Overlay() {
     remainingSeconds,
     transcribedDisplayProgress,
     processingCountdown,
+    modelLoading,
     dismissOverlay,
   } = useOverlayState();
   const { visualState, text, durationMs, error } = overlayData;
@@ -80,6 +81,16 @@ export function Overlay() {
           </div>
         )}
 
+        {visualState === "hands-free" && (
+          <div className="flex items-center justify-between h-full">
+            <YappingEmoji />
+            <Waveform color="blue" />
+            <span className="text-[12px] font-medium text-[#0058bc] tracking-tight">
+              Hands-free
+            </span>
+          </div>
+        )}
+
         {visualState === "stopping-soon" && (
           <div className="flex items-center justify-between h-full">
             <YappingEmoji />
@@ -109,7 +120,7 @@ export function Overlay() {
               <CountdownTimer mode="elapsed" seconds={elapsedSeconds} />
             )}
             <span className="text-[12px] font-medium text-black/35 tracking-tight">
-              Processing...
+              {modelLoading ? "Loading speech engine..." : "Processing..."}
             </span>
           </div>
         )}
@@ -128,7 +139,7 @@ export function Overlay() {
               </span>
             </div>
             <span className="text-[12px] font-medium text-black/35 tracking-tight">
-              Processing...
+              {modelLoading ? "Loading speech engine..." : "Processing..."}
             </span>
           </div>
         )}

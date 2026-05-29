@@ -8,6 +8,11 @@ import { overlayDataAtom } from "@/stores/overlayStore";
 import { getSetting, setSetting } from "@/lib/commands/settings";
 import type { OverlayData, OverlayVisualState, PipelineEvent } from "@/types/overlay";
 
+interface ModelStateEvent {
+  loaded: boolean;
+  state: "loaded" | "unloaded" | "loading";
+}
+
 // Recording and display timing constants
 /** Hard cap on single recording duration (seconds). */
 const MAX_RECORDING_SECONDS = 120;
@@ -23,6 +28,7 @@ export function useOverlayState() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [transcribedDisplayProgress, setTranscribedDisplayProgress] = useState(0);
   const [processingCountdown, setProcessingCountdown] = useState<number | null>(null);
+  const [modelLoading, setModelLoading] = useState(false);
 
   const generationRef = useRef(0);
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -156,6 +162,10 @@ export function useOverlayState() {
   );
 
   useEffect(() => {
+    const unlistenModel = listen<ModelStateEvent>("model-state", (event) => {
+      setModelLoading(event.payload.state === "loading");
+    });
+
     const unlisten = listen<PipelineEvent>("pipeline-state", (event) => {
       const { state, text, duration_ms, word_count, error } = event.payload;
 
@@ -169,6 +179,7 @@ export function useOverlayState() {
 
       switch (state) {
         case "listening": {
+          setModelLoading(false);
           setElapsedSeconds(0);
           setTranscribedDisplayProgress(0);
           setProcessingCountdown(null);
@@ -180,6 +191,19 @@ export function useOverlayState() {
             recordingStartedAt: Date.now(),
           });
           startElapsedTimer(gen);
+          showOverlay();
+          break;
+        }
+
+        case "hands-free": {
+          setModelLoading(false);
+          setTranscribedDisplayProgress(0);
+          transition("hands-free", {
+            text: null,
+            durationMs: null,
+            wordCount: null,
+            error: null,
+          });
           showOverlay();
           break;
         }
@@ -310,6 +334,7 @@ export function useOverlayState() {
     });
 
     return () => {
+      unlistenModel.then((fn) => fn());
       unlisten.then((fn) => fn());
       clearAllTimers();
     };
@@ -332,6 +357,7 @@ export function useOverlayState() {
     remainingSeconds,
     transcribedDisplayProgress,
     processingCountdown,
+    modelLoading,
     dismissOverlay,
   };
 }

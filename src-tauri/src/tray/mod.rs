@@ -58,7 +58,8 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     log::info!("Dictation resumed");
                     emit_paused_state(app, false);
                 } else {
-                    // Pause: unregister hotkeys
+                    // Pause: stop any active recording, then unregister hotkeys
+                    crate::hotkey::manager::abort_active_recording(app);
                     state.paused.store(true, Ordering::SeqCst);
                     if let Err(e) = app.global_shortcut().unregister_all() {
                         log::error!("Failed to unregister hotkeys on pause: {e}");

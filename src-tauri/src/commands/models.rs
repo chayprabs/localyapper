@@ -23,9 +23,27 @@ pub(crate) async fn ensure_speech_model_loaded(
     app_handle: &tauri::AppHandle,
     state: &AppState,
 ) -> Result<std::sync::Arc<WhisperEngine>, String> {
+    let desired_model = selected_speech_model_name(state);
+
     if let Ok(guard) = state.whisper.lock() {
         if let Some(engine) = guard.as_ref() {
-            return Ok(engine.clone());
+            let loaded = state
+                .loaded_speech_model
+                .lock()
+                .ok()
+                .and_then(|g| g.clone());
+            if loaded.as_deref() == Some(desired_model.as_str()) {
+                return Ok(engine.clone());
+            }
+        }
+    }
+
+    // Wrong model cached or none loaded — drop the stale engine first.
+    if let Ok(mut guard) = state.whisper.lock() {
+        if guard.take().is_some() {
+            if let Ok(mut loaded) = state.loaded_speech_model.lock() {
+                *loaded = None;
+            }
         }
     }
 
@@ -40,9 +58,10 @@ pub(crate) async fn ensure_speech_model_loaded(
     );
 
     let model_name = selected_speech_model_name(state);
+    let model_name_for_load = model_name.clone();
     let load_handle = app_handle.clone();
     let loaded_engine = tokio::task::spawn_blocking(move || {
-        crate::load_speech_model_from_setting(&load_handle, &model_name)
+        crate::load_speech_model_from_setting(&load_handle, &model_name_for_load)
     })
     .await
     .map_err(|e| format!("STT load task panicked: {e}"))??;
@@ -53,6 +72,9 @@ pub(crate) async fn ensure_speech_model_loaded(
         .map_err(|e| format!("STT lock failed: {e}"))?;
     if guard.is_none() {
         *guard = Some(loaded_engine.clone());
+        if let Ok(mut loaded) = state.loaded_speech_model.lock() {
+            *loaded = Some(model_name);
+        }
     }
     drop(guard);
 
@@ -426,10 +448,15 @@ pub async fn reload_models(
     let speech_model_loaded = state.whisper.lock().map(|g| g.is_some()).unwrap_or(false);
     log::info!("RELOAD: STT currently loaded: {speech_model_loaded}");
 
-    if !speech_model_loaded {
-        if let Err(e) = ensure_speech_model_loaded(&app_handle, state.inner()).await {
-            errors.push(e);
-        }
+    if let Ok(mut guard) = state.whisper.lock() {
+        guard.take();
+    }
+    if let Ok(mut loaded) = state.loaded_speech_model.lock() {
+        *loaded = None;
+    }
+
+    if let Err(e) = ensure_speech_model_loaded(&app_handle, state.inner()).await {
+        errors.push(e);
     }
 
     let vad_loaded = state.vad.lock().map(|g| g.is_some()).unwrap_or(false);

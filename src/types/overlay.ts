@@ -4,6 +4,7 @@
 export type OverlayVisualState =
   | "hidden"        // Pill is not visible
   | "listening"     // Actively recording, blue waveform
+  | "hands-free"    // Hands-free toggle recording (double-tap)
   | "stopping-soon" // Last 15s of recording, red countdown
   | "processing"    // Pipeline running after recording stops
   | "long-recording"// Processing a recording > 30s, shows minute counter

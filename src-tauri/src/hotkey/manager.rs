@@ -1,5 +1,5 @@
 // Hotkey manager -- global shortcut registration and state machine
-use std::sync::atomic::{AtomicI64, AtomicU8, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -10,19 +10,19 @@ use crate::commands::recording::{execute_pipeline, save_history_entry};
 use crate::context::detector;
 use crate::db::queries;
 use crate::models::PipelineEvent;
-use crate::state::AppState;
+use crate::state::{AppState, HotkeyState, HOTKEY_MODE_HANDS_FREE, HOTKEY_MODE_HOLD_RECORDING, HOTKEY_MODE_IDLE, HOTKEY_MODE_PROCESSING, HOTKEY_MODE_TAP_PENDING};
 
 /// State machine mode: no active recording, ready for input.
-const MODE_IDLE: u8 = 0;
+const MODE_IDLE: u8 = HOTKEY_MODE_IDLE;
 /// State machine mode: key is held down, recording in progress.
-const MODE_HOLD_RECORDING: u8 = 1;
+const MODE_HOLD_RECORDING: u8 = HOTKEY_MODE_HOLD_RECORDING;
 /// State machine mode: hands-free toggle recording is active.
-const MODE_HANDS_FREE: u8 = 2;
+const MODE_HANDS_FREE: u8 = HOTKEY_MODE_HANDS_FREE;
 /// State machine mode: recording stopped, pipeline is running.
-const MODE_PROCESSING: u8 = 3;
+const MODE_PROCESSING: u8 = HOTKEY_MODE_PROCESSING;
 /// State machine mode: a quick tap was released; waiting briefly for a
 /// second tap that would promote the session into hands-free.
-const MODE_TAP_PENDING: u8 = 4;
+const MODE_TAP_PENDING: u8 = HOTKEY_MODE_TAP_PENDING;
 
 /// Recording duration where the overlay should switch to the final warning state.
 const RECORDING_WARNING_SECONDS: u64 = 105;
@@ -38,15 +38,6 @@ const TAP_THRESHOLD_MS: i64 = 250;
 /// After a tap, this is how long the manager waits for a second tap before
 /// cancelling the in-flight recording and returning to idle.
 const DOUBLE_TAP_WINDOW_MS: u64 = 350;
-
-/// Shared hotkey state machine tracking recording mode.
-struct HotkeyState {
-    /// Current mode: idle, hold-recording, tap-pending, hands-free, or processing.
-    mode: AtomicU8,
-    /// Wall-clock millis since UNIX epoch of the most recent record-press.
-    /// Zero when no press is pending.
-    press_time_ms: AtomicI64,
-}
 
 /// Returns true when the given mode keeps the recorder running.
 fn is_recording_mode(mode: u8) -> bool {
@@ -80,14 +71,28 @@ fn get_hotkey_setting(app: &AppHandle, key: &str, default: &str) -> String {
 /// Hands-free is NOT registered as a separate global shortcut. Instead it is
 /// engaged by double-tapping the configured record hotkey within
 /// `DOUBLE_TAP_WINDOW_MS` of the first release.
+/// Cancel an in-flight recording session and reset the hotkey state machine.
+/// Used when dictation is paused from the tray or hotkeys are reloaded.
+pub fn abort_active_recording(app: &AppHandle) {
+    let app_state = app.state::<AppState>();
+    if !app_state.hotkey_state.is_recording() {
+        return;
+    }
+
+    if let Err(e) = app_state.recorder.cancel() {
+        log::warn!("Failed to cancel recording during abort: {e}");
+    }
+    app_state.hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
+    unregister_cancel_hotkey(app);
+    emit_pipeline_event(app, "cancelled", None, None, None, None);
+    log::info!("HOTKEY: Active recording aborted");
+}
+
 pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
     log::info!("HOTKEY: Registering hotkeys...");
     let mut failures = Vec::new();
 
-    let hotkey_state = Arc::new(HotkeyState {
-        mode: AtomicU8::new(MODE_IDLE),
-        press_time_ms: AtomicI64::new(0),
-    });
+    let hotkey_state = app.state::<AppState>().hotkey_state.clone();
 
     let record_hotkey = get_hotkey_setting(app, "hotkey_record", "F8");
     let paste_last_hotkey = get_hotkey_setting(app, "hotkey_paste_last", "Ctrl+Alt+J");
@@ -184,6 +189,7 @@ pub fn register_hotkeys(app: &AppHandle) -> Result<(), String> {
 
 /// Unregister all global shortcuts and re-register from current DB settings.
 pub fn reload_hotkeys(app: &AppHandle) -> Result<(), String> {
+    abort_active_recording(app);
     app.global_shortcut()
         .unregister_all()
         .map_err(|e| format!("Failed to unregister shortcuts: {e}"))?;
@@ -205,10 +211,14 @@ async fn start_recording_session(app: &AppHandle, state: &Arc<HotkeyState>) {
         return;
     }
 
+    let app_state = app.state::<AppState>();
+    let target_app = detector::get_focused_window_name();
+    if let Ok(mut guard) = app_state.recording_target_app.lock() {
+        *guard = Some(target_app);
+    }
+
     log::info!("OVERLAY: Showing listening state");
     emit_pipeline_event(app, "listening", None, None, None, None);
-
-    let app_state = app.state::<AppState>();
     if let Err(e) = app_state.recorder.start() {
         log::error!("Failed to start recording: {e}");
         let _ = app_state.recorder.cancel();
@@ -303,6 +313,14 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
     {
         let app_state = app.state::<AppState>();
         if app_state.paused.load(Ordering::SeqCst) {
+            emit_pipeline_event(
+                &app,
+                "error",
+                None,
+                None,
+                None,
+                Some("Dictation is paused. Resume from the tray menu."),
+            );
             return;
         }
     }
@@ -330,6 +348,7 @@ async fn handle_record_pressed(app: AppHandle, state: Arc<HotkeyState>) {
                 .is_ok() =>
         {
             log::info!("HOTKEY: Double-tap detected, hands-free engaged");
+            emit_pipeline_event(&app, "hands-free", None, None, None, None);
         }
         // Single tap inside hands-free stops the session. Same fall-through
         // behaviour if another thread already transitioned us out.
@@ -414,6 +433,7 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
             log::error!("Failed to stop recording: {e}");
             emit_pipeline_event(&app, "error", None, None, None, Some(&e.to_string()));
             hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
+            app_state.lifecycle.schedule_evict(app.clone());
             return;
         }
     };
@@ -451,6 +471,7 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
             log::error!("Pipeline failed: {e}");
             emit_pipeline_event(&app, "error", None, None, None, Some(&e));
             hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
+            app_state.lifecycle.schedule_evict(app.clone());
             return;
         }
         Err(_timeout) => {
@@ -464,6 +485,7 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
                 Some("Pipeline timed out (30s)"),
             );
             hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
+            app_state.lifecycle.schedule_evict(app.clone());
             return;
         }
     };
@@ -486,6 +508,7 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
             None,
         );
         hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
+        app_state.lifecycle.schedule_evict(app.clone());
         return;
     }
 
@@ -502,7 +525,12 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
         *last = Some(result.final_text.clone());
     }
 
-    let app_name = detector::get_focused_window_name();
+    let app_name = app_state
+        .recording_target_app
+        .lock()
+        .ok()
+        .and_then(|mut guard| guard.take())
+        .unwrap_or_else(detector::get_focused_window_name);
     save_history_entry(app_state.inner(), &result, &app_name);
     log::info!("HISTORY: Saved entry");
 
@@ -551,6 +579,8 @@ async fn run_pipeline_and_inject(app: AppHandle, hotkey_state: Arc<HotkeyState>)
             );
         }
     }
+
+    app_state.lifecycle.schedule_evict(app.clone());
 
     tokio::time::sleep(Duration::from_secs(TRANSCRIBED_OVERLAY_SECONDS)).await;
     hotkey_state.mode.store(MODE_IDLE, Ordering::SeqCst);
@@ -645,7 +675,7 @@ fn emit_pipeline_event(
     }
 
     let tooltip = match state {
-        "listening" | "stopping-soon" => "LocalYapper \u{2014} Recording...",
+        "listening" | "stopping-soon" | "hands-free" => "LocalYapper \u{2014} Recording...",
         "processing" | "long-recording" => "LocalYapper \u{2014} Processing...",
         _ => "LocalYapper",
     };

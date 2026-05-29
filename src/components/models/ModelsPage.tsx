@@ -304,9 +304,9 @@ export function ModelsPage() {
 
           {idleUnloadDirty && (
             <div className="border-t border-black/[0.07] bg-[#0058bc]/[0.04] px-5 py-3 flex items-center gap-2">
-              <Icon name="sync" size={14} className="text-[#0058bc] shrink-0" />
+              <Icon name="check_circle" size={14} className="text-[#0058bc] shrink-0" />
               <p className="text-[12px] font-medium text-[#0058bc]">
-                Restart LocalYapper to apply this change.
+                Saved. The new idle timeout applies after your next dictation.
               </p>
             </div>
           )}

@@ -52,7 +52,7 @@ export function HistoryPage() {
   };
 
   return (
-    <div className="flex flex-col h-full px-12 py-10">
+    <div className="flex flex-col h-full px-6 py-8 sm:px-12 sm:py-10">
       <header className="mb-10 flex justify-between items-start gap-4 shrink-0">
         <div>
           <h1 className="text-[26px] font-semibold text-[#1C1C1E]">History</h1>
@@ -93,7 +93,11 @@ export function HistoryPage() {
         )}
       </header>
 
-      {isEmpty ? (
+      {isLoading ? (
+        <div className="flex flex-1 items-center justify-center">
+          <Icon name="progress_activity" size={28} className="text-black/[0.30] animate-spin" />
+        </div>
+      ) : isEmpty ? (
         <EmptyState onOpenHotkeys={() => setActivePage("hotkeys")} />
       ) : (
         <div className="flex-1 overflow-y-auto pr-2 -mr-2 flex flex-col gap-2">

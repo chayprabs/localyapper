@@ -36,6 +36,7 @@ pub(crate) async fn execute_pipeline(
 
     if !vad_result.has_speech {
         log::info!("STT: No speech detected in audio");
+        state.lifecycle.schedule_evict(app_handle.clone());
         return Ok(PipelineResult {
             raw_text: String::new(),
             final_text: String::new(),

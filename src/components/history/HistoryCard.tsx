@@ -7,12 +7,20 @@ import { formatHistoryTimestamp } from "@/lib/formatters";
 interface HistoryCardProps {
   entry: HistoryEntry;
   onDelete: (id: string) => void;
+  confirmDelete?: boolean;
 }
 
-export function HistoryCard({ entry, onDelete }: HistoryCardProps) {
+export function HistoryCard({ entry, onDelete, confirmDelete = true }: HistoryCardProps) {
+  const handleDelete = () => {
+    if (confirmDelete && !window.confirm("Delete this dictation?")) {
+      return;
+    }
+    onDelete(entry.id);
+  };
+
   return (
     <div className="bg-white p-4 rounded-xl border border-black/[0.07] shadow-sm">
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,156px)_72px] items-center gap-3 mb-2.5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center mb-2.5">
         <div className="min-w-0 flex flex-wrap items-center gap-2">
           <span className="text-[12px] text-black/[0.26]">
             {formatHistoryTimestamp(entry.created_at)}
@@ -23,17 +31,12 @@ export function HistoryCard({ entry, onDelete }: HistoryCardProps) {
           </span>
         </div>
 
-        <div className="min-w-0 flex justify-end">
+        <div className="min-w-0 flex flex-wrap items-center justify-end gap-1 sm:justify-end">
           {entry.app_name ? (
             <span className="max-w-full truncate px-2.5 py-1 bg-[rgba(0,88,188,0.12)] text-[#0058bc] text-[11px] font-semibold rounded-md">
               {entry.app_name}
             </span>
-          ) : (
-            <span className="h-6" aria-hidden="true" />
-          )}
-        </div>
-
-        <div className="flex items-center justify-end gap-1">
+          ) : null}
           <CopyButton
             text={entry.final_text}
             variant="icon"
@@ -41,7 +44,9 @@ export function HistoryCard({ entry, onDelete }: HistoryCardProps) {
             className="w-8 h-8 flex items-center justify-center rounded-md text-black/[0.26] hover:bg-black/[0.04] hover:text-black/85 transition-colors"
           />
           <button
-            onClick={() => onDelete(entry.id)}
+            type="button"
+            onClick={handleDelete}
+            aria-label="Delete dictation"
             className="w-8 h-8 flex items-center justify-center rounded-md text-black/[0.26] hover:bg-[#fff1f1] hover:text-[#ba1a1a] transition-colors"
           >
             <Icon name="delete" size={18} />

@@ -47,12 +47,18 @@ fn inject_native(text: &str, auto_send: bool, platform: Platform) -> Result<(), 
     enigo
         .key(modifier, Direction::Press)
         .map_err(|e| format!("Key press failed: {e}"))?;
-    enigo
-        .key(Key::Unicode('v'), Direction::Click)
-        .map_err(|e| format!("Key click failed: {e}"))?;
-    enigo
-        .key(modifier, Direction::Release)
-        .map_err(|e| format!("Key release failed: {e}"))?;
+    if let Err(e) = enigo.key(Key::Unicode('v'), Direction::Click) {
+        if let Some(prev) = saved {
+            let _ = clipboard.set_text(prev);
+        }
+        return Err(format!("Key click failed: {e}"));
+    }
+    if let Err(e) = enigo.key(modifier, Direction::Release) {
+        if let Some(prev) = saved {
+            let _ = clipboard.set_text(prev);
+        }
+        return Err(format!("Key release failed: {e}"));
+    }
 
     // Wait for paste to complete
     std::thread::sleep(Duration::from_millis(PASTE_DELAY_MS));

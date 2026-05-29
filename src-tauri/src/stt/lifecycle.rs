@@ -107,6 +107,9 @@ impl ModelLifecycle {
                 changed = true;
             }
         }
+        if let Ok(mut loaded) = state.loaded_speech_model.lock() {
+            *loaded = None;
+        }
 
         if changed {
             log::info!("Idle eviction: dropped STT + VAD from memory");

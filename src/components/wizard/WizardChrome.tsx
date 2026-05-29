@@ -45,7 +45,7 @@ export function WizardChrome({
       </header>
 
       <main className="flex h-full w-full items-center justify-center px-6">
-        <div className="w-[480px] rounded-[14px] bg-white p-7 shadow-[0_8px_40px_rgba(0,0,0,0.10)]">
+        <div className="w-full max-w-[480px] rounded-[14px] bg-white p-7 shadow-[0_8px_40px_rgba(0,0,0,0.10)]">
           {children}
         </div>
       </main>

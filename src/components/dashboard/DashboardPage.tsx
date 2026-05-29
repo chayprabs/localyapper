@@ -14,7 +14,7 @@ interface SpeechFilesMissingBannerProps {
 
 function SpeechFilesMissingBanner({ onInstall }: SpeechFilesMissingBannerProps) {
   return (
-    <div className="mt-3 flex items-center justify-between gap-4 rounded-[10px] border border-[#ff9500]/30 bg-[#ff9500]/[0.08] px-4 py-3">
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-4 rounded-[10px] border border-[#ff9500]/30 bg-[#ff9500]/[0.08] px-4 py-3">
       <div className="flex items-center gap-3">
         <Icon name="download" size={20} className="text-[#9a5a00]" />
         <div>
@@ -72,10 +72,12 @@ export function DashboardPage() {
     recordHotkey,
     error,
     deleteLastDictation,
+    isLoading,
   } = useDashboard();
   const setActivePage = useSetAtom(activePageAtom);
 
-  const isEmpty = !stats || stats.total_sessions === 0;
+  const isEmpty =
+    !isLoading && stats !== null && stats.total_sessions === 0;
   const filesMissing =
     modelFileStatus !== null && modelFileStatus.exists === false;
 
@@ -102,7 +104,11 @@ export function DashboardPage() {
         )}
       </header>
 
-      {isEmpty ? (
+      {isLoading ? (
+        <div className="flex min-h-[260px] items-center justify-center">
+          <Icon name="progress_activity" size={28} className="text-black/[0.30] animate-spin" />
+        </div>
+      ) : isEmpty ? (
         <>
           <DashboardEmptyState recordHotkey={recordHotkey} />
           <section className="mt-4">
@@ -112,9 +118,9 @@ export function DashboardPage() {
             />
           </section>
         </>
-      ) : (
+      ) : stats ? (
         <>
-          <section className="mb-4 grid grid-cols-4 gap-3">
+          <section className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="WORDS TODAY" value={formatNumber(stats.words_today)} />
             <StatCard
               label="WORDS THIS WEEK"
@@ -127,7 +133,7 @@ export function DashboardPage() {
             <StatCard label="AVG WPM" value={formatNumber(stats.avg_wpm)} />
           </section>
 
-          <section className="mb-4 grid grid-cols-2 gap-3">
+          <section className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <StatCard
               label="TOTAL SESSIONS"
               value={formatNumber(stats.total_sessions)}
@@ -143,7 +149,7 @@ export function DashboardPage() {
             onDelete={handleDelete}
           />
         </>
-      )}
+      ) : null}
     </div>
   );
 }
