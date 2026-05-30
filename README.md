@@ -220,7 +220,7 @@ These were considered, prototyped, or previously present, and have been delibera
 - `docs/MANUAL_QA.md` — pre-release manual QA checklist.
 - `docs/FINAL_AUDIT.md` — release-hardening audit.
 - `docs/PRODUCT_AUDIT.md` — current spec-vs-code reconciliation.
-- `docs/RELEASE_NOTES_v0.1.0.md` — current release notes.
+- `docs/RELEASE_NOTES_v1.0.0.md` — current release notes.
 
 ## License
 

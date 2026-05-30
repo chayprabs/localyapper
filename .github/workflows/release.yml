@@ -159,7 +159,7 @@ jobs:
           releaseBody: |
             LocalYapper release build.
 
-            See docs/RELEASE_NOTES_v0.1.0.md for release notes.
+            See docs/RELEASE_NOTES_v1.0.0.md for release notes.
           releaseDraft: true
           prerelease: false
 
