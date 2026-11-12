@@ -2,7 +2,7 @@
 import type { HistoryEntry } from "@/types/commands";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Icon } from "@/components/ui/Icon";
-import { formatHistoryTimestamp } from "@/lib/formatters";
+import { formatLocalTime } from "@/lib/formatters";
 
 interface HistoryCardProps {
   entry: HistoryEntry;
@@ -23,7 +23,7 @@ export function HistoryCard({ entry, onDelete, confirmDelete = true }: HistoryCa
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center mb-2.5">
         <div className="min-w-0 flex flex-wrap items-center gap-2">
           <span className="text-[12px] text-black/[0.26]">
-            {formatHistoryTimestamp(entry.created_at)}
+            {formatLocalTime(entry.created_at)}
           </span>
           <span className="text-[12px] text-black/[0.26]">&middot;</span>
           <span className="text-[12px] text-black/[0.26]">

@@ -99,7 +99,7 @@ export function DashboardPage() {
         )}
         {filesMissing && (
           <SpeechFilesMissingBanner
-            onInstall={() => setActivePage("models")}
+            onInstall={() => setActivePage("speech")}
           />
         )}
       </header>

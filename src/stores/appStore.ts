@@ -2,7 +2,7 @@
 import { atom } from "jotai";
 
 /** Main settings pages — order matches sidebar nav items. */
-export type PageId = "dashboard" | "history" | "hotkeys" | "models";
+export type PageId = "dashboard" | "history" | "dictation" | "audio" | "speech" | "general";
 
 /** Currently active page in the settings window sidebar. */
 export const activePageAtom = atom<PageId>("dashboard");

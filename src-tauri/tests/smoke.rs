@@ -763,6 +763,43 @@ fn back_to_back() {
     assert_words(&got, &both);
 }
 
+/// The Audio page's test dictation runs the real pipeline, reports the
+/// text, and neither pastes it nor counts it as a dictation.
+#[test]
+fn test_dictation_reports_without_pasting() {
+    let (wav, want) = fixture("clip01_16k");
+    let mut t = TextTarget::spawn();
+    let mut app = App::launch(&wav);
+    if !in_front(&mut t) {
+        return;
+    }
+    app.cmd("test_on");
+    std::thread::sleep(Duration::from_millis(clip_ms(&wav) + 300));
+    app.cmd("test_off");
+    let start = Instant::now();
+    while app.state()["state"]["tests"].as_u64().unwrap_or(0) < 1 {
+        assert!(
+            start.elapsed() < WAIT,
+            "test dictation did not finish; app log:\n{}",
+            app.log_text()
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let st = app.state();
+    let got = st["state"]["last_test_text"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    assert_words(&got, &want);
+    assert_eq!(
+        app.dictations(),
+        0,
+        "a test dictation counted as a dictation"
+    );
+    std::thread::sleep(Duration::from_millis(500));
+    assert_eq!(t.text(), "", "a test dictation was pasted");
+}
+
 #[test]
 fn second_instance_exits() {
     let (wav, _) = fixture("clip01_16k");

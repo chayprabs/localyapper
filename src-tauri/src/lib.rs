@@ -124,11 +124,15 @@ macro_rules! app_commands {
             commands::settings::set_setting,
             commands::settings::get_all_settings,
             commands::settings::reset_all_settings,
+            commands::history::export_history,
+            commands::recording::test_dictation,
             commands::hotkeys::update_hotkey,
             commands::hotkeys::reset_hotkeys,
             commands::hotkeys::set_hotkey_probe,
             commands::system::check_permissions,
             commands::system::list_input_devices,
+            commands::system::about_info,
+            commands::system::diagnostics,
             commands::system::request_microphone_permission,
             commands::system::request_accessibility_permission,
             commands::system::get_paused_state,
@@ -166,6 +170,7 @@ pub fn run() {
 
     if let Err(e) = builder
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -194,6 +199,15 @@ pub fn run() {
             let settings_map: HashMap<String, String> =
                 db::queries::get_all_settings(&conn).unwrap_or_default();
             let settings_cache = Arc::new(settings::SettingsCache::new(settings_map.clone()));
+            let retention: i64 = settings_cache
+                .get_or_default("history_retention_days")
+                .parse()
+                .unwrap_or(0);
+            if retention > 0 {
+                if let Err(e) = db::queries::prune_history(&conn, retention) {
+                    log::warn!("history: could not prune at start: {e}");
+                }
+            }
             let auto_start_enabled = settings_cache.get_or_default("auto_start") == "true";
             commands::models::migrate_legacy_install(&models_dir(app.handle())?);
 

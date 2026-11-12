@@ -52,6 +52,9 @@ pub enum Msg {
     SetPaused(bool),
     /// Settings changed in the database: re-read them.
     ReloadSettings,
+    /// The Audio page's test: start (true) or stop (false) a dictation
+    /// whose text is reported to the settings window instead of pasted.
+    TestDictation(bool),
     /// Read the state for diagnostics and the test channel.
     Query(tokio::sync::oneshot::Sender<Snapshot>),
 }
@@ -106,6 +109,11 @@ pub struct Snapshot {
     /// Record-key events received (after any repeat filter).
     pub record_downs: u64,
     pub record_ups: u64,
+    /// Test dictations finished (Audio page).
+    pub tests: u64,
+    /// Text of the last test dictation, for the smoke test only.
+    #[cfg(feature = "test-hooks")]
+    pub last_test_text: Option<String>,
 }
 
 /// Cheap, cloneable sender used by every producer.
@@ -278,6 +286,14 @@ pub struct Controller {
     last_view: Option<crate::platform::overlay::ViewPayload>,
     last_timings: Option<StageTimings>,
     dictations: u64,
+    /// A test dictation from the Audio page is running. Shared with the
+    /// segmenter, which then also sends levels to the settings window.
+    test: Arc<AtomicBool>,
+    /// The text of the running test dictation, once decoded.
+    test_text: Option<String>,
+    tests: u64,
+    #[cfg(feature = "test-hooks")]
+    last_test_text: Option<String>,
 }
 
 /// Shared pieces the rest of the app needs.
@@ -345,6 +361,11 @@ pub fn start(parts: ControllerParts) -> Result<Started, String> {
         last_view: None,
         last_timings: None,
         dictations: 0,
+        test: Arc::new(AtomicBool::new(false)),
+        test_text: None,
+        tests: 0,
+        #[cfg(feature = "test-hooks")]
+        last_test_text: None,
     };
     tauri::async_runtime::spawn(ctl.run(rx));
     log::info!("controller: started, {} STT threads", manager.threads());
@@ -431,6 +452,13 @@ impl Controller {
                 let _ = self.app.emit("paused-state-changed", p);
             }
             Msg::ReloadSettings => self.reload_settings(),
+            Msg::TestDictation(true) if self.session.is_idle() => {
+                self.test.store(true, Ordering::SeqCst);
+                self.test_text = None;
+                self.cli(CliAction::Start);
+            }
+            Msg::TestDictation(true) => {}
+            Msg::TestDictation(false) => self.cli(CliAction::Stop),
             Msg::Query(reply) => {
                 let _ = reply.send(Snapshot {
                     idle: self.session.is_idle(),
@@ -443,6 +471,9 @@ impl Controller {
                     overlay_rect: self.overlay.rect(),
                     record_downs: self.record_downs,
                     record_ups: self.record_ups,
+                    tests: self.tests,
+                    #[cfg(feature = "test-hooks")]
+                    last_test_text: self.last_test_text.clone(),
                 });
             }
         }
@@ -511,6 +542,29 @@ impl Controller {
         for fx in effects {
             self.execute(fx);
         }
+        if self.session.is_idle() && self.test.swap(false, Ordering::SeqCst) {
+            self.finish_test();
+        }
+    }
+
+    /// Report the test dictation's text and timings to the settings
+    /// window; both are null when it was cancelled or failed.
+    fn finish_test(&mut self) {
+        #[derive(Serialize, Clone)]
+        struct Payload {
+            text: Option<String>,
+            timings: Option<StageTimings>,
+        }
+        let text = self.test_text.take();
+        let timings = text.as_ref().and(self.last_timings.clone());
+        self.tests += 1;
+        #[cfg(feature = "test-hooks")]
+        {
+            self.last_test_text = text.clone();
+        }
+        let _ = self
+            .app
+            .emit_to("main", "test-dictation-result", Payload { text, timings });
     }
 
     fn execute(&mut self, fx: Effect) {
@@ -575,6 +629,8 @@ impl Controller {
         let handle = self.handle.clone();
         let device = self.settings.input_device.clone();
         let vad_model = self.vad_model.clone();
+        let app = self.app.clone();
+        let test = self.test.clone();
         tauri::async_runtime::spawn_blocking(move || {
             let err_handle = handle.clone();
             let on_error = Box::new(move |message: String| {
@@ -597,7 +653,15 @@ impl Controller {
                 used_fallback: cap.used_fallback,
             });
             spawn_segmenter(
-                id, cap, stopped, discard, vad_model, worker, overlay, handle,
+                id,
+                cap,
+                stopped,
+                discard,
+                vad_model,
+                worker,
+                overlay,
+                handle,
+                LevelTap { app, test },
             );
         });
     }
@@ -720,6 +784,13 @@ impl Controller {
 
     fn inject(&mut self, id: SessionId, text: String) {
         self.timing.inject_started = Some(Instant::now());
+        if self.test.load(Ordering::SeqCst) {
+            // Test dictation: nothing is pasted or remembered.
+            self.test_text = Some(text);
+            self.handle
+                .send(Msg::Session(Event::InjectDone { id, result: Ok(()) }));
+            return;
+        }
         if let Ok(mut last) = self.last_injection.lock() {
             *last = Some(text.clone());
         }
@@ -767,6 +838,9 @@ impl Controller {
     }
 
     fn save_history(&self, text: &str, audio_ms: u64) {
+        if self.test.load(Ordering::SeqCst) {
+            return;
+        }
         let entry = crate::models::HistoryEntry {
             id: uuid::Uuid::new_v4().to_string(),
             raw_text: text.to_string(),
@@ -774,12 +848,26 @@ impl Controller {
             app_name: Some(self.target_app.name.clone()),
             duration_ms: Some(audio_ms as i64),
             word_count: Some(text.split_whitespace().count() as i64),
-            created_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            created_at: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
         };
         let state = self.app.state::<crate::state::AppState>();
+        let retention: i64 = state
+            .settings
+            .get_or_default("history_retention_days")
+            .parse()
+            .unwrap_or(0);
         let result = match state.db.lock() {
             Ok(conn) => {
-                crate::db::queries::insert_history(&conn, &entry).map_err(|e| e.to_string())
+                let saved =
+                    crate::db::queries::insert_history(&conn, &entry).map_err(|e| e.to_string());
+                // Retention is applied on each save as well as at start,
+                // so no daily timer runs while the app is idle.
+                if retention > 0 {
+                    if let Err(e) = crate::db::queries::prune_history(&conn, retention) {
+                        log::warn!("history: could not prune: {e}");
+                    }
+                }
+                saved
             }
             Err(e) => Err(e.to_string()),
         };
@@ -816,7 +904,9 @@ impl Controller {
         );
         let _ = self.app.emit("dictation-timings", &timings);
         self.last_timings = Some(timings);
-        self.dictations += 1;
+        if !self.test.load(Ordering::SeqCst) {
+            self.dictations += 1;
+        }
     }
 
     /// Wraps `feed` for `InjectDone` so timings are closed exactly once.
@@ -826,6 +916,12 @@ impl Controller {
         }
         self.feed(Event::InjectDone { id, result });
     }
+}
+
+/// Where a test dictation's levels also go (the Audio page's meter).
+struct LevelTap {
+    app: AppHandle,
+    test: Arc<AtomicBool>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -838,6 +934,7 @@ fn spawn_segmenter(
     worker: Arc<SttWorker>,
     overlay: Arc<dyn OverlayBackend>,
     handle: ControllerHandle,
+    tap: LevelTap,
 ) {
     let spawned = std::thread::Builder::new()
         .name(format!("segmenter-{id}"))
@@ -868,7 +965,12 @@ fn spawn_segmenter(
                 vad.as_mut(),
                 worker.as_ref(),
                 &events,
-                &mut |v| overlay.level(v),
+                &mut |v| {
+                    overlay.level(v);
+                    if tap.test.load(Ordering::Relaxed) {
+                        let _ = tap.app.emit_to("main", "audio-level", v);
+                    }
+                },
             );
             if let Err(message) = result {
                 handle.send(Msg::Session(Event::CaptureFailed { id, message }));

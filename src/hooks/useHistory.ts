@@ -30,7 +30,7 @@ function toErrorMessage(error: unknown, fallback: string): string {
       : fallback;
 }
 
-export function useHistory(): HistoryData {
+export function useHistory(search = ""): HistoryData {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
@@ -40,7 +40,7 @@ export function useHistory(): HistoryData {
   const fetchInitial = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await getHistory(PAGE_SIZE, 0);
+      const result = await getHistory(PAGE_SIZE, 0, search || null);
       setEntries(result);
       setHasMore(result.length === PAGE_SIZE);
       offsetRef.current = result.length;
@@ -51,7 +51,7 @@ export function useHistory(): HistoryData {
       setError(toErrorMessage(fetchError, "Failed to load history"));
     }
     setIsLoading(false);
-  }, []);
+  }, [search]);
 
   useEffect(() => {
     void fetchInitial();
@@ -69,7 +69,7 @@ export function useHistory(): HistoryData {
 
   const loadMore = useCallback(async () => {
     try {
-      const result = await getHistory(PAGE_SIZE, offsetRef.current);
+      const result = await getHistory(PAGE_SIZE, offsetRef.current, search || null);
       setEntries((prev) => [...prev, ...result]);
       setHasMore(result.length === PAGE_SIZE);
       offsetRef.current += result.length;
@@ -78,7 +78,7 @@ export function useHistory(): HistoryData {
       setHasMore(false);
       setError(toErrorMessage(loadError, "Failed to load more history"));
     }
-  }, []);
+  }, [search]);
 
   const deleteEntry = useCallback(
     async (id: string) => {

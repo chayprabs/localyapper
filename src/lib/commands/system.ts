@@ -29,3 +29,23 @@ export async function requestMicrophonePermission(): Promise<void> {
 export async function requestAccessibilityPermission(): Promise<boolean> {
   return invoke<boolean>("request_accessibility_permission");
 }
+
+/** Input device names, the system default first. */
+export async function listInputDevices(): Promise<string[]> {
+  return invoke<string[]>("list_input_devices");
+}
+
+export interface AboutInfo {
+  version: string;
+  data_dir: string;
+  log_dir: string;
+}
+
+export async function aboutInfo(): Promise<AboutInfo> {
+  return invoke<AboutInfo>("about_info");
+}
+
+/** OS, CPU, RAM, model and last timings as text. Never dictated text. */
+export async function diagnostics(): Promise<string> {
+  return invoke<string>("diagnostics");
+}

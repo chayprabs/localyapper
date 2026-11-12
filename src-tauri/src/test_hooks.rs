@@ -89,6 +89,14 @@ fn handle_line(line: &str, app: &AppHandle, ctl: &ControllerHandle) -> serde_jso
             ctl.send(Msg::Session(Event::Cancel));
             json!({"ok": true})
         }
+        "test_on" => {
+            ctl.send(Msg::TestDictation(true));
+            json!({"ok": true})
+        }
+        "test_off" => {
+            ctl.send(Msg::TestDictation(false));
+            json!({"ok": true})
+        }
         "reset_seen" => {
             reset_seen();
             json!({"ok": true})

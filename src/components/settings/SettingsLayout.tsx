@@ -16,19 +16,27 @@ const DashboardPage = lazy(() =>
 const HistoryPage = lazy(() =>
   import("@/components/history/HistoryPage").then((m) => ({ default: m.HistoryPage })),
 );
-const HotkeysPage = lazy(() =>
-  import("@/components/hotkeys/HotkeysPage").then((m) => ({ default: m.HotkeysPage })),
+const DictationPage = lazy(() =>
+  import("@/components/dictation/DictationPage").then((m) => ({ default: m.DictationPage })),
 );
-const ModelsPage = lazy(() =>
+const AudioPage = lazy(() =>
+  import("@/components/audio/AudioPage").then((m) => ({ default: m.AudioPage })),
+);
+const SpeechPage = lazy(() =>
   import("@/components/speech/SpeechPage").then((m) => ({ default: m.SpeechPage })),
+);
+const GeneralPage = lazy(() =>
+  import("@/components/general/GeneralPage").then((m) => ({ default: m.GeneralPage })),
 );
 
 /** Page ID → React component lookup table for content area rendering. */
 const pages = {
   dashboard: DashboardPage,
   history: HistoryPage,
-  hotkeys: HotkeysPage,
-  models: ModelsPage,
+  dictation: DictationPage,
+  audio: AudioPage,
+  speech: SpeechPage,
+  general: GeneralPage,
 } as const;
 
 function PageFallback() {

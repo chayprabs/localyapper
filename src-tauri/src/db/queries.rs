@@ -7,17 +7,30 @@ use crate::models::{HistoryEntry, Stats};
 
 // --- History ---
 
-/// Returns history entries in reverse chronological order.
+/// Returns history entries in reverse chronological order, optionally
+/// only those whose text or app name contains `search` (any case).
 pub fn get_history(
     conn: &Connection,
     limit: i64,
     offset: i64,
+    search: Option<&str>,
 ) -> Result<Vec<HistoryEntry>, LocalYapperError> {
+    let pattern = search.map(str::trim).filter(|s| !s.is_empty()).map(|s| {
+        let escaped = s
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_");
+        format!("%{escaped}%")
+    });
     let mut stmt = conn.prepare(
         "SELECT id, raw_text, final_text, app_name, duration_ms, word_count, created_at
-         FROM transcription_history ORDER BY julianday(created_at) DESC LIMIT ?1 OFFSET ?2",
+         FROM transcription_history
+         WHERE ?3 IS NULL
+            OR final_text LIKE ?3 ESCAPE '\\'
+            OR app_name LIKE ?3 ESCAPE '\\'
+         ORDER BY julianday(created_at) DESC LIMIT ?1 OFFSET ?2",
     )?;
-    let rows = stmt.query_map(params![limit, offset], |row| {
+    let rows = stmt.query_map(params![limit, offset, pattern], |row| {
         Ok(HistoryEntry {
             id: row.get(0)?,
             raw_text: row.get(1)?,
@@ -242,7 +255,7 @@ mod tests {
             ),
         )?;
 
-        let first_page = get_history(&conn, 2, 0)?;
+        let first_page = get_history(&conn, 2, 0, None)?;
         assert_eq!(
             first_page
                 .iter()
@@ -251,7 +264,7 @@ mod tests {
             vec!["three", "two"]
         );
 
-        let second_page = get_history(&conn, 2, 2)?;
+        let second_page = get_history(&conn, 2, 2, None)?;
         assert_eq!(
             second_page
                 .iter()
@@ -362,7 +375,7 @@ mod tests {
             &conn,
             &history_entry("old", "d", &old_style, Some(1_000), Some(1)),
         )?;
-        let ids: Vec<String> = get_history(&conn, 10, 0)?
+        let ids: Vec<String> = get_history(&conn, 10, 0, None)?
             .into_iter()
             .map(|e| e.id)
             .collect();
@@ -375,7 +388,7 @@ mod tests {
         );
         assert_eq!(prune_history(&conn, 10)?, 1);
         assert_eq!(prune_history(&conn, 1)?, 1);
-        let left: Vec<String> = get_history(&conn, 10, 0)?
+        let left: Vec<String> = get_history(&conn, 10, 0, None)?
             .into_iter()
             .map(|e| e.id)
             .collect();
@@ -425,13 +438,41 @@ mod tests {
 
         clear_history(&conn)?;
 
-        assert!(get_history(&conn, 20, 0)?.is_empty());
+        assert!(get_history(&conn, 20, 0, None)?.is_empty());
         let (day, week) = bounds(1, 3);
         let stats = get_stats(&conn, &day, &week)?;
         assert_eq!(stats.total_sessions, 0);
         assert_eq!(stats.words_all_time, 0);
         assert_eq!(stats.avg_wpm, 0.0);
 
+        Ok(())
+    }
+
+    #[test]
+    fn history_search_matches_text_and_app_and_escapes_wildcards() -> Result<(), LocalYapperError> {
+        let conn = test_connection()?;
+        for (id, text) in [
+            ("a", "Ship the release"),
+            ("b", "100% done"),
+            ("c", "snake_case name"),
+        ] {
+            insert_history(
+                &conn,
+                &history_entry(id, text, "2026-05-16T10:00:00.000Z", None, None),
+            )?;
+        }
+        let ids = |s: &str| -> Result<Vec<String>, LocalYapperError> {
+            Ok(get_history(&conn, 10, 0, Some(s))?
+                .into_iter()
+                .map(|e| e.id)
+                .collect())
+        };
+        assert_eq!(ids("RELEASE")?, vec!["a"]);
+        assert_eq!(ids("%")?, vec!["b"]);
+        assert_eq!(ids("_")?, vec!["c"]);
+        assert_eq!(ids("test app")?.len(), 3);
+        assert_eq!(ids("   ")?.len(), 3);
+        assert!(ids("absent")?.is_empty());
         Ok(())
     }
 }

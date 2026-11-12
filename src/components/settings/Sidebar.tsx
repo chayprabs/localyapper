@@ -14,8 +14,10 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
   { id: "history", label: "History", icon: "history" },
-  { id: "hotkeys", label: "Hotkeys", icon: "keyboard" },
-  { id: "models", label: "Speech", icon: "graphic_eq" },
+  { id: "dictation", label: "Dictation", icon: "keyboard" },
+  { id: "audio", label: "Audio", icon: "mic" },
+  { id: "speech", label: "Speech", icon: "graphic_eq" },
+  { id: "general", label: "General", icon: "settings" },
 ];
 
 export function Sidebar() {

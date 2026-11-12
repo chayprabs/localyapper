@@ -13,3 +13,8 @@ export async function setSetting(key: string, value: string): Promise<void> {
 export async function getAllSettings(): Promise<AllSettings> {
   return invoke<AllSettings>("get_all_settings");
 }
+
+/** Restore every user-facing setting to its default. */
+export async function resetAllSettings(): Promise<void> {
+  return invoke<void>("reset_all_settings");
+}

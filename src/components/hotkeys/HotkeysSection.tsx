@@ -1,4 +1,4 @@
-// Hotkeys page -- remappable keyboard shortcuts with live key capture
+// Hotkeys section of the Dictation page -- remappable shortcuts with live key capture
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { reservedHotkeyMessage } from "@/lib/hotkeyReservations";
@@ -156,7 +156,7 @@ function KeySelector({
   );
 }
 
-export function HotkeysPage() {
+export function HotkeysSection() {
   const {
     entries,
     isLoading,
@@ -179,20 +179,17 @@ export function HotkeysPage() {
 
   if (isLoading) {
     return (
-      <div className="px-12 py-10">
-        <h1 className="text-[26px] font-semibold text-black/85">Hotkeys</h1>
-      </div>
+      <section className="mb-8">
+        <h2 className="text-[12px] font-semibold uppercase tracking-wide text-black/40">Hotkeys</h2>
+      </section>
     );
   }
 
   return (
-    <div className="px-12 py-10">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+    <section className="mb-8">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[26px] font-semibold text-black/85">Hotkeys</h1>
-          <p className="mt-2 text-[13px] text-black/[0.45]">
-            Choose the shortcuts you want to use across the app.
-          </p>
+          <h2 className="text-[12px] font-semibold uppercase tracking-wide text-black/40">Hotkeys</h2>
           {error && (
             <p className="mt-3 max-w-[520px] rounded-lg border border-[#ba1a1a]/15 bg-[#ba1a1a]/[0.06] px-3 py-2 text-[12px] font-medium text-[#ba1a1a]">
               {error}
@@ -270,6 +267,6 @@ export function HotkeysPage() {
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

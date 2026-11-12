@@ -52,3 +52,11 @@ pub async fn overlay_current_view(
         .and_then(|s| s.last_view)
         .unwrap_or(crate::platform::overlay::ViewPayload::Hidden))
 }
+
+/// The Audio page's test dictation: `true` starts recording, `false`
+/// stops. The result arrives as a `test-dictation-result` event and
+/// levels as `audio-level` events; nothing is pasted or saved.
+#[tauri::command]
+pub fn test_dictation(state: tauri::State<'_, AppState>, start: bool) {
+    state.controller.send(Msg::TestDictation(start));
+}
