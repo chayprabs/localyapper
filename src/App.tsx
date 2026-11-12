@@ -1,5 +1,5 @@
 // Root application component for the main settings window. The overlay
-// has its own entry point (`src/overlay-main.tsx`) so the overlay WebView
+// has its own plain-TypeScript entry (`src/overlay-main.ts`) so the overlay WebView
 // does not download or parse the settings/wizard module graph.
 import { Suspense, lazy, useEffect } from "react";
 import { useAtom } from "jotai";

@@ -8,7 +8,6 @@ import type {
   SpeechModelFileStatus,
   Stats,
 } from "@/types/commands";
-import type { PipelineEvent } from "@/types/overlay";
 import {
   deleteHistoryEntry,
   getHistory,
@@ -38,10 +37,6 @@ function toErrorMessage(error: unknown, fallback: string): string {
     : typeof error === "string"
       ? error
       : fallback;
-}
-
-function eventShouldRefreshDashboard(event: PipelineEvent): boolean {
-  return event.state === "injected" || (event.state === "error" && Boolean(event.text));
 }
 
 export function useDashboard(): DashboardData {
@@ -107,10 +102,8 @@ export function useDashboard(): DashboardData {
   }, [fetchAll]);
 
   useEffect(() => {
-    const unlisten = listen<PipelineEvent>("pipeline-state", (event) => {
-      if (eventShouldRefreshDashboard(event.payload)) {
-        void fetchAll();
-      }
+    const unlisten = listen("history-updated", () => {
+      void fetchAll();
     });
 
     return () => {
