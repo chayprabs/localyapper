@@ -11,6 +11,7 @@ runs it before bundling.
 """
 
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -50,7 +51,7 @@ def rust_crates():
         ["cargo", "metadata", "--format-version", "1", "--manifest-path", str(ROOT / "src-tauri" / "Cargo.toml")],
         check=True,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     ).stdout
     meta = json.loads(out)
     rows = set()
@@ -63,10 +64,11 @@ def rust_crates():
 
 def npm_packages():
     out = subprocess.run(
-        ["npm", "ls", "--omit=dev", "--all", "--json", "--long"],
+        # npm is npm.cmd on Windows.
+        [shutil.which("npm") or "npm", "ls", "--omit=dev", "--all", "--json", "--long"],
         cwd=ROOT,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     ).stdout
     tree = json.loads(out or "{}")
     rows = set()
