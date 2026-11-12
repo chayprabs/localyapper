@@ -9,15 +9,15 @@ Fixtures: `src-tauri/tests/fixtures` (LibriSpeech test-clean, CC-BY-4.0).
 
 | Model | Threads | Load ms | Warm-up ms | RTF | Peak RSS MB | WER % |
 |---|---|---|---|---|---|---|
-| moonshine-tiny-en | 1 | 665 | 9 | 0.104 | 2484 | 63.74 |
-| moonshine-tiny-en | 2 | 681 | 8 | 0.077 | 2483 | 63.74 |
-| moonshine-tiny-en | 4 | 750 | 13 | 0.089 | 2487 | 63.74 |
-| parakeet-0.6b-v3 | 1 | 2889 | 117 | 0.178 | 2796 | 1.72 |
-| parakeet-0.6b-v3 | 2 | 2992 | 83 | 0.104 | 3036 | 1.72 |
-| parakeet-0.6b-v3 | 4 | 2789 | 149 | 0.115 | 2672 | 1.72 |
-| parakeet-110m | 1 | 1738 | 43 | 0.055 | 1384 | 2.29 |
-| parakeet-110m | 2 | 1756 | 27 | 0.032 | 1406 | 2.29 |
-| parakeet-110m | 4 | 1781 | 25 | 0.032 | 1397 | 2.29 |
+| moonshine-tiny-en | 1 | 685 | 9 | 0.105 | 2483 | 63.74 |
+| moonshine-tiny-en | 2 | 692 | 9 | 0.077 | 2485 | 63.74 |
+| moonshine-tiny-en | 4 | 737 | 16 | 0.088 | 2484 | 63.74 |
+| parakeet-0.6b-v3 | 1 | 2904 | 117 | 0.179 | 2849 | 1.72 |
+| parakeet-0.6b-v3 | 2 | 3003 | 83 | 0.105 | 3035 | 1.72 |
+| parakeet-0.6b-v3 | 4 | 2825 | 174 | 0.115 | 2671 | 1.72 |
+| parakeet-110m | 1 | 1738 | 43 | 0.056 | 1383 | 2.29 |
+| parakeet-110m | 2 | 1761 | 27 | 0.032 | 1408 | 2.29 |
+| parakeet-110m | 4 | 1762 | 25 | 0.032 | 1396 | 2.29 |
 
 RTF is decode time divided by audio time (lower is faster). A model whose
 RTF on 4 threads is above 0.3 is dropped from the catalog (plan section 9.1).
@@ -26,106 +26,106 @@ RTF on 4 threads is above 0.3 is dropped from the catalog (plan section 9.1).
 
 | model | threads | clip | audio s | decode s | RTF | WER % |
 |---|---|---|---|---|---|---|
-| moonshine-tiny-en | 1 | clip01_16k | 5.1 | 0.12 | 0.024 | 6.2 |
+| moonshine-tiny-en | 1 | clip01_16k | 5.1 | 0.13 | 0.025 | 6.2 |
 | moonshine-tiny-en | 1 | clip02_16k | 8.5 | 0.20 | 0.024 | 11.8 |
-| moonshine-tiny-en | 1 | clip03_16k | 12.0 | 0.35 | 0.029 | 2.7 |
+| moonshine-tiny-en | 1 | clip03_16k | 12.0 | 0.36 | 0.030 | 2.7 |
 | moonshine-tiny-en | 1 | clip04_16k | 7.0 | 0.15 | 0.021 | 0.0 |
 | moonshine-tiny-en | 1 | clip05_16k | 10.2 | 0.25 | 0.024 | 0.0 |
 | moonshine-tiny-en | 1 | clip06_16k | 7.0 | 0.15 | 0.021 | 7.7 |
-| moonshine-tiny-en | 1 | clip07_44k1_stereo | 10.4 | 0.31 | 0.030 | 7.1 |
-| moonshine-tiny-en | 1 | clip08_48k_float | 10.7 | 0.26 | 0.024 | 5.3 |
-| moonshine-tiny-en | 1 | clip09_pause | 27.5 | 1.18 | 0.043 | 5.4 |
-| moonshine-tiny-en | 1 | clip10_long | 102.3 | 17.83 | 0.174 | 113.4 |
+| moonshine-tiny-en | 1 | clip07_44k1_stereo | 10.4 | 0.32 | 0.031 | 7.1 |
+| moonshine-tiny-en | 1 | clip08_48k_float | 10.7 | 0.26 | 0.025 | 5.3 |
+| moonshine-tiny-en | 1 | clip09_pause | 27.5 | 1.26 | 0.046 | 5.4 |
+| moonshine-tiny-en | 1 | clip10_long | 102.3 | 18.10 | 0.177 | 113.4 |
 
 ## moonshine-tiny-en-t2.txt
 
 | model | threads | clip | audio s | decode s | RTF | WER % |
 |---|---|---|---|---|---|---|
 | moonshine-tiny-en | 2 | clip01_16k | 5.1 | 0.12 | 0.023 | 6.2 |
-| moonshine-tiny-en | 2 | clip02_16k | 8.5 | 0.16 | 0.019 | 11.8 |
-| moonshine-tiny-en | 2 | clip03_16k | 12.0 | 0.28 | 0.023 | 2.7 |
-| moonshine-tiny-en | 2 | clip04_16k | 7.0 | 0.14 | 0.020 | 0.0 |
-| moonshine-tiny-en | 2 | clip05_16k | 10.2 | 0.20 | 0.020 | 0.0 |
-| moonshine-tiny-en | 2 | clip06_16k | 7.0 | 0.14 | 0.020 | 7.7 |
-| moonshine-tiny-en | 2 | clip07_44k1_stereo | 10.4 | 0.26 | 0.024 | 7.1 |
-| moonshine-tiny-en | 2 | clip08_48k_float | 10.7 | 0.22 | 0.020 | 5.3 |
-| moonshine-tiny-en | 2 | clip09_pause | 27.5 | 0.88 | 0.032 | 5.4 |
-| moonshine-tiny-en | 2 | clip10_long | 102.3 | 13.04 | 0.128 | 113.4 |
+| moonshine-tiny-en | 2 | clip02_16k | 8.5 | 0.18 | 0.021 | 11.8 |
+| moonshine-tiny-en | 2 | clip03_16k | 12.0 | 0.29 | 0.024 | 2.7 |
+| moonshine-tiny-en | 2 | clip04_16k | 7.0 | 0.15 | 0.021 | 0.0 |
+| moonshine-tiny-en | 2 | clip05_16k | 10.2 | 0.21 | 0.020 | 0.0 |
+| moonshine-tiny-en | 2 | clip06_16k | 7.0 | 0.15 | 0.021 | 7.7 |
+| moonshine-tiny-en | 2 | clip07_44k1_stereo | 10.4 | 0.26 | 0.025 | 7.1 |
+| moonshine-tiny-en | 2 | clip08_48k_float | 10.7 | 0.22 | 0.021 | 5.3 |
+| moonshine-tiny-en | 2 | clip09_pause | 27.5 | 0.94 | 0.034 | 5.4 |
+| moonshine-tiny-en | 2 | clip10_long | 102.3 | 12.96 | 0.127 | 113.4 |
 
 ## moonshine-tiny-en-t4.txt
 
 | model | threads | clip | audio s | decode s | RTF | WER % |
 |---|---|---|---|---|---|---|
-| moonshine-tiny-en | 4 | clip01_16k | 5.1 | 0.24 | 0.047 | 6.2 |
-| moonshine-tiny-en | 4 | clip02_16k | 8.5 | 0.35 | 0.041 | 11.8 |
-| moonshine-tiny-en | 4 | clip03_16k | 12.0 | 0.49 | 0.041 | 2.7 |
+| moonshine-tiny-en | 4 | clip01_16k | 5.1 | 0.29 | 0.057 | 6.2 |
+| moonshine-tiny-en | 4 | clip02_16k | 8.5 | 0.32 | 0.038 | 11.8 |
+| moonshine-tiny-en | 4 | clip03_16k | 12.0 | 0.46 | 0.038 | 2.7 |
 | moonshine-tiny-en | 4 | clip04_16k | 7.0 | 0.31 | 0.044 | 0.0 |
-| moonshine-tiny-en | 4 | clip05_16k | 10.2 | 0.40 | 0.039 | 0.0 |
+| moonshine-tiny-en | 4 | clip05_16k | 10.2 | 0.38 | 0.037 | 0.0 |
 | moonshine-tiny-en | 4 | clip06_16k | 7.0 | 0.31 | 0.044 | 7.7 |
-| moonshine-tiny-en | 4 | clip07_44k1_stereo | 10.4 | 0.43 | 0.042 | 7.1 |
-| moonshine-tiny-en | 4 | clip08_48k_float | 10.7 | 0.40 | 0.037 | 5.3 |
-| moonshine-tiny-en | 4 | clip09_pause | 27.5 | 1.06 | 0.039 | 5.4 |
-| moonshine-tiny-en | 4 | clip10_long | 102.3 | 13.88 | 0.136 | 113.4 |
+| moonshine-tiny-en | 4 | clip07_44k1_stereo | 10.4 | 0.44 | 0.042 | 7.1 |
+| moonshine-tiny-en | 4 | clip08_48k_float | 10.7 | 0.39 | 0.036 | 5.3 |
+| moonshine-tiny-en | 4 | clip09_pause | 27.5 | 1.05 | 0.038 | 5.4 |
+| moonshine-tiny-en | 4 | clip10_long | 102.3 | 13.79 | 0.135 | 113.4 |
 
 ## parakeet-0.6b-v3-t1.txt
 
 | model | threads | clip | audio s | decode s | RTF | WER % |
 |---|---|---|---|---|---|---|
-| parakeet-0.6b-v3 | 1 | clip01_16k | 5.1 | 0.79 | 0.156 | 0.0 |
+| parakeet-0.6b-v3 | 1 | clip01_16k | 5.1 | 0.79 | 0.155 | 0.0 |
 | parakeet-0.6b-v3 | 1 | clip02_16k | 8.5 | 1.30 | 0.154 | 0.0 |
-| parakeet-0.6b-v3 | 1 | clip03_16k | 12.0 | 1.86 | 0.155 | 0.0 |
-| parakeet-0.6b-v3 | 1 | clip04_16k | 7.0 | 1.05 | 0.149 | 0.0 |
-| parakeet-0.6b-v3 | 1 | clip05_16k | 10.2 | 1.54 | 0.151 | 0.0 |
-| parakeet-0.6b-v3 | 1 | clip06_16k | 7.0 | 1.04 | 0.148 | 7.7 |
-| parakeet-0.6b-v3 | 1 | clip07_44k1_stereo | 10.4 | 1.58 | 0.151 | 0.0 |
+| parakeet-0.6b-v3 | 1 | clip03_16k | 12.0 | 1.87 | 0.156 | 0.0 |
+| parakeet-0.6b-v3 | 1 | clip04_16k | 7.0 | 1.05 | 0.150 | 0.0 |
+| parakeet-0.6b-v3 | 1 | clip05_16k | 10.2 | 1.55 | 0.152 | 0.0 |
+| parakeet-0.6b-v3 | 1 | clip06_16k | 7.0 | 1.05 | 0.149 | 7.7 |
+| parakeet-0.6b-v3 | 1 | clip07_44k1_stereo | 10.4 | 1.59 | 0.152 | 0.0 |
 | parakeet-0.6b-v3 | 1 | clip08_48k_float | 10.7 | 1.62 | 0.151 | 5.3 |
-| parakeet-0.6b-v3 | 1 | clip09_pause | 27.5 | 4.38 | 0.159 | 1.4 |
-| parakeet-0.6b-v3 | 1 | clip10_long | 102.3 | 20.62 | 0.202 | 2.1 |
+| parakeet-0.6b-v3 | 1 | clip09_pause | 27.5 | 4.42 | 0.161 | 1.4 |
+| parakeet-0.6b-v3 | 1 | clip10_long | 102.3 | 20.78 | 0.203 | 2.1 |
 
 ## parakeet-0.6b-v3-t2.txt
 
 | model | threads | clip | audio s | decode s | RTF | WER % |
 |---|---|---|---|---|---|---|
-| parakeet-0.6b-v3 | 2 | clip01_16k | 5.1 | 0.48 | 0.094 | 0.0 |
-| parakeet-0.6b-v3 | 2 | clip02_16k | 8.5 | 0.76 | 0.090 | 0.0 |
+| parakeet-0.6b-v3 | 2 | clip01_16k | 5.1 | 0.47 | 0.093 | 0.0 |
+| parakeet-0.6b-v3 | 2 | clip02_16k | 8.5 | 0.77 | 0.091 | 0.0 |
 | parakeet-0.6b-v3 | 2 | clip03_16k | 12.0 | 1.09 | 0.091 | 0.0 |
-| parakeet-0.6b-v3 | 2 | clip04_16k | 7.0 | 0.62 | 0.089 | 0.0 |
-| parakeet-0.6b-v3 | 2 | clip05_16k | 10.2 | 0.90 | 0.088 | 0.0 |
-| parakeet-0.6b-v3 | 2 | clip06_16k | 7.0 | 0.62 | 0.088 | 7.7 |
+| parakeet-0.6b-v3 | 2 | clip04_16k | 7.0 | 0.62 | 0.088 | 0.0 |
+| parakeet-0.6b-v3 | 2 | clip05_16k | 10.2 | 0.91 | 0.088 | 0.0 |
+| parakeet-0.6b-v3 | 2 | clip06_16k | 7.0 | 0.63 | 0.090 | 7.7 |
 | parakeet-0.6b-v3 | 2 | clip07_44k1_stereo | 10.4 | 0.92 | 0.088 | 0.0 |
 | parakeet-0.6b-v3 | 2 | clip08_48k_float | 10.7 | 0.94 | 0.087 | 5.3 |
-| parakeet-0.6b-v3 | 2 | clip09_pause | 27.5 | 2.54 | 0.092 | 1.4 |
-| parakeet-0.6b-v3 | 2 | clip10_long | 102.3 | 11.96 | 0.117 | 2.1 |
+| parakeet-0.6b-v3 | 2 | clip09_pause | 27.5 | 2.56 | 0.093 | 1.4 |
+| parakeet-0.6b-v3 | 2 | clip10_long | 102.3 | 12.12 | 0.118 | 2.1 |
 
 ## parakeet-0.6b-v3-t4.txt
 
 | model | threads | clip | audio s | decode s | RTF | WER % |
 |---|---|---|---|---|---|---|
-| parakeet-0.6b-v3 | 4 | clip01_16k | 5.1 | 0.60 | 0.117 | 0.0 |
-| parakeet-0.6b-v3 | 4 | clip02_16k | 8.5 | 0.90 | 0.106 | 0.0 |
-| parakeet-0.6b-v3 | 4 | clip03_16k | 12.0 | 1.30 | 0.109 | 0.0 |
-| parakeet-0.6b-v3 | 4 | clip04_16k | 7.0 | 0.72 | 0.102 | 0.0 |
-| parakeet-0.6b-v3 | 4 | clip05_16k | 10.2 | 1.06 | 0.104 | 0.0 |
-| parakeet-0.6b-v3 | 4 | clip06_16k | 7.0 | 0.74 | 0.105 | 7.7 |
-| parakeet-0.6b-v3 | 4 | clip07_44k1_stereo | 10.4 | 1.00 | 0.096 | 0.0 |
-| parakeet-0.6b-v3 | 4 | clip08_48k_float | 10.7 | 1.10 | 0.103 | 5.3 |
-| parakeet-0.6b-v3 | 4 | clip09_pause | 27.5 | 2.88 | 0.105 | 1.4 |
-| parakeet-0.6b-v3 | 4 | clip10_long | 102.3 | 12.84 | 0.126 | 2.1 |
+| parakeet-0.6b-v3 | 4 | clip01_16k | 5.1 | 0.62 | 0.123 | 0.0 |
+| parakeet-0.6b-v3 | 4 | clip02_16k | 8.5 | 0.94 | 0.112 | 0.0 |
+| parakeet-0.6b-v3 | 4 | clip03_16k | 12.0 | 1.24 | 0.104 | 0.0 |
+| parakeet-0.6b-v3 | 4 | clip04_16k | 7.0 | 0.75 | 0.107 | 0.0 |
+| parakeet-0.6b-v3 | 4 | clip05_16k | 10.2 | 1.06 | 0.103 | 0.0 |
+| parakeet-0.6b-v3 | 4 | clip06_16k | 7.0 | 0.76 | 0.108 | 7.7 |
+| parakeet-0.6b-v3 | 4 | clip07_44k1_stereo | 10.4 | 1.05 | 0.100 | 0.0 |
+| parakeet-0.6b-v3 | 4 | clip08_48k_float | 10.7 | 1.12 | 0.105 | 5.3 |
+| parakeet-0.6b-v3 | 4 | clip09_pause | 27.5 | 2.76 | 0.101 | 1.4 |
+| parakeet-0.6b-v3 | 4 | clip10_long | 102.3 | 12.77 | 0.125 | 2.1 |
 
 ## parakeet-110m-t1.txt
 
 | model | threads | clip | audio s | decode s | RTF | WER % |
 |---|---|---|---|---|---|---|
 | parakeet-110m | 1 | clip01_16k | 5.1 | 0.23 | 0.045 | 0.0 |
-| parakeet-110m | 1 | clip02_16k | 8.5 | 0.37 | 0.044 | 0.0 |
-| parakeet-110m | 1 | clip03_16k | 12.0 | 0.51 | 0.043 | 2.7 |
-| parakeet-110m | 1 | clip04_16k | 7.0 | 0.30 | 0.043 | 0.0 |
-| parakeet-110m | 1 | clip05_16k | 10.2 | 0.44 | 0.043 | 0.0 |
-| parakeet-110m | 1 | clip06_16k | 7.0 | 0.29 | 0.042 | 7.7 |
-| parakeet-110m | 1 | clip07_44k1_stereo | 10.4 | 0.45 | 0.043 | 0.0 |
-| parakeet-110m | 1 | clip08_48k_float | 10.7 | 0.46 | 0.042 | 5.3 |
-| parakeet-110m | 1 | clip09_pause | 27.5 | 1.27 | 0.046 | 4.1 |
-| parakeet-110m | 1 | clip10_long | 102.3 | 6.77 | 0.066 | 2.1 |
+| parakeet-110m | 1 | clip02_16k | 8.5 | 0.38 | 0.044 | 0.0 |
+| parakeet-110m | 1 | clip03_16k | 12.0 | 0.52 | 0.043 | 2.7 |
+| parakeet-110m | 1 | clip04_16k | 7.0 | 0.29 | 0.042 | 0.0 |
+| parakeet-110m | 1 | clip05_16k | 10.2 | 0.44 | 0.042 | 0.0 |
+| parakeet-110m | 1 | clip06_16k | 7.0 | 0.29 | 0.041 | 7.7 |
+| parakeet-110m | 1 | clip07_44k1_stereo | 10.4 | 0.44 | 0.042 | 0.0 |
+| parakeet-110m | 1 | clip08_48k_float | 10.7 | 0.45 | 0.042 | 5.3 |
+| parakeet-110m | 1 | clip09_pause | 27.5 | 1.28 | 0.046 | 4.1 |
+| parakeet-110m | 1 | clip10_long | 102.3 | 6.83 | 0.067 | 2.1 |
 
 ## parakeet-110m-t2.txt
 
@@ -134,25 +134,25 @@ RTF on 4 threads is above 0.3 is dropped from the catalog (plan section 9.1).
 | parakeet-110m | 2 | clip01_16k | 5.1 | 0.13 | 0.025 | 0.0 |
 | parakeet-110m | 2 | clip02_16k | 8.5 | 0.21 | 0.025 | 0.0 |
 | parakeet-110m | 2 | clip03_16k | 12.0 | 0.29 | 0.024 | 2.7 |
-| parakeet-110m | 2 | clip04_16k | 7.0 | 0.16 | 0.023 | 0.0 |
-| parakeet-110m | 2 | clip05_16k | 10.2 | 0.24 | 0.024 | 0.0 |
+| parakeet-110m | 2 | clip04_16k | 7.0 | 0.18 | 0.025 | 0.0 |
+| parakeet-110m | 2 | clip05_16k | 10.2 | 0.25 | 0.025 | 0.0 |
 | parakeet-110m | 2 | clip06_16k | 7.0 | 0.16 | 0.023 | 7.7 |
-| parakeet-110m | 2 | clip07_44k1_stereo | 10.4 | 0.24 | 0.023 | 0.0 |
-| parakeet-110m | 2 | clip08_48k_float | 10.7 | 0.25 | 0.024 | 5.3 |
+| parakeet-110m | 2 | clip07_44k1_stereo | 10.4 | 0.25 | 0.024 | 0.0 |
+| parakeet-110m | 2 | clip08_48k_float | 10.7 | 0.26 | 0.024 | 5.3 |
 | parakeet-110m | 2 | clip09_pause | 27.5 | 0.71 | 0.026 | 4.1 |
-| parakeet-110m | 2 | clip10_long | 102.3 | 4.04 | 0.040 | 2.1 |
+| parakeet-110m | 2 | clip10_long | 102.3 | 4.04 | 0.039 | 2.1 |
 
 ## parakeet-110m-t4.txt
 
 | model | threads | clip | audio s | decode s | RTF | WER % |
 |---|---|---|---|---|---|---|
 | parakeet-110m | 4 | clip01_16k | 5.1 | 0.13 | 0.025 | 0.0 |
-| parakeet-110m | 4 | clip02_16k | 8.5 | 0.21 | 0.024 | 0.0 |
+| parakeet-110m | 4 | clip02_16k | 8.5 | 0.21 | 0.025 | 0.0 |
 | parakeet-110m | 4 | clip03_16k | 12.0 | 0.29 | 0.024 | 2.7 |
 | parakeet-110m | 4 | clip04_16k | 7.0 | 0.17 | 0.024 | 0.0 |
-| parakeet-110m | 4 | clip05_16k | 10.2 | 0.25 | 0.024 | 0.0 |
+| parakeet-110m | 4 | clip05_16k | 10.2 | 0.24 | 0.024 | 0.0 |
 | parakeet-110m | 4 | clip06_16k | 7.0 | 0.16 | 0.023 | 7.7 |
 | parakeet-110m | 4 | clip07_44k1_stereo | 10.4 | 0.25 | 0.024 | 0.0 |
-| parakeet-110m | 4 | clip08_48k_float | 10.7 | 0.27 | 0.025 | 5.3 |
+| parakeet-110m | 4 | clip08_48k_float | 10.7 | 0.26 | 0.024 | 5.3 |
 | parakeet-110m | 4 | clip09_pause | 27.5 | 0.70 | 0.025 | 4.1 |
-| parakeet-110m | 4 | clip10_long | 102.3 | 4.02 | 0.039 | 2.1 |
+| parakeet-110m | 4 | clip10_long | 102.3 | 3.94 | 0.038 | 2.1 |
