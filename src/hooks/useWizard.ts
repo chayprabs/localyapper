@@ -25,6 +25,7 @@ const ALL_WIZARD_STEPS = [
   "accessibility",
   "hotkey",
   "files",
+  "try",
   "done",
 ] as const;
 
@@ -217,10 +218,11 @@ export function useWizard(onComplete: () => void) {
     setDownloadProgress(null);
   }, []);
 
-  const finishWizard = useCallback(async () => {
+  const finishWizard = useCallback(async (launchAtLogin: boolean) => {
     setSetupError(null);
     try {
       await updateHotkey("hotkey_record", hotkey);
+      await setSetting("auto_start", launchAtLogin ? "true" : "false");
       await setSetting("setup_step", "done");
       await setSetting("setup_complete", "true");
       onComplete();

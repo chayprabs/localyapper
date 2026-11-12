@@ -1,4 +1,5 @@
 // Wizard ready step -- summary of choices made before completing setup
+import { useState } from "react";
 import type { PermissionsStatus } from "@/types/commands";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
@@ -63,7 +64,7 @@ interface ReadyStepProps {
   hotkey: string;
   permissions: PermissionsStatus | null;
   filesInstalled: boolean;
-  onFinish: () => void;
+  onFinish: (launchAtLogin: boolean) => void;
   error: string | null;
 }
 
@@ -75,6 +76,7 @@ export function ReadyStep({
   error,
 }: ReadyStepProps) {
   const hotkeyParts = parseHotkeyParts(hotkey);
+  const [launchAtLogin, setLaunchAtLogin] = useState(false);
   const micGranted = permissions?.microphone === true;
 
   return (
@@ -124,19 +126,28 @@ export function ReadyStep({
         <SummaryRow
           icon={filesInstalled ? "check_circle" : "cloud_off"}
           label="Speech engine"
-          value={filesInstalled ? "Parakeet installed" : "Not installed yet"}
+          value={filesInstalled ? "Speech model installed" : "Not installed yet"}
           tone={filesInstalled ? "ok" : "warn"}
           detail={
             filesInstalled
-              ? "Local Parakeet model is ready for offline use."
+              ? "The model runs on this computer, offline."
               : "Open Speech in the app to install the model later."
           }
         />
       </div>
 
+      <label className="mb-5 flex w-full items-center gap-2 text-left text-[13px] text-black/70">
+        <input
+          type="checkbox"
+          checked={launchAtLogin}
+          onChange={(e) => setLaunchAtLogin(e.target.checked)}
+        />
+        Launch LocalYapper when I sign in
+      </label>
+
       <button
         type="button"
-        onClick={onFinish}
+        onClick={() => onFinish(launchAtLogin)}
         className="h-9 w-full rounded-[8px] bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-[13px] font-medium text-white transition-all hover:brightness-110 active:brightness-95"
       >
         Start yapping

@@ -8,6 +8,7 @@ import { HotkeyStep } from "./HotkeyStep";
 import { MicrophoneStep } from "./MicrophoneStep";
 import { ReadyStep } from "./ReadyStep";
 import { SpeechFilesStep } from "./SpeechFilesStep";
+import { TryStep } from "./TryStep";
 import { WelcomeStep } from "./WelcomeStep";
 import { WizardChrome } from "./WizardChrome";
 import { Icon } from "@/components/ui/Icon";
@@ -75,13 +76,15 @@ export function Wizard() {
             onContinue={wizard.goNext}
           />
         );
+      case "try":
+        return <TryStep hotkey={wizard.hotkey} onContinue={wizard.goNext} />;
       case "done":
         return (
           <ReadyStep
             hotkey={wizard.hotkey}
             permissions={wizard.permissions}
             filesInstalled={wizard.filesInstalled}
-            onFinish={wizard.finishWizard}
+            onFinish={(launchAtLogin) => void wizard.finishWizard(launchAtLogin)}
             error={wizard.setupError}
           />
         );
