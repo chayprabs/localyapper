@@ -58,6 +58,8 @@ futures-util = "0.3"
 # pattern. The system allocator on Windows in particular tends to hold on
 # to freed ONNX scratch space, which would defeat the idle-unload work.
 ringbuf = "0.4"
+# Model download verification (plan P4.2).
+sha2 = "0.10"
 mimalloc = { version = "0.1", default-features = false }
 # mi_collect() after model eviction (plan P1.13).
 libmimalloc-sys = { version = "0.1", features = ["extended"] }
@@ -73,6 +75,7 @@ windows = { version = "0.58", features = [
     "Win32_Security",
     "Win32_Graphics_Gdi",
     "Win32_System_LibraryLoader",
+    "Win32_Storage_FileSystem",
 ] }
 
 [target.'cfg(unix)'.dependencies]
