@@ -128,6 +128,18 @@ impl TextTarget {
         );
     }
 
+    /// Poll until the field's words match `want` closely or 20 s pass.
+    fn wait_for_words(&mut self, want: &str) -> String {
+        let start = Instant::now();
+        loop {
+            let got = self.text();
+            if (!got.trim().is_empty() && wer::wer(want, &got) < 0.15) || start.elapsed() > WAIT {
+                return got;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+
     /// Poll until the field holds `want` or 20 s pass; return the last text.
     fn wait_for(&mut self, want: &str) -> String {
         let start = Instant::now();
@@ -291,4 +303,437 @@ fn inject_with_modifier_down() {
     inject::inject("plain text", &opts(250)).expect("inject");
     let _ = release.join();
     assert_eq!(t.wait_for("plain text"), "plain text");
+}
+
+// ---------------------------------------------------------------------
+// The app under test: built with test-hooks, driven over the control
+// channel (LOCALYAPPER_TEST_PORT) with fake audio from a fixture.
+// ---------------------------------------------------------------------
+
+use localyapper_lib::core::wer;
+use serde_json::Value;
+use std::io::Read;
+use std::net::TcpStream;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+
+fn fixture(name: &str) -> (PathBuf, String) {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let text = std::fs::read_to_string(dir.join(format!("{name}.txt"))).expect("fixture text");
+    (dir.join(format!("{name}.wav")), text.trim().to_string())
+}
+
+/// One data folder for the whole run, with the speech model linked in.
+fn data_dir() -> &'static Path {
+    static DIR: OnceLock<PathBuf> = OnceLock::new();
+    DIR.get_or_init(|| {
+        let dir = std::env::temp_dir().join(format!("localyapper-smoke-{}", std::process::id()));
+        let model_src = std::env::var_os("LOCALYAPPER_TEST_MODEL_DIR")
+            .map(PathBuf::from)
+            .expect("set LOCALYAPPER_TEST_MODEL_DIR to the parakeet-110m model folder");
+        let model_dst = dir.join("models").join("parakeet-tdt-ctc-110m");
+        std::fs::create_dir_all(&model_dst).expect("model dir");
+        for entry in std::fs::read_dir(&model_src)
+            .expect("read model dir")
+            .flatten()
+        {
+            let to = model_dst.join(entry.file_name());
+            if std::fs::hard_link(entry.path(), &to).is_err() {
+                std::fs::copy(entry.path(), &to).expect("copy model file");
+            }
+        }
+        dir
+    })
+}
+
+fn free_port() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|l| l.local_addr())
+        .map(|a| a.port())
+        .expect("free port")
+}
+
+struct App {
+    child: Child,
+    conn: BufReader<TcpStream>,
+    log: PathBuf,
+}
+
+impl App {
+    fn launch(audio: &Path) -> Self {
+        Self::launch_with(audio, "")
+    }
+
+    fn launch_with(audio: &Path, extra_settings: &str) -> Self {
+        let port = free_port();
+        let log = data_dir().join(format!("app-{port}.log"));
+        let log_file = std::fs::File::create(&log).expect("log file");
+        let settings = format!(
+            "setup_complete=true;setup_step=done;auto_start=false;idle_unload_seconds=0;\
+             overlay_preview=true;activation_mode=hold;{extra_settings}"
+        );
+        let child = Command::new(env!("CARGO_BIN_EXE_localyapper"))
+            .env("LOCALYAPPER_DATA_DIR", data_dir())
+            .env("LOCALYAPPER_TEST_PORT", port.to_string())
+            .env("LOCALYAPPER_FAKE_AUDIO", audio)
+            .env("LOCALYAPPER_TEST_SETTINGS", settings)
+            .env("RUST_LOG", "info")
+            .stdout(Stdio::null())
+            .stderr(log_file)
+            .spawn()
+            .expect("start app");
+        let start = Instant::now();
+        let stream = loop {
+            match TcpStream::connect(("127.0.0.1", port)) {
+                Ok(s) => break s,
+                Err(_) if start.elapsed() < WAIT => std::thread::sleep(Duration::from_millis(100)),
+                Err(e) => panic!("app control channel did not open: {e}"),
+            }
+        };
+        stream.set_read_timeout(Some(WAIT)).expect("read timeout");
+        let mut app = Self {
+            child,
+            conn: BufReader::new(stream),
+            log,
+        };
+        // The controller answers once setup has finished.
+        let st = app.state();
+        assert_eq!(st["ok"], Value::Bool(true), "controller did not answer");
+        app
+    }
+
+    fn cmd(&mut self, c: &str) -> Value {
+        let s = self.conn.get_mut();
+        writeln!(s, "{c}").expect("send");
+        let mut line = String::new();
+        self.conn.read_line(&mut line).expect("reply");
+        serde_json::from_str(&line).expect("json")
+    }
+
+    fn state(&mut self) -> Value {
+        self.cmd("state")
+    }
+
+    fn dictations(&mut self) -> u64 {
+        self.state()["state"]["dictations"].as_u64().unwrap_or(0)
+    }
+
+    fn idle(&mut self) -> bool {
+        self.state()["state"]["idle"].as_bool().unwrap_or(false)
+    }
+
+    fn pid(&self) -> u32 {
+        self.child.id()
+    }
+
+    /// Whether this app process may send key events (macOS grant).
+    fn can_type(&mut self) -> bool {
+        let ok = self.cmd("ax")["trusted"].as_bool().unwrap_or(false);
+        if !ok {
+            println!(
+                "SKIP: no Accessibility grant on runner (synthetic key events are not allowed)"
+            );
+        }
+        ok
+    }
+
+    fn log_text(&self) -> String {
+        let mut s = String::new();
+        if let Ok(mut f) = std::fs::File::open(&self.log) {
+            let _ = f.read_to_string(&mut s);
+        }
+        s
+    }
+
+    /// Hold the record key for `ms`, then release.
+    fn dictate(&mut self, ms: u64) {
+        self.cmd("down");
+        std::thread::sleep(Duration::from_millis(ms));
+        self.cmd("up");
+    }
+
+    fn wait_dictations(&mut self, n: u64) {
+        let start = Instant::now();
+        while self.dictations() < n {
+            if start.elapsed() > WAIT {
+                panic!(
+                    "dictation {n} did not finish; app log:\n{}",
+                    self.log_text()
+                );
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+}
+
+impl Drop for App {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+fn clip_ms(path: &Path) -> u64 {
+    localyapper_lib::core::audio::wav::read_file(path)
+        .expect("wav")
+        .duration_ms()
+}
+
+fn fg_pid() -> Option<u32> {
+    localyapper_lib::platform::focus::foreground_pid()
+}
+
+#[test]
+fn hotkey_registers() {
+    let (wav, _) = fixture("clip01_16k");
+    let mut app = App::launch(&wav);
+    let r = app.cmd("hotkeys");
+    assert_eq!(r["ok"], Value::Bool(true), "hotkey errors: {r}");
+}
+
+#[test]
+fn overlay_receives_levels() {
+    let (wav, _) = fixture("clip01_16k");
+    let mut app = App::launch(&wav);
+    app.cmd("reset_seen");
+    app.cmd("down");
+    std::thread::sleep(Duration::from_millis(2500));
+    let st = app.state();
+    app.cmd("cancel");
+    let levels = st["overlay"]["distinct_levels"].as_u64().unwrap_or(0);
+    assert!(levels >= 10, "overlay saw {levels} distinct levels: {st}");
+    let kinds = st["overlay"]["page_kinds"].to_string();
+    assert!(
+        kinds.contains("listening"),
+        "page never showed Listening: {kinds}"
+    );
+}
+
+#[test]
+fn overlay_does_not_take_focus() {
+    let (wav, _) = fixture("clip01_16k");
+    let mut t = TextTarget::spawn();
+    let mut app = App::launch(&wav);
+    t.focus();
+    let target = t.pid;
+    assert_eq!(
+        fg_pid(),
+        Some(target),
+        "text target is not in front to begin with"
+    );
+    app.cmd("down");
+    std::thread::sleep(Duration::from_millis(300));
+    let shown = app.state()["state"]["overlay_rect"].clone();
+    let during = fg_pid();
+    app.cmd("cancel");
+    std::thread::sleep(Duration::from_millis(300));
+    let after = fg_pid();
+    assert!(!shown.is_null(), "overlay was not shown");
+    assert_ne!(during, Some(app.pid()), "overlay took focus");
+    assert_eq!(
+        during,
+        Some(target),
+        "focus moved while the overlay was shown"
+    );
+    assert_eq!(after, Some(target), "focus moved after the overlay hid");
+}
+
+#[test]
+fn overlay_is_click_through() {
+    use enigo::{Button, Coordinate, Direction, Enigo, Mouse, Settings};
+    let (wav, _) = fixture("clip01_16k");
+    let mut t = TextTarget::spawn();
+    t.command("cover");
+    if !keys_reach(&mut t) {
+        return;
+    }
+    let mut app = App::launch(&wav);
+    app.cmd("down");
+    std::thread::sleep(Duration::from_millis(500));
+    let rect = app.state()["state"]["overlay_rect"].clone();
+    assert!(!rect.is_null(), "overlay was not shown");
+    let scale = rect["scale"].as_f64().unwrap_or(1.0);
+    let px = rect["x"].as_f64().unwrap_or(0.0) + rect["width"].as_f64().unwrap_or(0.0) / 2.0;
+    let py = rect["y"].as_f64().unwrap_or(0.0) + rect["height"].as_f64().unwrap_or(0.0) / 2.0;
+    // enigo takes points on macOS and pixels elsewhere.
+    let (cx, cy) = if cfg!(target_os = "macos") {
+        (px / scale, py / scale)
+    } else {
+        (px, py)
+    };
+    let before: usize = t.command("clicks").parse().unwrap_or(0);
+    let mut enigo = Enigo::new(&Settings::default()).expect("enigo");
+    enigo
+        .move_mouse(cx.round() as i32, cy.round() as i32, Coordinate::Abs)
+        .expect("move");
+    enigo.button(Button::Left, Direction::Click).expect("click");
+    std::thread::sleep(Duration::from_millis(300));
+    let after: usize = t.command("clicks").parse().unwrap_or(0);
+    app.cmd("cancel");
+    assert!(
+        after > before,
+        "the click at the pill's centre did not reach the window below"
+    );
+}
+
+#[test]
+fn cancel_discards() {
+    let (wav, _) = fixture("clip01_16k");
+    let mut t = TextTarget::spawn();
+    t.focus();
+    let mut app = App::launch(&wav);
+    app.cmd("down");
+    std::thread::sleep(Duration::from_millis(1500));
+    app.cmd("cancel");
+    std::thread::sleep(Duration::from_millis(2000));
+    assert!(app.idle(), "not idle after cancel");
+    assert_eq!(app.dictations(), 0);
+    assert_eq!(t.text(), "");
+}
+
+fn assert_words(got: &str, want: &str) {
+    let w = wer::wer(want, got);
+    assert!(
+        w < 0.15,
+        "WER {:.1} %: got {got:?}, want {want:?}",
+        100.0 * w
+    );
+}
+
+fn timings(app: &mut App) -> Value {
+    app.state()["state"]["last_timings"].clone()
+}
+
+#[test]
+fn end_to_end_dictation() {
+    let (wav, want) = fixture("clip01_16k");
+    let mut t = TextTarget::spawn();
+    t.focus();
+    let mut app = App::launch(&wav);
+    if !app.can_type() || !keys_reach(&mut t) {
+        return;
+    }
+    t.focus();
+    let target = t.pid;
+    app.dictate(clip_ms(&wav) + 300);
+    let during = fg_pid();
+    app.wait_dictations(1);
+    let got = t.wait_for_words(&want);
+    assert_words(&got, &want);
+    assert_eq!(during, Some(target), "focus moved during dictation");
+    assert_eq!(fg_pid(), Some(target), "focus moved after dictation");
+    let tm = timings(&mut app);
+    println!("PERF end_to_end_dictation {tm}");
+    let r2t = tm["release_to_text_ms"].as_u64().unwrap_or(u64::MAX);
+    assert!(r2t < 5000, "release_to_text_ms {r2t}");
+}
+
+#[test]
+fn end_to_end_cold_and_warm() {
+    let (wav, want) = fixture("clip02_16k");
+    let mut t = TextTarget::spawn();
+    t.focus();
+    let mut app = App::launch(&wav);
+    if !app.can_type() || !keys_reach(&mut t) {
+        return;
+    }
+    t.focus();
+    app.dictate(clip_ms(&wav) + 300);
+    app.wait_dictations(1);
+    assert_words(&t.wait_for_words(&want), &want);
+    let cold = timings(&mut app);
+    std::thread::sleep(Duration::from_secs(2));
+    t.command("clear");
+    t.focus();
+    app.dictate(clip_ms(&wav) + 300);
+    app.wait_dictations(2);
+    assert_words(&t.wait_for_words(&want), &want);
+    let warm = timings(&mut app);
+    println!("PERF cold {cold}");
+    println!("PERF warm {warm}");
+    for tm in [&cold, &warm] {
+        let r2t = tm["release_to_text_ms"].as_u64().unwrap_or(u64::MAX);
+        assert!(r2t < 5000, "release_to_text_ms {r2t}");
+    }
+}
+
+#[test]
+fn back_to_back() {
+    let (wav, want) = fixture("clip01_16k");
+    let mut t = TextTarget::spawn();
+    t.focus();
+    let mut app = App::launch(&wav);
+    if !app.can_type() || !keys_reach(&mut t) {
+        return;
+    }
+    t.focus();
+    app.dictate(clip_ms(&wav) + 300);
+    app.wait_dictations(1);
+    // No pause: the next press comes as soon as the first paste lands.
+    app.dictate(clip_ms(&wav) + 300);
+    app.wait_dictations(2);
+    let both = format!("{want} {want}");
+    let got = t.wait_for_words(&both);
+    assert_words(&got, &both);
+}
+
+#[test]
+fn second_instance_exits() {
+    let (wav, _) = fixture("clip01_16k");
+    let mut first = App::launch(&wav);
+    let mut second = Command::new(env!("CARGO_BIN_EXE_localyapper"))
+        .env("LOCALYAPPER_DATA_DIR", data_dir())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("second instance");
+    let start = Instant::now();
+    let exited = loop {
+        if let Ok(Some(status)) = second.try_wait() {
+            break Some(status);
+        }
+        if start.elapsed() > Duration::from_secs(3) {
+            break None;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    if exited.is_none() {
+        let _ = second.kill();
+    }
+    assert!(exited.is_some(), "second instance kept running");
+    assert!(
+        first.child.try_wait().ok().flatten().is_none(),
+        "first instance died"
+    );
+    assert_eq!(first.state()["ok"], Value::Bool(true));
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn x11_repeat_hold() {
+    let (wav, _) = fixture("clip01_16k");
+    let mut app = App::launch_with(&wav, "hotkey_record=F8");
+    let before = app.state()["state"].clone();
+    let (d0, u0) = (
+        before["record_downs"].as_u64().unwrap_or(0),
+        before["record_ups"].as_u64().unwrap_or(0),
+    );
+    let run = |args: &[&str]| {
+        Command::new("xdotool")
+            .args(args)
+            .status()
+            .expect("xdotool")
+    };
+    assert!(run(&["keydown", "F8"]).success());
+    std::thread::sleep(Duration::from_secs(2));
+    assert!(run(&["keyup", "F8"]).success());
+    std::thread::sleep(Duration::from_millis(300));
+    let after = app.state()["state"].clone();
+    app.cmd("cancel");
+    assert_eq!(
+        after["record_downs"].as_u64().unwrap_or(0) - d0,
+        1,
+        "{after}"
+    );
+    assert_eq!(after["record_ups"].as_u64().unwrap_or(0) - u0, 1, "{after}");
 }
