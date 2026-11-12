@@ -19,14 +19,13 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     let menu = Menu::with_items(app, &[&open_i, &sep1, &pause_i, &sep2, &quit_i])?;
 
-    // Build tray icon with ID for later retrieval
-    let icon = app
-        .default_window_icon()
-        .cloned()
-        .ok_or("No default window icon found")?;
+    // Build tray icon with ID for later retrieval. The tray is the state
+    // indicator that never depends on a WebView.
+    let icon = tray_image(Tray::Idle)?;
 
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
+        .icon_as_template(cfg!(target_os = "macos"))
         .menu(&menu)
         .show_menu_on_left_click(false)
         .tooltip("LocalYapper")
@@ -78,7 +77,28 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Update tray tooltip text. Call from hotkey manager on pipeline state changes.
-/// Reflect the dictation state in the tray. Icons per state arrive in P3.8.
+/// PNG for a tray state: colour icons on Windows and Linux, template
+/// images (black and alpha only) on macOS so the menu bar can tint them.
+fn tray_png(state: Tray) -> &'static [u8] {
+    #[cfg(target_os = "macos")]
+    match state {
+        Tray::Idle => include_bytes!("../../icons/tray/idle-template.png"),
+        Tray::Recording => include_bytes!("../../icons/tray/recording-template.png"),
+        Tray::Processing => include_bytes!("../../icons/tray/processing-template.png"),
+    }
+    #[cfg(not(target_os = "macos"))]
+    match state {
+        Tray::Idle => include_bytes!("../../icons/tray/idle.png"),
+        Tray::Recording => include_bytes!("../../icons/tray/recording.png"),
+        Tray::Processing => include_bytes!("../../icons/tray/processing.png"),
+    }
+}
+
+fn tray_image(state: Tray) -> tauri::Result<tauri::image::Image<'static>> {
+    tauri::image::Image::from_bytes(tray_png(state))
+}
+
+/// Reflect the dictation state in the tray icon and tooltip.
 pub fn set_state(app: &tauri::AppHandle, state: Tray) {
     let tip = match state {
         Tray::Idle => "LocalYapper",
@@ -87,5 +107,26 @@ pub fn set_state(app: &tauri::AppHandle, state: Tray) {
     };
     if let Some(tray) = app.tray_by_id("main-tray") {
         let _ = tray.set_tooltip(Some(tip));
+        match tray_image(state) {
+            Ok(icon) => {
+                let _ = tray.set_icon(Some(icon));
+                #[cfg(target_os = "macos")]
+                let _ = tray.set_icon_as_template(true);
+            }
+            Err(e) => log::warn!("tray: icon for {state:?}: {e}"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_state_has_a_decodable_icon() {
+        for state in [Tray::Idle, Tray::Recording, Tray::Processing] {
+            let img = tray_image(state).expect("tray icon decodes");
+            assert_eq!((img.width(), img.height()), (64, 64));
+        }
     }
 }
