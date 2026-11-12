@@ -19,12 +19,7 @@ pub(crate) fn manifest() -> Result<&'static Manifest, String> {
 }
 
 fn speech_setting(state: &AppState) -> String {
-    state
-        .db
-        .lock()
-        .ok()
-        .and_then(|db| crate::db::queries::get_setting(&db, "speech_model").ok())
-        .unwrap_or_else(|| "auto".to_string())
+    state.settings.get_or_default("speech_model")
 }
 
 /// The model id the `speech_model` setting resolves to on this machine.

@@ -6,6 +6,7 @@ mod db;
 mod error;
 mod models;
 pub mod platform;
+pub mod settings;
 mod state;
 #[cfg(feature = "test-hooks")]
 mod test_hooks;
@@ -122,6 +123,7 @@ macro_rules! app_commands {
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::settings::get_all_settings,
+            commands::settings::reset_all_settings,
             commands::hotkeys::update_hotkey,
             commands::hotkeys::reset_hotkeys,
             commands::hotkeys::set_hotkey_probe,
@@ -174,18 +176,25 @@ pub fn run() {
                 e
             })?;
 
-            let conn = db::open_database(&app_data_dir).map_err(|e| {
+            let (conn, migration) = db::open_database(&app_data_dir).map_err(|e| {
                 log::error!("Failed to initialize database: {e}");
                 Box::new(e) as Box<dyn std::error::Error>
             })?;
             #[cfg(feature = "test-hooks")]
             test_hooks::apply_test_settings(&conn);
+            if migration.from_version < 2 && !migration.fresh {
+                // Schema version 2 (P5.3): an upgraded install keeps
+                // whatever launch-at-login state the OS has now.
+                use tauri_plugin_autostart::ManagerExt;
+                let on = app.autolaunch().is_enabled().unwrap_or(false);
+                if let Err(e) = db::queries::set_setting(&conn, "auto_start", &on.to_string()) {
+                    log::warn!("settings: could not record launch-at-login state: {e}");
+                }
+            }
             let settings_map: HashMap<String, String> =
                 db::queries::get_all_settings(&conn).unwrap_or_default();
-            let auto_start_enabled = settings_map
-                .get("auto_start")
-                .map(|v| v.eq_ignore_ascii_case("true"))
-                .unwrap_or(true);
+            let settings_cache = Arc::new(settings::SettingsCache::new(settings_map.clone()));
+            let auto_start_enabled = settings_cache.get_or_default("auto_start") == "true";
             commands::models::migrate_legacy_install(&models_dir(app.handle())?);
 
             let controller_settings = controller::ControllerSettings::from_map(&settings_map);
@@ -217,6 +226,7 @@ pub fn run() {
                 last_injection: started.last_injection,
                 download_cancel: Arc::new(AtomicBool::new(false)),
                 hotkeys: started.hotkeys,
+                settings: settings_cache,
             });
 
             #[cfg(feature = "test-hooks")]

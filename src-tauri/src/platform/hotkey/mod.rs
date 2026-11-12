@@ -132,19 +132,18 @@ pub fn apply_settings(app: &tauri::AppHandle) -> Result<(), String> {
     use tauri::Manager;
     let state = app.state::<crate::state::AppState>();
     let paused = state.paused.load(std::sync::atomic::Ordering::SeqCst);
-    let combos: Vec<(HotkeyId, String)> = {
-        let conn = state.db.lock().map_err(|e| e.to_string())?;
+    let combos: Vec<(HotkeyId, String)> =
         [HotkeyId::Record, HotkeyId::PasteLast, HotkeyId::OpenApp]
             .into_iter()
             .map(|id| {
-                let combo = crate::db::queries::get_setting(&conn, id.setting_key())
-                    .ok()
+                let combo = state
+                    .settings
+                    .get(id.setting_key())
                     .filter(|c| !c.trim().is_empty())
                     .unwrap_or_else(|| default_combo(id).to_string());
                 (id, combo)
             })
-            .collect()
-    };
+            .collect();
     let mut errors = Vec::new();
     for (id, combo) in combos {
         let r = if paused && id != HotkeyId::OpenApp {

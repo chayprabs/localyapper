@@ -22,4 +22,7 @@ pub struct AppState {
     pub download_cancel: Arc<AtomicBool>,
     /// Global hotkey back end (shortcut plugin, or the Wayland portal).
     pub hotkeys: Arc<dyn HotkeyBackend>,
+    /// Every setting, read from SQLite once at start and kept in step by
+    /// `set_setting`, so hot paths never query the database (P5.1).
+    pub settings: Arc<crate::settings::SettingsCache>,
 }

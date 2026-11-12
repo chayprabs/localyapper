@@ -474,11 +474,8 @@ impl Controller {
         let map = self
             .app
             .state::<crate::state::AppState>()
-            .db
-            .lock()
-            .ok()
-            .and_then(|c| crate::db::queries::get_all_settings(&c).ok())
-            .unwrap_or_default();
+            .settings
+            .snapshot();
         let next = ControllerSettings::from_map(&map);
         if next.overlay != self.settings.overlay {
             self.overlay.configure(next.overlay);

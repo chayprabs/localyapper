@@ -31,9 +31,26 @@ pub async fn clear_history(state: tauri::State<'_, AppState>) -> Result<(), Stri
     queries::clear_history(&conn).map_err(|e| e.to_string())
 }
 
-/// Returns dashboard statistics.
+/// Local midnight today and at the start of this week (Monday), as UTC
+/// RFC 3339 timestamps.
+pub(crate) fn local_boundaries() -> (String, String) {
+    use chrono::{Datelike, Duration, Local, TimeZone, Utc};
+    let now = Local::now();
+    let midnight = now.date_naive().and_hms_opt(0, 0, 0).unwrap_or_default();
+    let day = Local
+        .from_local_datetime(&midnight)
+        .earliest()
+        .map(|d| d.with_timezone(&Utc))
+        .unwrap_or_else(Utc::now);
+    let week = day - Duration::days(i64::from(now.weekday().num_days_from_monday()));
+    let fmt = |d: chrono::DateTime<Utc>| d.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    (fmt(day), fmt(week))
+}
+
+/// Returns dashboard statistics using the local day and week.
 #[tauri::command]
 pub async fn get_stats(state: tauri::State<'_, AppState>) -> Result<Stats, String> {
+    let (day, week) = local_boundaries();
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    queries::get_stats(&conn).map_err(|e| e.to_string())
+    queries::get_stats(&conn, &day, &week).map_err(|e| e.to_string())
 }
