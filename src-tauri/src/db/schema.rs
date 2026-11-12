@@ -53,6 +53,8 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
         ("setup_step", "welcome"),
         ("idle_unload_seconds", "60"),
         ("max_recording_seconds", "600"),
+        ("cancel_key_enabled", "true"),
+        ("cancel_key_in_hands_free", "false"),
     ];
 
     let tx = conn.unchecked_transaction()?;
@@ -176,7 +178,9 @@ mod tests {
 
         let settings_count: i64 =
             conn.query_row("SELECT COUNT(*) FROM settings", [], |row| row.get(0))?;
-        assert_eq!(settings_count, 12);
+        assert_eq!(settings_count, 14);
+        assert_eq!(queries::get_setting(&conn, "cancel_key_enabled")?, "true");
+        assert_eq!(queries::get_setting(&conn, "cancel_key_in_hands_free")?, "false");
         assert_eq!(queries::get_setting(&conn, "idle_unload_seconds")?, "60");
 
         Ok(())

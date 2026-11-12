@@ -894,6 +894,24 @@ mod tests {
     }
 
     #[test]
+    fn cancel_key_settings_reach_the_session_config() {
+        let map: HashMap<String, String> = [
+            ("cancel_key_enabled", "false"),
+            ("cancel_key_in_hands_free", "true"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        let s = ControllerSettings::from_map(&map);
+        assert!(!s.session.cancel_key_enabled);
+        assert!(s.session.cancel_key_in_hands_free);
+        // With the key disabled the session never registers it.
+        let mut sess = Session::new(s.session);
+        let fx = sess.handle(Event::RecordDown { at_ms: 0 });
+        assert!(!fx.contains(&Effect::RegisterCancelKey));
+    }
+
+    #[test]
     fn ms_between_handles_missing_marks() {
         let a = Instant::now();
         assert_eq!(ms_between(None, Some(a)), 0);
