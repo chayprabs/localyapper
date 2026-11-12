@@ -1,0 +1,156 @@
+{
+  "schema": 1,
+  "models": {
+    "parakeet-110m": {
+      "name": "Parakeet 110M",
+      "family": "nemo_ctc",
+      "languages": [
+        "en"
+      ],
+      "license": "CC-BY-4.0",
+      "repo": "csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000",
+      "revision": "3af92f152d32c836acabf38f4c993bc96b80eb2d",
+      "files": [
+        {
+          "name": "model.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000/resolve/3af92f152d32c836acabf38f4c993bc96b80eb2d/model.onnx",
+          "size": 458161021,
+          "sha256": "936806cf3dd0db5aba53f8c7410bb5632d7a8ad6b2c51009f5e4fc0890ec76bf"
+        },
+        {
+          "name": "tokens.txt",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000/resolve/3af92f152d32c836acabf38f4c993bc96b80eb2d/tokens.txt",
+          "size": 9953,
+          "sha256": "450e56bd2f036fe5b6aa821865838cc5aa9d8b0106134ce9a9ba0664abe6cd10"
+        }
+      ]
+    },
+    "parakeet-110m-fp32": {
+      "name": "Parakeet 110M (fp32, legacy)",
+      "family": "nemo_ctc",
+      "languages": [
+        "en"
+      ],
+      "license": "CC-BY-4.0",
+      "legacy": true,
+      "repo": "csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000",
+      "revision": "3af92f152d32c836acabf38f4c993bc96b80eb2d",
+      "files": [
+        {
+          "name": "model.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000/resolve/3af92f152d32c836acabf38f4c993bc96b80eb2d/model.onnx",
+          "size": 458161021,
+          "sha256": "936806cf3dd0db5aba53f8c7410bb5632d7a8ad6b2c51009f5e4fc0890ec76bf"
+        },
+        {
+          "name": "tokens.txt",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000/resolve/3af92f152d32c836acabf38f4c993bc96b80eb2d/tokens.txt",
+          "size": 9953,
+          "sha256": "450e56bd2f036fe5b6aa821865838cc5aa9d8b0106134ce9a9ba0664abe6cd10"
+        }
+      ]
+    },
+    "parakeet-0.6b-v3": {
+      "name": "Parakeet 0.6B v3",
+      "family": "nemo_transducer",
+      "languages": [
+        "bg",
+        "cs",
+        "da",
+        "de",
+        "el",
+        "en",
+        "es",
+        "et",
+        "fi",
+        "fr",
+        "hr",
+        "hu",
+        "it",
+        "lt",
+        "lv",
+        "mt",
+        "nl",
+        "pl",
+        "pt",
+        "ro",
+        "ru",
+        "sk",
+        "sl",
+        "sv",
+        "uk"
+      ],
+      "license": "CC-BY-4.0",
+      "repo": "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+      "revision": "ed5d745623472f97cfc2e6c2916ee248798fc5a8",
+      "files": [
+        {
+          "name": "decoder.int8.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/ed5d745623472f97cfc2e6c2916ee248798fc5a8/decoder.int8.onnx",
+          "size": 11845274,
+          "sha256": "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5"
+        },
+        {
+          "name": "encoder.int8.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/ed5d745623472f97cfc2e6c2916ee248798fc5a8/encoder.int8.onnx",
+          "size": 652282294,
+          "sha256": "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479"
+        },
+        {
+          "name": "joiner.int8.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/ed5d745623472f97cfc2e6c2916ee248798fc5a8/joiner.int8.onnx",
+          "size": 6355277,
+          "sha256": "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98"
+        },
+        {
+          "name": "tokens.txt",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/ed5d745623472f97cfc2e6c2916ee248798fc5a8/tokens.txt",
+          "size": 93939,
+          "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
+        }
+      ]
+    },
+    "moonshine-tiny-en": {
+      "name": "Moonshine Tiny",
+      "family": "moonshine",
+      "languages": [
+        "en"
+      ],
+      "license": "MIT",
+      "repo": "csukuangfj/sherpa-onnx-moonshine-tiny-en-int8",
+      "revision": "bf2b762c076d8ea61e2af0b3851c9564fb77552e",
+      "files": [
+        {
+          "name": "cached_decode.int8.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-tiny-en-int8/resolve/bf2b762c076d8ea61e2af0b3851c9564fb77552e/cached_decode.int8.onnx",
+          "size": 45264830,
+          "sha256": "2aff28bba6a03d8dcf5c9feac45462629bae37317442299f28115ad09da773f6"
+        },
+        {
+          "name": "encode.int8.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-tiny-en-int8/resolve/bf2b762c076d8ea61e2af0b3851c9564fb77552e/encode.int8.onnx",
+          "size": 18249187,
+          "sha256": "8774dfba578de027ec6595c2c654a0836434489bc963a0db124a7f181f571acb"
+        },
+        {
+          "name": "preprocess.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-tiny-en-int8/resolve/bf2b762c076d8ea61e2af0b3851c9564fb77552e/preprocess.onnx",
+          "size": 6800738,
+          "sha256": "f33addce61a143460fe753b5ee5b7db255e5140b5b779c065b94f6c83ff0bf4e"
+        },
+        {
+          "name": "tokens.txt",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-tiny-en-int8/resolve/bf2b762c076d8ea61e2af0b3851c9564fb77552e/tokens.txt",
+          "size": 436688,
+          "sha256": "1165c2aeb9f72f457a83be2d459a09054f27490acd9b41bd43794dfd25e296ea"
+        },
+        {
+          "name": "uncached_decode.int8.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-tiny-en-int8/resolve/bf2b762c076d8ea61e2af0b3851c9564fb77552e/uncached_decode.int8.onnx",
+          "size": 53216096,
+          "sha256": "216737000dd5881a17aa043f6bbd286add33e4c3b0ae257153e2ec15438bdc41"
+        }
+      ]
+    }
+  }
+}
