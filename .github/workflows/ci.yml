@@ -50,6 +50,14 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Drop an incomplete sherpa-onnx download from the cache
+        shell: bash
+        run: |
+          d=src-tauri/target/sherpa-onnx-prebuilt
+          if [ -d "$d" ] && [ -z "$(find "$d" -path '*/lib/*' -name '*sherpa-onnx-c-api*' -print -quit)" ]; then
+            echo "removing $d"; rm -rf "$d"
+          fi
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -79,6 +87,14 @@ jobs:
         with:
           workspaces: src-tauri
           key: pipeline
+
+      - name: Drop an incomplete sherpa-onnx download from the cache
+        shell: bash
+        run: |
+          d=src-tauri/target/sherpa-onnx-prebuilt
+          if [ -d "$d" ] && [ -z "$(find "$d" -path '*/lib/*' -name '*sherpa-onnx-c-api*' -print -quit)" ]; then
+            echo "removing $d"; rm -rf "$d"
+          fi
 
       - name: Install Linux dependencies
         run: |
@@ -118,6 +134,14 @@ jobs:
         with:
           workspaces: src-tauri
           key: smoke
+
+      - name: Drop an incomplete sherpa-onnx download from the cache
+        shell: bash
+        run: |
+          d=src-tauri/target/sherpa-onnx-prebuilt
+          if [ -d "$d" ] && [ -z "$(find "$d" -path '*/lib/*' -name '*sherpa-onnx-c-api*' -print -quit)" ]; then
+            echo "removing $d"; rm -rf "$d"
+          fi
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'

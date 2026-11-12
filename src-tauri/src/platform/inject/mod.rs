@@ -354,6 +354,7 @@ impl<'a> Held<'a> {
         Ok(())
     }
 
+    #[cfg(not(target_os = "macos"))]
     pub(crate) fn click(&mut self, key: enigo::Key) -> Result<(), String> {
         use enigo::Keyboard;
         self.enigo
