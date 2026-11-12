@@ -157,6 +157,7 @@ macro_rules! app_commands {
             commands::system::list_input_devices,
             commands::system::about_info,
             commands::system::diagnostics,
+            commands::system::open_releases,
             commands::system::request_microphone_permission,
             commands::system::request_accessibility_permission,
             commands::system::get_paused_state,
@@ -169,7 +170,6 @@ macro_rules! app_commands {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-
     let args: Vec<String> = std::env::args().collect();
     let cli_action = controller::CliAction::from_args(&args);
     // Launched at login (P6.2): never build the settings window.
@@ -198,6 +198,7 @@ pub fn run() {
         .plugin(log_plugin())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![AUTOSTART_ARG]),
@@ -309,15 +310,15 @@ pub fn run() {
                 let is_enabled = manager.is_enabled().unwrap_or(false);
                 if auto_start_enabled && !is_enabled {
                     if let Err(e) = manager.enable() {
-                        log::warn!("Failed to enable autostart: {e}");
+                        log::warn!("Failed to enable launch at login: {e}");
                     } else {
-                        log::info!("Autostart enabled by default");
+                        log::info!("Launch at login enabled, following the setting");
                     }
                 } else if !auto_start_enabled && is_enabled {
                     if let Err(e) = manager.disable() {
-                        log::warn!("Failed to disable autostart: {e}");
+                        log::warn!("Failed to disable launch at login: {e}");
                     } else {
-                        log::info!("Autostart disabled by setting");
+                        log::info!("Launch at login disabled, following the setting");
                     }
                 }
             }

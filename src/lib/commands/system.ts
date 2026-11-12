@@ -49,3 +49,8 @@ export async function aboutInfo(): Promise<AboutInfo> {
 export async function diagnostics(): Promise<string> {
   return invoke<string>("diagnostics");
 }
+
+/** Open the GitHub releases page in the browser (no auto-updater). */
+export async function openReleases(): Promise<void> {
+  return invoke<void>("open_releases");
+}

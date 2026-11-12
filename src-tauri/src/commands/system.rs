@@ -319,3 +319,15 @@ mod diagnostics_tests {
         assert!(none.contains("not loaded") && none.contains("none since start"));
     }
 }
+
+/// Where releases are published (plan P7.4: no auto-updater).
+pub const RELEASES_URL: &str = "https://github.com/chayprabs/localyapper/releases";
+
+/// Open the releases page in the default browser.
+#[tauri::command]
+pub fn open_releases(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(RELEASES_URL, None::<&str>)
+        .map_err(|e| e.to_string())
+}

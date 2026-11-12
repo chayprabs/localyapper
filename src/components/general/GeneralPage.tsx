@@ -1,6 +1,6 @@
 // General page -- launch at login, theme, privacy and About (plan P5.6)
 import { useEffect, useState } from "react";
-import { aboutInfo, diagnostics, type AboutInfo } from "@/lib/commands/system";
+import { aboutInfo, diagnostics, openReleases, type AboutInfo } from "@/lib/commands/system";
 import { resetAllSettings } from "@/lib/commands/settings";
 import { CopyButton } from "@/components/ui/CopyButton";
 import {
@@ -69,12 +69,20 @@ function About() {
   return (
     <Section title="About">
       <Row label="LocalYapper" hint={info ? `Version ${info.version}` : undefined} error={error}>
+        <span className="flex gap-2">
+        <button
+          onClick={() => openReleases().catch((err: unknown) => setError(errorText(err)))}
+          className="h-8 rounded-lg border border-black/[0.15] bg-surface px-3 text-[13px] font-medium text-black/85 hover:bg-black/[0.02]"
+        >
+          Releases
+        </button>
         <button
           onClick={copyDiagnostics}
           className="h-8 rounded-lg border border-black/[0.15] bg-surface px-3 text-[13px] font-medium text-black/85 hover:bg-black/[0.02]"
         >
           {copied ? "Copied" : "Copy diagnostics"}
         </button>
+        </span>
       </Row>
       {info && <PathRow label="Data folder" path={info.data_dir} />}
       {info && <PathRow label="Log folder" path={info.log_dir} />}
