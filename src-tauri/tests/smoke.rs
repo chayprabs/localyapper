@@ -592,10 +592,12 @@ fn overlay_is_click_through() {
     let (wav, _) = fixture("clip01_16k");
     let mut t = TextTarget::spawn();
     t.command("cover");
+    // Launch first: starting the app can raise another window (on the
+    // Windows runner, a terminal) above the target.
+    let mut app = App::launch(&wav);
     if !keys_reach(&mut t) {
         return;
     }
-    let mut app = App::launch(&wav);
     app.cmd("down");
     std::thread::sleep(Duration::from_millis(500));
     let rect = app.state()["state"]["overlay_rect"].clone();

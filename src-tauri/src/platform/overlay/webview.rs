@@ -160,34 +160,24 @@ impl WebviewOverlay {
         self.config.lock().map(|c| *c).unwrap_or_default()
     }
 
-    fn work_area(&self) -> Option<WorkArea> {
-        let monitor = self
-            .app
-            .cursor_position()
-            .ok()
-            .and_then(|p| self.app.monitor_from_point(p.x, p.y).ok().flatten())
-            .or_else(|| self.app.primary_monitor().ok().flatten())?;
-        let wa = monitor.work_area();
-        Some(WorkArea {
-            x: wa.position.x,
-            y: wa.position.y,
-            width: wa.size.width,
-            height: wa.size.height,
-            scale: monitor.scale_factor(),
-        })
-    }
-
     fn show_window(&self, clicks: bool) {
-        let Some(window) = self.app.get_webview_window(LABEL) else {
-            return;
-        };
-        if let Some(area) = self.work_area() {
-            let (x, y) = place(area, self.config().position);
-            let _ = window.set_position(PhysicalPosition::new(x, y));
-        }
         self.visible.store(true, Ordering::Release);
-        show_no_activate(&self.app, &window);
-        let _ = window.set_ignore_cursor_events(!clicks);
+        let position = self.config().position;
+        // Monitor queries build GDK objects on the calling thread, which
+        // corrupts GTK's X connection off the main thread (the Linux app
+        // then exits), so the whole show runs on the main thread.
+        let app = self.app.clone();
+        let _ = self.app.run_on_main_thread(move || {
+            let Some(window) = app.get_webview_window(LABEL) else {
+                return;
+            };
+            if let Some(area) = work_area(&app) {
+                let (x, y) = place(area, position);
+                let _ = window.set_position(PhysicalPosition::new(x, y));
+            }
+            show_no_activate(&app, &window);
+            let _ = window.set_ignore_cursor_events(!clicks);
+        });
     }
 
     fn hide_window(&self) {
@@ -197,22 +187,58 @@ impl WebviewOverlay {
         }
     }
 
-    /// The overlay's on-screen rectangle, if shown.
+    /// The overlay's on-screen rectangle, if shown. Must not be called
+    /// on the main thread (it waits for it).
     pub fn rect(&self) -> Option<OverlayRect> {
         if !self.visible.load(Ordering::Acquire) {
             return None;
         }
-        let w = self.app.get_webview_window(LABEL)?;
-        let p = w.outer_position().ok()?;
-        let s = w.outer_size().ok()?;
-        Some(OverlayRect {
-            x: p.x,
-            y: p.y,
-            width: s.width,
-            height: s.height,
-            scale: w.scale_factor().unwrap_or(1.0),
+        on_main_thread(&self.app, |app| {
+            let w = app.get_webview_window(LABEL)?;
+            let p = w.outer_position().ok()?;
+            let s = w.outer_size().ok()?;
+            Some(OverlayRect {
+                x: p.x,
+                y: p.y,
+                width: s.width,
+                height: s.height,
+                scale: w.scale_factor().unwrap_or(1.0),
+            })
         })
+        .flatten()
     }
+}
+
+/// The work area of the monitor under the cursor, or the primary one.
+/// Main thread only.
+fn work_area(app: &AppHandle) -> Option<WorkArea> {
+    let monitor = app
+        .cursor_position()
+        .ok()
+        .and_then(|p| app.monitor_from_point(p.x, p.y).ok().flatten())
+        .or_else(|| app.primary_monitor().ok().flatten())?;
+    let wa = monitor.work_area();
+    Some(WorkArea {
+        x: wa.position.x,
+        y: wa.position.y,
+        width: wa.size.width,
+        height: wa.size.height,
+        scale: monitor.scale_factor(),
+    })
+}
+
+/// Run `f` on the main thread and wait up to two seconds for its result.
+fn on_main_thread<T: Send + 'static>(
+    app: &AppHandle,
+    f: impl FnOnce(&AppHandle) -> T + Send + 'static,
+) -> Option<T> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(f(&handle));
+    })
+    .ok()?;
+    rx.recv_timeout(std::time::Duration::from_secs(2)).ok()
 }
 
 #[cfg(windows)]
