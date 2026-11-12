@@ -7,7 +7,9 @@ P6.6). Do not edit by hand: the workflow rewrites this file.
 The app under test is the release build with the `test-hooks` feature,
 which only adds a local control channel used to drive the states below.
 Audio comes from a fixture file instead of a microphone. Private memory
-is USS on Linux and macOS and private bytes on Windows; WebView helpers
+is USS on Linux, private bytes on Windows and the physical footprint on
+macOS (what Activity Monitor shows; falls back to USS where it cannot be
+read); WebView helpers
 are the app's child processes (on macOS, the WebKit processes started
 with the app).
 
@@ -49,64 +51,64 @@ suite (`tests/smoke.rs`, end-to-end on each runner).
 
 | State | Main process MB | WebView helpers MB | Total MB |
 |---|---|---|---|
-| Idle, model not loaded yet | 14.3 | 92.1 | 106.4 |
-| Model loaded (parakeet-110m) | 585.2 | 95.1 | 680.3 |
-| Settings window open | 583.2 | 139.7 | 722.9 |
-| Idle, model evicted | 57.9 | 105.1 | 163.1 |
-| Idle, model evicted, overlay destroyed | 58.3 | 0.0 | 58.3 |
+| Idle, model not loaded yet | 13.8 | 92.5 | 106.3 |
+| Model loaded (parakeet-110m) | 585.7 | 96.6 | 682.3 |
+| Settings window open | 582.1 | 141.6 | 723.7 |
+| Idle, model evicted | 57.9 | 105.7 | 163.6 |
+| Idle, model evicted, overlay destroyed | 57.9 | 0.0 | 57.9 |
 
 Per process:
 
-- Idle, model not loaded yet: localyapper.exe 14.3, msedgewebview2.exe 37.4, msedgewebview2.exe 2.5, msedgewebview2.exe 11.2, msedgewebview2.exe 12.3, msedgewebview2.exe 8.5, msedgewebview2.exe 20.3
-- Model loaded (parakeet-110m): localyapper.exe 585.2, msedgewebview2.exe 37.4, msedgewebview2.exe 2.5, msedgewebview2.exe 11.1, msedgewebview2.exe 12.3, msedgewebview2.exe 8.5, msedgewebview2.exe 23.3
-- Settings window open: localyapper.exe 583.2, msedgewebview2.exe 44.9, msedgewebview2.exe 2.5, msedgewebview2.exe 11.3, msedgewebview2.exe 14.8, msedgewebview2.exe 8.5, msedgewebview2.exe 23.3, msedgewebview2.exe 34.6
-- Idle, model evicted: localyapper.exe 57.9, msedgewebview2.exe 44.9, msedgewebview2.exe 3.5, msedgewebview2.exe 11.2, msedgewebview2.exe 14.8, msedgewebview2.exe 8.5, msedgewebview2.exe 22.3
-- Idle, model evicted, overlay destroyed: localyapper.exe 58.3
+- Idle, model not loaded yet: localyapper.exe 13.8, msedgewebview2.exe 36.7, msedgewebview2.exe 2.3, msedgewebview2.exe 12.1, msedgewebview2.exe 10.9, msedgewebview2.exe 7.3, msedgewebview2.exe 23.2
+- Model loaded (parakeet-110m): localyapper.exe 585.7, msedgewebview2.exe 36.8, msedgewebview2.exe 2.3, msedgewebview2.exe 12.2, msedgewebview2.exe 10.9, msedgewebview2.exe 7.3, msedgewebview2.exe 27.1
+- Settings window open: localyapper.exe 582.1, msedgewebview2.exe 44.4, msedgewebview2.exe 2.3, msedgewebview2.exe 14.6, msedgewebview2.exe 11.0, msedgewebview2.exe 7.3, msedgewebview2.exe 27.1, msedgewebview2.exe 34.8
+- Idle, model evicted: localyapper.exe 57.9, msedgewebview2.exe 44.4, msedgewebview2.exe 3.3, msedgewebview2.exe 14.6, msedgewebview2.exe 10.9, msedgewebview2.exe 7.3, msedgewebview2.exe 25.1
+- Idle, model evicted, overlay destroyed: localyapper.exe 57.9
 
-Overlay window kept alive costs 104.8 MB (P6.3 threshold: 30 MB).
-Idle CPU over 10 s with the model evicted: 0.5 %.
+Overlay window kept alive costs 105.6 MB (P6.3 threshold: 30 MB).
+Idle CPU over 10 s with the model evicted: 0.2 %.
 A7 (idle, settings closed, model evicted: main process under 40 MB private, no settings WebView): main process 57.9 MB, settings WebView not alive: not met.
 
 ### macOS (macOS-15.8.2-arm64-arm-64bit)
 
 | State | Main process MB | WebView helpers MB | Total MB |
 |---|---|---|---|
-| Idle, model not loaded yet | 71.4 | 83.4 | 154.8 |
-| Model loaded (parakeet-110m) | 737.3 | 94.0 | 831.3 |
-| Settings window open | 740.8 | 154.0 | 894.7 |
-| Idle, model evicted | 556.3 | 65.2 | 621.5 |
-| Idle, model evicted, overlay destroyed | 556.4 | 65.2 | 621.6 |
+| Idle, model not loaded yet | 16.3 | 16.0 | 32.3 |
+| Model loaded (parakeet-110m) | 380.9 | 28.1 | 409.1 |
+| Settings window open | 381.0 | 61.9 | 442.9 |
+| Idle, model evicted | 27.4 | 21.2 | 48.6 |
+| Idle, model evicted, overlay destroyed | 27.4 | 20.9 | 48.3 |
 
 Per process:
 
-- Idle, model not loaded yet: localyapper 71.4, com.apple.WebKit 0.0, com.apple.WebKit 0.0, com.apple.WebKit.WebContent 28.4, com.apple.WebKit.WebContent 36.5, com.apple.WebKit.Networking 18.4
-- Model loaded (parakeet-110m): localyapper 737.3, com.apple.WebKit.WebContent 28.4, com.apple.WebKit.WebContent 47.3, com.apple.WebKit.Networking 18.3
-- Settings window open: localyapper 740.8, com.apple.WebKit.WebContent 28.4, com.apple.WebKit.WebContent 47.1, com.apple.WebKit.Networking 18.4, com.apple.WebKit.WebContent 60.1
-- Idle, model evicted: localyapper 556.3, com.apple.WebKit.WebContent 46.9, com.apple.WebKit.Networking 18.3
-- Idle, model evicted, overlay destroyed: localyapper 556.4, com.apple.WebKit.WebContent 46.9, com.apple.WebKit.Networking 18.3
+- Idle, model not loaded yet: localyapper 16.3, com.apple.WebKit.WebContent 11.0, com.apple.WebKit.Networking 4.9
+- Model loaded (parakeet-110m): localyapper 380.9, com.apple.WebKit.WebContent 23.3, com.apple.WebKit.Networking 4.8
+- Settings window open: localyapper 381.0, com.apple.WebKit.WebContent 16.6, com.apple.WebKit.Networking 4.8, com.apple.WebKit.WebContent 40.5
+- Idle, model evicted: localyapper 27.4, com.apple.WebKit.WebContent 16.4, com.apple.WebKit.Networking 4.8
+- Idle, model evicted, overlay destroyed: localyapper 27.4, com.apple.WebKit.WebContent 16.1, com.apple.WebKit.Networking 4.8
 
-Overlay window kept alive costs -0.0 MB (P6.3 threshold: 30 MB).
-Idle CPU over 10 s with the model evicted: 0.1 %.
-A7 (idle, settings closed, model evicted: main process under 40 MB private, no settings WebView): main process 556.3 MB, settings WebView not alive: not met.
+Overlay window kept alive costs 0.3 MB (P6.3 threshold: 30 MB).
+Idle CPU over 10 s with the model evicted: 0.2 %.
+A7 (idle, settings closed, model evicted: main process under 40 MB private, no settings WebView): main process 27.4 MB, settings WebView not alive: met.
 
 ### Linux (Linux-6.8.0-1070-azure-x86_64-with-glibc2.35)
 
 | State | Main process MB | WebView helpers MB | Total MB |
 |---|---|---|---|
-| Idle, model not loaded yet | 75.4 | 65.1 | 140.5 |
-| Model loaded (parakeet-110m) | 613.2 | 147.0 | 760.1 |
-| Settings window open | 625.3 | 242.3 | 867.6 |
-| Idle, model evicted | 117.3 | 144.4 | 261.7 |
-| Idle, model evicted, overlay destroyed | 136.1 | 10.1 | 146.2 |
+| Idle, model not loaded yet | 75.0 | 64.9 | 139.8 |
+| Model loaded (parakeet-110m) | 612.8 | 143.9 | 756.7 |
+| Settings window open | 618.6 | 234.4 | 853.0 |
+| Idle, model evicted | 115.4 | 141.3 | 256.7 |
+| Idle, model evicted, overlay destroyed | 133.8 | 10.0 | 143.8 |
 
 Per process:
 
-- Idle, model not loaded yet: localyapper 75.4, WebKitNetworkProcess 8.8, WebKitWebProcess 56.3
-- Model loaded (parakeet-110m): localyapper 613.2, WebKitNetworkProcess 8.8, WebKitWebProcess 138.2
-- Settings window open: localyapper 625.3, WebKitNetworkProcess 8.7, WebKitWebProcess 84.3, WebKitWebProcess 149.3
-- Idle, model evicted: localyapper 117.3, WebKitNetworkProcess 8.8, WebKitWebProcess 135.5
-- Idle, model evicted, overlay destroyed: localyapper 136.1, WebKitNetworkProcess 10.1
+- Idle, model not loaded yet: localyapper 75.0, WebKitNetworkProcess 8.8, WebKitWebProcess 56.1
+- Model loaded (parakeet-110m): localyapper 612.8, WebKitNetworkProcess 8.7, WebKitWebProcess 135.2
+- Settings window open: localyapper 618.6, WebKitNetworkProcess 8.7, WebKitWebProcess 80.9, WebKitWebProcess 144.8
+- Idle, model evicted: localyapper 115.4, WebKitNetworkProcess 8.8, WebKitWebProcess 132.5
+- Idle, model evicted, overlay destroyed: localyapper 133.8, WebKitNetworkProcess 10.0
 
-Overlay window kept alive costs 115.5 MB (P6.3 threshold: 30 MB).
+Overlay window kept alive costs 112.9 MB (P6.3 threshold: 30 MB).
 Idle CPU over 10 s with the model evicted: 0.1 %.
-A7 (idle, settings closed, model evicted: main process under 40 MB private, no settings WebView): main process 117.3 MB, settings WebView not alive: not met.
+A7 (idle, settings closed, model evicted: main process under 40 MB private, no settings WebView): main process 115.4 MB, settings WebView not alive: not met.
