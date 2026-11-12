@@ -2,9 +2,8 @@
 
 use crate::controller::ControllerHandle;
 use crate::core::stt::manager::ModelManager;
-use crate::platform::hotkey::shortcut::HotkeyId;
+use crate::platform::hotkey::HotkeyBackend;
 use rusqlite::Connection;
-use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
@@ -21,6 +20,6 @@ pub struct AppState {
     pub last_injection: Arc<Mutex<Option<String>>>,
     /// Signal flag to abort an in-progress model download.
     pub download_cancel: Arc<AtomicBool>,
-    /// Combos registered now, so reloads unregister exactly these.
-    pub hotkeys: Mutex<HashMap<HotkeyId, String>>,
+    /// Global hotkey back end (shortcut plugin, or the Wayland portal).
+    pub hotkeys: Arc<dyn HotkeyBackend>,
 }

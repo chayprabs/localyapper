@@ -9,7 +9,7 @@ use crate::core::audio::segmenter::{self, EnergyDetector, Flags, SileroDetector,
 use crate::core::session::{self, Cue, Effect, Event, Session, SessionId, TimerKind};
 use crate::core::stt::manager::{LoadOutcome, ModelManager, ModelSpec, SttWorker, WorkerEvent};
 use crate::platform::audio_in::{AudioThread, Capture};
-use crate::platform::hotkey::shortcut::{self, HotkeyId};
+use crate::platform::hotkey::{HotkeyBackend, HotkeyId};
 use crate::platform::memory;
 use crate::platform::overlay::OverlayBackend;
 use serde::Serialize;
@@ -35,11 +35,39 @@ pub enum Msg {
         generation: u64,
     },
     PasteLast,
+    /// The cancel hotkey fired. Forwarded only while it is registered,
+    /// so back ends that cannot unbind it still follow the policy.
+    CancelKey,
+    OpenApp,
+    /// A command-line action from this or a second instance.
+    Cli(CliAction),
     SetPaused(bool),
     /// Settings changed in the database: re-read them.
     ReloadSettings,
     /// Read the state for diagnostics and the test channel.
     Query(tokio::sync::oneshot::Sender<Snapshot>),
+}
+
+/// `localyapper --toggle | --start | --stop | --cancel`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CliAction {
+    Toggle,
+    Start,
+    Stop,
+    Cancel,
+}
+
+impl CliAction {
+    /// The first action flag in `args`, if any.
+    pub fn from_args<S: AsRef<str>>(args: &[S]) -> Option<Self> {
+        args.iter().find_map(|a| match a.as_ref() {
+            "--toggle" => Some(Self::Toggle),
+            "--start" => Some(Self::Start),
+            "--stop" => Some(Self::Stop),
+            "--cancel" => Some(Self::Cancel),
+            _ => None,
+        })
+    }
 }
 
 /// Stage timings of one dictation, in milliseconds. Never holds text.
@@ -196,6 +224,9 @@ pub struct Controller {
     overlay: Arc<dyn OverlayBackend>,
     resolve_model: ModelResolver,
     vad_model: Option<PathBuf>,
+    hotkeys: Arc<dyn HotkeyBackend>,
+    /// `at_ms` of the last RecordDown, for CLI stop.
+    last_down_ms: u64,
     captures: HashMap<SessionId, CaptureFlags>,
     current_id: Option<SessionId>,
     timing: Timing,
@@ -215,6 +246,7 @@ pub struct Controller {
 /// Shared pieces the rest of the app needs.
 pub struct Started {
     pub handle: ControllerHandle,
+    pub hotkeys: Arc<dyn HotkeyBackend>,
     pub manager: Arc<ModelManager>,
     pub paused: Arc<AtomicBool>,
     pub last_injection: Arc<Mutex<Option<String>>>,
@@ -226,7 +258,11 @@ pub struct ControllerParts {
     pub overlay: Arc<dyn OverlayBackend>,
     pub resolve_model: ModelResolver,
     pub vad_model: Option<PathBuf>,
+    /// Builds the hotkey back end once the controller handle exists.
+    pub hotkeys: HotkeyFactory,
 }
+
+pub type HotkeyFactory = Box<dyn FnOnce(&ControllerHandle) -> Arc<dyn HotkeyBackend> + Send>;
 
 /// Create the controller and start its task.
 pub fn start(parts: ControllerParts) -> Result<Started, String> {
@@ -244,6 +280,7 @@ pub fn start(parts: ControllerParts) -> Result<Started, String> {
     let audio = Arc::new(AudioThread::spawn()?);
     let paused = Arc::new(AtomicBool::new(false));
     let last_injection = Arc::new(Mutex::new(None));
+    let hotkeys = (parts.hotkeys)(&handle);
     let ctl = Controller {
         app: parts.app,
         handle: handle.clone(),
@@ -254,6 +291,8 @@ pub fn start(parts: ControllerParts) -> Result<Started, String> {
         overlay: parts.overlay,
         resolve_model: parts.resolve_model,
         vad_model: parts.vad_model,
+        hotkeys: hotkeys.clone(),
+        last_down_ms: 0,
         captures: HashMap::new(),
         current_id: None,
         timing: Timing::default(),
@@ -271,6 +310,7 @@ pub fn start(parts: ControllerParts) -> Result<Started, String> {
     log::info!("controller: started, {} STT threads", manager.threads());
     Ok(Started {
         handle,
+        hotkeys,
         manager,
         paused,
         last_injection,
@@ -311,6 +351,14 @@ impl Controller {
                 }
             }
             Msg::PasteLast => self.paste_last(),
+            Msg::CancelKey => {
+                if self.cancel_registered.is_some() {
+                    self.feed(Event::Cancel);
+                }
+            }
+            Msg::OpenApp => crate::show_or_create_main_window(&self.app),
+            Msg::Cli(action) => self.cli(action),
+
             Msg::SetPaused(p) => {
                 self.paused.store(p, Ordering::SeqCst);
                 self.feed(Event::SetPaused(p));
@@ -328,6 +376,28 @@ impl Controller {
                     dictations: self.dictations,
                 });
             }
+        }
+    }
+
+    fn cli(&mut self, action: CliAction) {
+        let now = self.handle.now_ms();
+        let start = |c: &mut Self| c.feed(Event::RecordDown { at_ms: now });
+        let stop = |c: &mut Self| {
+            // A release long after the press ends a held recording; if
+            // the session is latched hands-free a press ends it instead.
+            let at_ms = now.max(c.last_down_ms + c.settings.session.tap_threshold_ms + 1);
+            c.feed(Event::RecordUp { at_ms });
+            if c.session.is_recording() {
+                c.feed(Event::RecordDown { at_ms });
+            }
+        };
+        match action {
+            CliAction::Start if self.session.is_idle() => start(self),
+            CliAction::Stop if self.session.is_recording() => stop(self),
+            CliAction::Toggle if self.session.is_idle() => start(self),
+            CliAction::Toggle if self.session.is_recording() => stop(self),
+            CliAction::Cancel => self.feed(Event::Cancel),
+            _ => {}
         }
     }
 
@@ -350,7 +420,8 @@ impl Controller {
     /// Feed one event to the session and execute its effects in order.
     fn feed(&mut self, ev: Event) {
         match &ev {
-            Event::RecordDown { .. } if self.session.is_idle() => {
+            Event::RecordDown { at_ms } if self.session.is_idle() => {
+                self.last_down_ms = *at_ms;
                 self.timing = Timing {
                     pressed: Some(Instant::now()),
                     ..Timing::default()
@@ -400,14 +471,16 @@ impl Controller {
             Effect::Cue(c) => self.cue(c),
             Effect::RegisterCancelKey => {
                 let combo = self.settings.hotkey_cancel.clone();
-                match shortcut::register(&self.app, HotkeyId::Cancel, &combo, &self.handle) {
+                match self.hotkeys.register(HotkeyId::Cancel, &combo) {
                     Ok(()) => self.cancel_registered = Some(combo),
                     Err(e) => log::warn!("controller: {e}"),
                 }
             }
             Effect::UnregisterCancelKey => {
-                if let Some(combo) = self.cancel_registered.take() {
-                    shortcut::unregister(&self.app, &combo);
+                if self.cancel_registered.take().is_some() {
+                    if let Err(e) = self.hotkeys.unregister(HotkeyId::Cancel) {
+                        log::warn!("controller: {e}");
+                    }
                 }
             }
             Effect::StartTimer { kind, id, after_ms } => self.start_timer(kind, id, after_ms),

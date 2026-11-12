@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use rusqlite::Connection;
 
 use crate::db::queries;
-use crate::platform::hotkey::shortcut;
+use crate::platform::hotkey;
 use crate::state::AppState;
 
 /// Valid hotkey setting keys. Hands-free is no longer a separate hotkey -- it
@@ -103,11 +103,11 @@ pub async fn update_hotkey(
     queries::set_setting(&conn, &key, &value).map_err(|e| e.to_string())?;
 
     drop(conn);
-    if let Err(register_error) = shortcut::reload(&app) {
+    if let Err(register_error) = hotkey::apply_settings(&app) {
         if let Ok(conn) = state.db.lock() {
             restore_hotkey_settings(&conn, &previous);
         }
-        if let Err(rollback_error) = shortcut::reload(&app) {
+        if let Err(rollback_error) = hotkey::apply_settings(&app) {
             log::error!(
                 "Failed to restore previous hotkeys after registration error: {rollback_error}"
             );
@@ -132,11 +132,11 @@ pub async fn reset_hotkeys(
     }
 
     drop(conn);
-    if let Err(register_error) = shortcut::reload(&app) {
+    if let Err(register_error) = hotkey::apply_settings(&app) {
         if let Ok(conn) = state.db.lock() {
             restore_hotkey_settings(&conn, &previous);
         }
-        if let Err(rollback_error) = shortcut::reload(&app) {
+        if let Err(rollback_error) = hotkey::apply_settings(&app) {
             log::error!(
                 "Failed to restore previous hotkeys after reset registration error: {rollback_error}"
             );

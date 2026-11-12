@@ -1,117 +1,168 @@
-//! `tauri-plugin-global-shortcut` back end (Windows, macOS, Linux X11).
+//! `tauri-plugin-global-shortcut` back end for Windows, macOS and X11.
 //!
-//! Callbacks send straight into the controller channel. Nothing is
-//! spawned per event, so press and release keep their order.
+//! On Linux the record key passes through `RepeatFilter` (Appendix C):
+//! X11 auto-repeat sends Release/Press pairs while a key is held, which
+//! would end hold-to-talk after the keyboard repeat delay (F21).
 
-use crate::controller::{ControllerHandle, Msg};
-use crate::core::session::Event;
+use super::{dispatch, HotkeyBackend, HotkeyId};
+use crate::controller::ControllerHandle;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
-/// The hotkey actions.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum HotkeyId {
-    Record,
-    Cancel,
-    PasteLast,
-    OpenApp,
+pub struct ShortcutBackend {
+    app: AppHandle,
+    ctl: ControllerHandle,
+    registered: Mutex<HashMap<HotkeyId, String>>,
+    warning: Option<String>,
+    #[cfg(target_os = "linux")]
+    gate: std::sync::Arc<linux::RepeatGate>,
 }
 
-impl HotkeyId {
-    pub fn setting_key(self) -> &'static str {
-        match self {
-            Self::Record => "hotkey_record",
-            Self::Cancel => "hotkey_cancel",
-            Self::PasteLast => "hotkey_paste_last",
-            Self::OpenApp => "hotkey_open_app",
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Record => "Record",
-            Self::Cancel => "Cancel",
-            Self::PasteLast => "Paste Last",
-            Self::OpenApp => "Open App",
+impl ShortcutBackend {
+    pub fn new(app: AppHandle, ctl: ControllerHandle, warning: Option<String>) -> Self {
+        Self {
+            #[cfg(target_os = "linux")]
+            gate: std::sync::Arc::new(linux::RepeatGate::new(ctl.clone())),
+            app,
+            ctl,
+            registered: Mutex::new(HashMap::new()),
+            warning,
         }
     }
 }
 
-/// Register `combo` for `id`, replacing nothing: the caller unregisters
-/// the previous combo first.
-pub fn register(
-    app: &AppHandle,
-    id: HotkeyId,
-    combo: &str,
-    ctl: &ControllerHandle,
-) -> Result<(), String> {
-    let ctl = ctl.clone();
-    app.global_shortcut()
-        .on_shortcut(combo, move |app, _shortcut, event| {
-            let pressed = event.state == ShortcutState::Pressed;
-            match id {
-                HotkeyId::Record => {
-                    let at_ms = ctl.now_ms();
-                    ctl.send(Msg::Session(if pressed {
-                        Event::RecordDown { at_ms }
-                    } else {
-                        Event::RecordUp { at_ms }
-                    }));
+impl HotkeyBackend for ShortcutBackend {
+    fn register(&self, id: HotkeyId, combo: &str) -> Result<(), String> {
+        self.unregister(id)?;
+        let ctl = self.ctl.clone();
+        #[cfg(target_os = "linux")]
+        let gate = self.gate.clone();
+        self.app
+            .global_shortcut()
+            .on_shortcut(combo, move |_app, _shortcut, event| {
+                let pressed = event.state == ShortcutState::Pressed;
+                let at_ms = ctl.now_ms();
+                #[cfg(target_os = "linux")]
+                if id == HotkeyId::Record {
+                    gate.on_key(pressed, at_ms);
+                    return;
                 }
-                HotkeyId::Cancel if pressed => ctl.send(Msg::Session(Event::Cancel)),
-                HotkeyId::PasteLast if pressed => ctl.send(Msg::PasteLast),
-                HotkeyId::OpenApp if pressed => crate::show_or_create_main_window(app),
-                _ => {}
-            }
-        })
-        .map_err(|e| format!("Failed to register {} hotkey '{combo}': {e}", id.label()))
-}
-
-pub fn unregister(app: &AppHandle, combo: &str) {
-    if combo.is_empty() {
-        return;
-    }
-    if let Err(e) = app.global_shortcut().unregister(combo) {
-        log::debug!("hotkey: unregister '{combo}': {e}");
-    }
-}
-
-/// Re-register record, paste-last and open-app from settings. While
-/// paused only open-app stays registered. The cancel key is owned by the
-/// controller and untouched here.
-pub fn reload(app: &AppHandle) -> Result<(), String> {
-    use tauri::Manager;
-    let state = app.state::<crate::state::AppState>();
-    let paused = state.paused.load(std::sync::atomic::Ordering::SeqCst);
-    let wanted: Vec<(HotkeyId, String)> = {
-        let conn = state.db.lock().map_err(|e| e.to_string())?;
-        [HotkeyId::Record, HotkeyId::PasteLast, HotkeyId::OpenApp]
-            .into_iter()
-            .filter(|id| !paused || *id == HotkeyId::OpenApp)
-            .filter_map(|id| {
-                crate::db::queries::get_setting(&conn, id.setting_key())
-                    .ok()
-                    .filter(|c| !c.trim().is_empty())
-                    .map(|c| (id, c))
+                dispatch(&ctl, id, pressed, at_ms);
             })
-            .collect()
-    };
-    let mut registered = state.hotkeys.lock().map_err(|e| e.to_string())?;
-    for (_, combo) in registered.drain() {
-        unregister(app, &combo);
+            .map_err(|e| format!("Failed to register {} hotkey '{combo}': {e}", id.label()))?;
+        if let Ok(mut r) = self.registered.lock() {
+            r.insert(id, combo.to_string());
+        }
+        Ok(())
     }
-    let mut errors = Vec::new();
-    for (id, combo) in wanted {
-        match register(app, id, &combo, &state.controller) {
-            Ok(()) => {
-                registered.insert(id, combo);
+
+    fn unregister(&self, id: HotkeyId) -> Result<(), String> {
+        let previous = self.registered.lock().ok().and_then(|mut r| r.remove(&id));
+        if let Some(combo) = previous {
+            self.app
+                .global_shortcut()
+                .unregister(combo.as_str())
+                .map_err(|e| format!("Failed to unregister '{combo}': {e}"))?;
+        }
+        Ok(())
+    }
+
+    fn name(&self) -> &'static str {
+        "global-shortcut"
+    }
+
+    fn warning(&self) -> Option<String> {
+        self.warning.clone()
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod linux {
+    use super::super::repeat_filter::{Key, RepeatFilter};
+    use super::{dispatch, HotkeyId};
+    use crate::controller::ControllerHandle;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+
+    /// Holds a release back for 30 ms; a 10 ms poll runs only while a
+    /// release is pending.
+    pub struct RepeatGate {
+        filter: Arc<Mutex<RepeatFilter>>,
+        ctl: ControllerHandle,
+        polling: Arc<AtomicBool>,
+    }
+
+    fn forward(ctl: &ControllerHandle, keys: Vec<Key>) {
+        for k in keys {
+            match k {
+                Key::Down { at_ms } => dispatch(ctl, HotkeyId::Record, true, at_ms),
+                Key::Up { at_ms } => dispatch(ctl, HotkeyId::Record, false, at_ms),
             }
-            Err(e) => errors.push(e),
         }
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors.join("; "))
+
+    impl RepeatGate {
+        pub fn new(ctl: ControllerHandle) -> Self {
+            Self {
+                filter: Arc::new(Mutex::new(RepeatFilter::new(30))),
+                ctl,
+                polling: Arc::new(AtomicBool::new(false)),
+            }
+        }
+
+        pub fn on_key(&self, pressed: bool, at_ms: u64) {
+            // The polling flag only changes under the filter lock, so a
+            // pending release can never be left without a poll thread.
+            let (out, start_poll) = match self.filter.lock() {
+                Ok(mut f) => {
+                    let out = if pressed {
+                        f.on_press(at_ms)
+                    } else {
+                        f.on_release(at_ms)
+                    };
+                    let pending = f.next_deadline().is_some();
+                    (out, pending && !self.polling.swap(true, Ordering::AcqRel))
+                }
+                Err(_) => return,
+            };
+            forward(&self.ctl, out);
+            if start_poll {
+                self.spawn_poll();
+            }
+        }
+
+        fn spawn_poll(&self) {
+            let (filter, ctl, polling) =
+                (self.filter.clone(), self.ctl.clone(), self.polling.clone());
+            let spawned = std::thread::Builder::new()
+                .name("hotkey-repeat".into())
+                .spawn(move || loop {
+                    std::thread::sleep(Duration::from_millis(10));
+                    let (out, done) = match filter.lock() {
+                        Ok(mut f) => {
+                            let out = f.poll(ctl.now_ms());
+                            let done = f.next_deadline().is_none();
+                            if done {
+                                polling.store(false, Ordering::Release);
+                            }
+                            (out, done)
+                        }
+                        Err(_) => {
+                            polling.store(false, Ordering::Release);
+                            (Vec::new(), true)
+                        }
+                    };
+                    forward(&ctl, out);
+                    if done {
+                        return;
+                    }
+                });
+            if spawned.is_err() {
+                self.polling.store(false, Ordering::Release);
+            }
+        }
     }
 }

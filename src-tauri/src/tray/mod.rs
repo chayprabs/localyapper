@@ -40,7 +40,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 // The controller aborts any recording and mirrors the flag.
                 state.paused.store(pause, Ordering::SeqCst);
                 state.controller.send(Msg::SetPaused(pause));
-                if let Err(e) = crate::platform::hotkey::shortcut::reload(app) {
+                if let Err(e) = crate::platform::hotkey::apply_settings(app) {
                     log::error!("Failed to update hotkeys after pause toggle: {e}");
                 }
                 let _ = pause_i.set_text(if pause {

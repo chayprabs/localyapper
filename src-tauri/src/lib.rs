@@ -114,14 +114,27 @@ fn send_notification(handle: &tauri::AppHandle, title: &str, body: &str) {
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
+    let cli_action = controller::CliAction::from_args(&std::env::args().collect::<Vec<_>>());
+
     if let Err(e) = tauri::Builder::default()
+        // Registered first: a second launch hands its arguments to this
+        // instance and exits.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            match controller::CliAction::from_args(&args) {
+                Some(action) => app
+                    .state::<AppState>()
+                    .controller
+                    .send(controller::Msg::Cli(action)),
+                None => show_or_create_main_window(app),
+            }
+        }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
         .plugin(tauri_plugin_notification::init())
-        .setup(|app| -> Result<(), Box<dyn std::error::Error>> {
+        .setup(move |app| -> Result<(), Box<dyn std::error::Error>> {
             let app_data_dir = app.path().app_data_dir().map_err(|e| {
                 log::error!("Failed to resolve app data directory: {e}");
                 Box::new(e) as Box<dyn std::error::Error>
@@ -156,6 +169,10 @@ pub fn run() {
                 )),
                 resolve_model: Box::new(resolve_model_spec),
                 vad_model: vad_model_path(app.handle()),
+                hotkeys: {
+                    let handle = app.handle().clone();
+                    Box::new(move |ctl| platform::hotkey::create_backend(&handle, ctl))
+                },
             })?;
 
             app.manage(AppState {
@@ -165,7 +182,7 @@ pub fn run() {
                 paused: started.paused,
                 last_injection: started.last_injection,
                 download_cancel: Arc::new(AtomicBool::new(false)),
-                hotkeys: Mutex::new(HashMap::new()),
+                hotkeys: started.hotkeys,
             });
 
             if !speech_model_installed {
@@ -176,7 +193,13 @@ pub fn run() {
                 );
             }
 
-            match platform::hotkey::shortcut::reload(app.handle()) {
+            if let Some(action) = cli_action {
+                app.state::<AppState>()
+                    .controller
+                    .send(controller::Msg::Cli(action));
+            }
+
+            match platform::hotkey::apply_settings(app.handle()) {
                 Ok(()) => log::info!("STARTUP: Hotkeys registered successfully"),
                 Err(e) => log::error!("STARTUP: FAILED to register hotkeys: {e}"),
             }
