@@ -166,7 +166,7 @@ mod tests {
 
         let settings_count: i64 =
             conn.query_row("SELECT COUNT(*) FROM settings", [], |row| row.get(0))?;
-        assert_eq!(settings_count, 11);
+        assert_eq!(settings_count, 12);
         assert_eq!(queries::get_setting(&conn, "idle_unload_seconds")?, "60");
 
         Ok(())
