@@ -6,15 +6,59 @@
 //!     --fixtures src-tauri/tests/fixtures --threads 4 [--family nemo_ctc]
 //! ```
 //!
-//! Prints one Markdown table row per clip and a summary row with load ms,
-//! warm-up ms, real-time factor, peak resident memory and word error rate.
-//! Run it once per thread count so peak memory is per configuration.
+//! Each clip goes through the same path as the app: Silero VAD segments
+//! (src-tauri/resources/silero_vad.onnx, or --vad PATH) decoded one by one
+//! and joined. Prints one Markdown table row per clip and a summary row
+//! with load ms, warm-up ms, real-time factor, peak resident memory and
+//! word error rate. Run it once per thread count so peak memory is per
+//! configuration.
 
+use localyapper_lib::core::audio::segmenter::{
+    run_segmenter, Flags, SegmentSink, SileroDetector, VecSource,
+};
 use localyapper_lib::core::audio::wav;
+use localyapper_lib::core::session::{join_segments, SessionId};
 use localyapper_lib::core::stt::engine::{Family, SherpaEngine};
 use localyapper_lib::core::wer;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
+use std::sync::Mutex;
 use std::time::Instant;
+
+#[derive(Default)]
+struct Collect(Mutex<Vec<(usize, Vec<f32>)>>);
+
+impl SegmentSink for Collect {
+    fn push(&self, _id: SessionId, index: usize, samples: Vec<f32>) {
+        if let Ok(mut v) = self.0.lock() {
+            v.push((index, samples));
+        }
+    }
+}
+
+/// Cut a clip into VAD segments at its native rate, as the app does.
+fn segments(data: &wav::WavData, vad_model: &Path) -> Result<Vec<Vec<f32>>, String> {
+    let mut vad = SileroDetector::new(vad_model)?;
+    let sink = Collect::default();
+    let stop = AtomicBool::new(true);
+    let discard = AtomicBool::new(false);
+    run_segmenter(
+        1,
+        data.sample_rate,
+        &mut VecSource::new(data.to_mono()),
+        Flags {
+            stop: &stop,
+            discard: &discard,
+        },
+        &mut vad,
+        &sink,
+        &|_| {},
+        &mut |_| {},
+    )?;
+    let mut segs = sink.0.into_inner().unwrap_or_default();
+    segs.sort_by_key(|(i, _)| *i);
+    Ok(segs.into_iter().map(|(_, s)| s).collect())
+}
 
 struct Args {
     model_id: String,
@@ -22,6 +66,7 @@ struct Args {
     fixtures: PathBuf,
     threads: i32,
     family: Option<String>,
+    vad: PathBuf,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -30,6 +75,7 @@ fn parse_args() -> Result<Args, String> {
     let mut fixtures = None;
     let mut threads = 4;
     let mut family = None;
+    let mut vad = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/silero_vad.onnx");
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         let mut val = || it.next().ok_or_else(|| format!("missing value for {a}"));
@@ -39,6 +85,7 @@ fn parse_args() -> Result<Args, String> {
             "--fixtures" => fixtures = Some(PathBuf::from(val()?)),
             "--threads" => threads = val()?.parse().map_err(|e| format!("--threads: {e}"))?,
             "--family" => family = Some(val()?),
+            "--vad" => vad = PathBuf::from(val()?),
             other => return Err(format!("unknown argument {other}")),
         }
     }
@@ -48,6 +95,7 @@ fn parse_args() -> Result<Args, String> {
         fixtures: fixtures.ok_or("--fixtures is required")?,
         threads,
         family,
+        vad,
     })
 }
 
@@ -101,11 +149,15 @@ fn run() -> Result<(), String> {
     println!("|---|---|---|---|---|---|---|");
     for (path, reference) in clips(&args.fixtures)? {
         let data = wav::read_file(&path)?;
-        let samples = SherpaEngine::to_16k_mono(&data)?;
-        let audio_s = samples.len() as f64 / 16_000.0;
+        let audio_s = data.duration_ms() as f64 / 1000.0;
+        let segs = segments(&data, &args.vad)?;
         let t = Instant::now();
-        let text = engine.transcribe(&samples)?;
+        let mut texts = Vec::with_capacity(segs.len());
+        for seg in &segs {
+            texts.push(engine.transcribe(seg)?);
+        }
         let dec = t.elapsed().as_secs_f64();
+        let text = join_segments(texts.iter().map(String::as_str));
         let (err, words) = wer::counts(&reference, &text);
         total_err += err;
         total_words += words;
