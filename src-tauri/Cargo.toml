@@ -39,22 +39,20 @@ tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+tauri-plugin-log = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "time", "sync", "macros"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-anyhow = "1"
 thiserror = "1"
 log = "0.4"
-env_logger = "0.11"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "http2"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2"] }
 cpal = "0.15"
 sherpa-onnx = { version = "2.0", default-features = false }
 arboard = "3"
 enigo = "0.2"
-futures-util = "0.3"
 # mimalloc tames fragmentation from sherpa-onnx's short-burst alloc/free
 # pattern. The system allocator on Windows in particular tends to hold on
 # to freed ONNX scratch space, which would defeat the idle-unload work.
@@ -93,6 +91,7 @@ x11-dl = "2"
 gtk = "0.18"
 # Wayland global shortcuts through the xdg-desktop-portal.
 ashpd = { version = "0.13", default-features = false, features = ["global_shortcuts", "tokio"] }
+futures-util = { version = "0.3", default-features = false }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

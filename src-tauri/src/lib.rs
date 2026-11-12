@@ -70,6 +70,27 @@ fn vad_model_path(app: &tauri::AppHandle) -> Option<PathBuf> {
 /// exist. The main window is destroyed on user close to free its WebView
 /// process; this helper recreates it on demand from the tray and the
 /// open-app hotkey.
+/// Logging (plan P7.2): the log folder keeps the current file and one
+/// rotated file of at most 1 MB each, plus stderr. `info`, or `debug`
+/// with LOCALYAPPER_DEBUG=1. Transcripts and clipboard text are never
+/// logged.
+fn log_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
+    let debug = std::env::var("LOCALYAPPER_DEBUG").is_ok_and(|v| v == "1");
+    tauri_plugin_log::Builder::new()
+        .clear_targets()
+        .target(Target::new(TargetKind::LogDir { file_name: None }))
+        .target(Target::new(TargetKind::Stderr))
+        .max_file_size(1_000_000)
+        .rotation_strategy(RotationStrategy::KeepOne)
+        .level(if debug {
+            log::LevelFilter::Debug
+        } else {
+            log::LevelFilter::Info
+        })
+        .build()
+}
+
 /// The argument the OS passes when it starts the app at login.
 const AUTOSTART_ARG: &str = "--autostart";
 
@@ -148,7 +169,6 @@ macro_rules! app_commands {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let args: Vec<String> = std::env::args().collect();
     let cli_action = controller::CliAction::from_args(&args);
@@ -175,6 +195,7 @@ pub fn run() {
     }
 
     if let Err(e) = builder
+        .plugin(log_plugin())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(

@@ -123,7 +123,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         use tauri_nspanel::{CollectionBehavior, PanelLevel, StyleMask, WebviewWindowExt};
         let panel = window
             .to_panel::<OverlayPanel>()
-            .map_err(|e| tauri::Error::Anyhow(anyhow::anyhow!("overlay panel: {e}")))?;
+            .map_err(|e| tauri::Error::Io(std::io::Error::other(format!("overlay panel: {e}"))))?;
         panel.set_level(PanelLevel::Floating.value());
         let _ = panel.set_style_mask(StyleMask::empty().nonactivating_panel().borderless().into());
         panel.set_collection_behavior(
