@@ -8,18 +8,18 @@
         "en"
       ],
       "license": "CC-BY-4.0",
-      "repo": "csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000",
-      "revision": "3af92f152d32c836acabf38f4c993bc96b80eb2d",
+      "repo": "Jensen01001/openvino-nemo-parakeet-tdt-ctc-110m-int8",
+      "revision": "f6a16e3501cd83ae7d5121730452d57b46ff8d90",
       "files": [
         {
-          "name": "model.onnx",
-          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000/resolve/3af92f152d32c836acabf38f4c993bc96b80eb2d/model.onnx",
-          "size": 458161021,
-          "sha256": "936806cf3dd0db5aba53f8c7410bb5632d7a8ad6b2c51009f5e4fc0890ec76bf"
+          "name": "model.int8.onnx",
+          "url": "https://huggingface.co/Jensen01001/openvino-nemo-parakeet-tdt-ctc-110m-int8/resolve/f6a16e3501cd83ae7d5121730452d57b46ff8d90/model.int8.onnx",
+          "size": 131652171,
+          "sha256": "9177a9146cf32ee0cc8152276ef95116f312018d316be37ccf57f7efea81fc1a"
         },
         {
           "name": "tokens.txt",
-          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000/resolve/3af92f152d32c836acabf38f4c993bc96b80eb2d/tokens.txt",
+          "url": "https://huggingface.co/Jensen01001/openvino-nemo-parakeet-tdt-ctc-110m-int8/resolve/f6a16e3501cd83ae7d5121730452d57b46ff8d90/tokens.txt",
           "size": 9953,
           "sha256": "450e56bd2f036fe5b6aa821865838cc5aa9d8b0106134ce9a9ba0664abe6cd10"
         }
