@@ -39,8 +39,9 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
 /// left off if they quit the app mid-onboarding. Valid values:
 /// `welcome | microphone | hotkey | files | done`.
 fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
+    use crate::platform::hotkey::{default_combo, HotkeyId};
     let seeds = [
-        ("hotkey_record", "F8"),
+        ("hotkey_record", default_combo(HotkeyId::Record)),
         ("hotkey_cancel", "Escape"),
         ("hotkey_paste_last", "Ctrl+Alt+J"),
         ("hotkey_open_app", "Ctrl+Alt+O"),
@@ -89,10 +90,16 @@ fn migrate_hotkey_defaults(conn: &Connection) -> Result<(), LocalYapperError> {
         "Ctrl+Alt+X",
         "Ctrl+Alt+H",
     ];
-    for old_val in &legacy_record_values {
+    // Never rewrite this OS's own default (Alt+Space on macOS).
+    let current_default =
+        crate::platform::hotkey::default_combo(crate::platform::hotkey::HotkeyId::Record);
+    for old_val in legacy_record_values
+        .iter()
+        .filter(|v| **v != current_default)
+    {
         conn.execute(
-            "UPDATE settings SET value = 'F8', updated_at = datetime('now') WHERE key = 'hotkey_record' AND value = ?1",
-            rusqlite::params![old_val],
+            "UPDATE settings SET value = ?2, updated_at = datetime('now') WHERE key = 'hotkey_record' AND value = ?1",
+            rusqlite::params![old_val, current_default],
         )?;
     }
 
@@ -153,7 +160,10 @@ mod tests {
 
         assert_eq!(queries::get_setting(&conn, "setup_complete")?, "false");
         assert_eq!(queries::get_setting(&conn, "setup_step")?, "welcome");
-        assert_eq!(queries::get_setting(&conn, "hotkey_record")?, "F8");
+        assert_eq!(
+            queries::get_setting(&conn, "hotkey_record")?,
+            crate::platform::hotkey::default_combo(crate::platform::hotkey::HotkeyId::Record)
+        );
         assert_eq!(queries::get_setting(&conn, "hotkey_cancel")?, "Escape");
         assert_eq!(
             queries::get_setting(&conn, "speech_model")?,

@@ -1,3 +1,4 @@
+import { DEFAULT_RECORD_HOTKEY } from "@/lib/hotkeyDefaults";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DownloadProgress, PermissionsStatus } from "@/types/commands";
 import { getAllSettings, setSetting } from "@/lib/commands/settings";
@@ -27,7 +28,7 @@ export const WIZARD_STEPS = [
 
 export type WizardStep = (typeof WIZARD_STEPS)[number];
 
-const DEFAULT_HOTKEY = "F8";
+const DEFAULT_HOTKEY = DEFAULT_RECORD_HOTKEY;
 
 function isWizardStep(value: string | undefined): value is WizardStep {
   if (value == null) return false;

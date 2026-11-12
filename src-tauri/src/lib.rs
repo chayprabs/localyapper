@@ -258,6 +258,7 @@ pub fn run() {
             commands::settings::get_all_settings,
             commands::hotkeys::update_hotkey,
             commands::hotkeys::reset_hotkeys,
+            commands::hotkeys::set_hotkey_probe,
             commands::system::get_focused_app,
             commands::system::check_permissions,
             commands::system::list_input_devices,

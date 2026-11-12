@@ -1,9 +1,9 @@
 // Wizard hotkey configuration -- set primary recording shortcut
 import { useEffect, useRef, useState, useCallback } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { Icon } from "@/components/ui/Icon";
-
-const isMac =
-  typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent);
+import { setHotkeyProbe, updateHotkey } from "@/lib/commands/hotkeys";
+import { isMacPlatform as isMac } from "@/lib/hotkeyDefaults";
 
 function formatKey(key: string): string {
   if (isMac) {
@@ -57,7 +57,35 @@ export function HotkeyStep({
   onContinue: () => void;
 }) {
   const [isCapturing, setIsCapturing] = useState(false);
+  const [detected, setDetected] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Register the hotkey now and listen for it globally. While the probe
+  // is on, presses only report detection and start no dictation.
+  useEffect(() => {
+    let cancelled = false;
+    setDetected(false);
+    updateHotkey("hotkey_record", hotkey)
+      .then(() => {
+        if (!cancelled) setRegisterError(null);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setRegisterError(String(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hotkey]);
+
+  useEffect(() => {
+    void setHotkeyProbe(true);
+    const unlisten = listen("hotkey-detected", () => setDetected(true));
+    return () => {
+      void setHotkeyProbe(false);
+      void unlisten.then((stop) => stop());
+    };
+  }, []);
 
   const handleCapture = useCallback(
     (shortcut: string) => {
@@ -152,9 +180,21 @@ export function HotkeyStep({
         </button>
       </div>
 
+      <p
+        role="status"
+        className={`text-[12px] mb-4 ${detected ? "text-[#1a7f37]" : "text-black/50"}`}
+      >
+        {registerError
+          ? registerError
+          : detected
+            ? "Hotkey detected. It works from any app."
+            : "Press your hotkey now to test it."}
+      </p>
+
       <button
         onClick={onContinue}
-        className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 active:brightness-95 transition-all"
+        disabled={!detected}
+        className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 active:brightness-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
       >
         Continue
       </button>

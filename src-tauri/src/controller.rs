@@ -43,6 +43,8 @@ pub enum Msg {
     OpenApp,
     /// A command-line action from this or a second instance.
     Cli(CliAction),
+    /// Wizard hotkey test: record presses emit `hotkey-detected` only.
+    HotkeyProbe(bool),
     SetPaused(bool),
     /// Settings changed in the database: re-read them.
     ReloadSettings,
@@ -243,6 +245,8 @@ pub struct Controller {
     hotkeys: Arc<dyn HotkeyBackend>,
     /// `at_ms` of the last RecordDown, for CLI stop.
     last_down_ms: u64,
+    /// Wizard hotkey test in progress.
+    probe: bool,
     captures: HashMap<SessionId, CaptureFlags>,
     current_id: Option<SessionId>,
     timing: Timing,
@@ -309,6 +313,7 @@ pub fn start(parts: ControllerParts) -> Result<Started, String> {
         vad_model: parts.vad_model,
         hotkeys: hotkeys.clone(),
         last_down_ms: 0,
+        probe: false,
         captures: HashMap::new(),
         current_id: None,
         timing: Timing::default(),
@@ -343,6 +348,10 @@ impl Controller {
     fn on_msg(&mut self, msg: Msg) {
         match msg {
             Msg::Session(Event::InjectDone { id, result }) => self.on_inject_done(id, result),
+            Msg::Session(Event::RecordDown { .. }) if self.probe => {
+                let _ = self.app.emit("hotkey-detected", ());
+            }
+            Msg::Session(Event::RecordUp { .. }) if self.probe => {}
             Msg::Session(ev) => self.feed(ev),
             Msg::Worker(ev) => self.on_worker(ev),
             Msg::CaptureStarted {
@@ -374,6 +383,12 @@ impl Controller {
             }
             Msg::OpenApp => crate::show_or_create_main_window(&self.app),
             Msg::Cli(action) => self.cli(action),
+            Msg::HotkeyProbe(on) => {
+                self.probe = on;
+                if on {
+                    self.feed(Event::Cancel);
+                }
+            }
             Msg::SetPaused(p) => {
                 self.paused.store(p, Ordering::SeqCst);
                 self.feed(Event::SetPaused(p));

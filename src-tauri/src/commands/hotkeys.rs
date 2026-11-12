@@ -18,11 +18,18 @@ const HOTKEY_KEYS: &[&str] = &[
 
 /// Default hotkey values.
 const HOTKEY_DEFAULTS: &[(&str, &str)] = &[
-    ("hotkey_record", "F8"),
+    ("hotkey_record", RECORD_DEFAULT),
     ("hotkey_cancel", "Escape"),
     ("hotkey_paste_last", "Ctrl+Alt+J"),
     ("hotkey_open_app", "Ctrl+Alt+O"),
 ];
+
+/// Record default per OS (plan P2.2): F8, or Alt+Space on macOS.
+const RECORD_DEFAULT: &str = if cfg!(target_os = "macos") {
+    "Alt+Space"
+} else {
+    "F8"
+};
 
 fn hotkey_label(key: &str) -> &str {
     match key {
@@ -119,6 +126,19 @@ pub async fn update_hotkey(
 }
 
 /// Reset all hotkeys to platform defaults and reload.
+/// While on, record-key presses only emit `hotkey-detected` and start no
+/// dictation. The wizard uses it to prove the global hotkey works.
+#[tauri::command]
+pub async fn set_hotkey_probe(
+    state: tauri::State<'_, AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    state
+        .controller
+        .send(crate::controller::Msg::HotkeyProbe(enabled));
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn reset_hotkeys(
     app: tauri::AppHandle,
@@ -184,7 +204,7 @@ mod tests {
 
         assert_eq!(
             settings.get("hotkey_record").map(String::as_str),
-            Some("F8")
+            Some(RECORD_DEFAULT)
         );
         assert_eq!(
             settings.get("hotkey_cancel").map(String::as_str),

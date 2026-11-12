@@ -1,4 +1,5 @@
 // Dashboard hook -- stats, last dictation, model status with auto-refresh
+import { DEFAULT_RECORD_HOTKEY } from "@/lib/hotkeyDefaults";
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type {
@@ -49,7 +50,7 @@ export function useDashboard(): DashboardData {
   const [modelStatus, setModelStatus] = useState<ModelsStatus | null>(null);
   const [modelFileStatus, setModelFileStatus] =
     useState<SpeechModelFileStatus | null>(null);
-  const [recordHotkey, setRecordHotkey] = useState("F8");
+  const [recordHotkey, setRecordHotkey] = useState(DEFAULT_RECORD_HOTKEY);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
