@@ -18,15 +18,6 @@ pub struct HistoryEntry {
     pub created_at: String,
 }
 
-/// Result from the voice dictation pipeline.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PipelineResult {
-    pub raw_text: String,
-    pub final_text: String,
-    pub duration_ms: i64,
-    pub word_count: i64,
-}
-
 /// Model download progress event payload.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DownloadProgress {
@@ -59,22 +50,6 @@ pub struct Stats {
 pub struct PermissionsStatus {
     pub microphone: bool,
     pub accessibility: bool,
-}
-
-/// Pipeline state event emitted to frontend for overlay state transitions.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PipelineEvent {
-    /// Known states include "listening", "stopping-soon", "processing",
-    /// "transcribed", "injected", "no-speech", "cancelled", and "error".
-    pub state: String,
-    /// The transcribed/final text (populated in "transcribed" and "injected" states).
-    pub text: Option<String>,
-    /// Speech duration in milliseconds.
-    pub duration_ms: Option<i64>,
-    /// Word count.
-    pub word_count: Option<i64>,
-    /// Error message (populated in "error" state).
-    pub error: Option<String>,
 }
 
 /// Status of loaded models.

@@ -3,22 +3,12 @@ use std::sync::atomic::Ordering;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Emitter, Manager};
-use tauri_plugin_global_shortcut::GlobalShortcutExt;
+use tauri::Manager;
 
+use crate::controller::Msg;
+use crate::core::session::Tray;
 use crate::state::AppState;
 
-/// Tauri event emitted when the dictation paused state flips.
-const PAUSED_EVENT: &str = "paused-state-changed";
-
-fn emit_paused_state(app: &tauri::AppHandle, paused: bool) {
-    if let Err(e) = app.emit(PAUSED_EVENT, paused) {
-        log::warn!("Failed to emit {PAUSED_EVENT}: {e}");
-    }
-}
-
-/// Set up the system tray icon with context menu.
-/// Called from lib.rs setup() after AppState is managed and hotkeys are registered.
 pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // Menu items
     let open_i = MenuItem::with_id(app, "open", "Open LocalYapper", true, None::<&str>)?;
@@ -46,28 +36,19 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             }
             "pause_toggle" => {
                 let state = app.state::<AppState>();
-                let currently_paused = state.paused.load(Ordering::SeqCst);
-
-                if currently_paused {
-                    // Resume: re-register hotkeys
-                    state.paused.store(false, Ordering::SeqCst);
-                    if let Err(e) = crate::hotkey::manager::reload_hotkeys(app) {
-                        log::error!("Failed to re-register hotkeys on resume: {e}");
-                    }
-                    let _ = pause_i.set_text("Pause Dictation");
-                    log::info!("Dictation resumed");
-                    emit_paused_state(app, false);
-                } else {
-                    // Pause: stop any active recording, then unregister hotkeys
-                    crate::hotkey::manager::abort_active_recording(app);
-                    state.paused.store(true, Ordering::SeqCst);
-                    if let Err(e) = app.global_shortcut().unregister_all() {
-                        log::error!("Failed to unregister hotkeys on pause: {e}");
-                    }
-                    let _ = pause_i.set_text("Resume Dictation");
-                    log::info!("Dictation paused");
-                    emit_paused_state(app, true);
+                let pause = !state.paused.load(Ordering::SeqCst);
+                // The controller aborts any recording and mirrors the flag.
+                state.paused.store(pause, Ordering::SeqCst);
+                state.controller.send(Msg::SetPaused(pause));
+                if let Err(e) = crate::platform::hotkey::shortcut::reload(app) {
+                    log::error!("Failed to update hotkeys after pause toggle: {e}");
                 }
+                let _ = pause_i.set_text(if pause {
+                    "Resume Dictation"
+                } else {
+                    "Pause Dictation"
+                });
+                log::info!("Dictation {}", if pause { "paused" } else { "resumed" });
             }
             "quit" => {
                 app.exit(0);
@@ -97,8 +78,14 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Update tray tooltip text. Call from hotkey manager on pipeline state changes.
-pub fn update_tray_tooltip(app: &tauri::AppHandle, text: &str) {
+/// Reflect the dictation state in the tray. Icons per state arrive in P3.8.
+pub fn set_state(app: &tauri::AppHandle, state: Tray) {
+    let tip = match state {
+        Tray::Idle => "LocalYapper",
+        Tray::Recording => "LocalYapper - recording",
+        Tray::Processing => "LocalYapper - transcribing",
+    };
     if let Some(tray) = app.tray_by_id("main-tray") {
-        let _ = tray.set_tooltip(Some(text));
+        let _ = tray.set_tooltip(Some(tip));
     }
 }

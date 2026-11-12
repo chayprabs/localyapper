@@ -3,3 +3,4 @@
 pub mod audio_in;
 pub mod hotkey;
 pub mod memory;
+pub mod overlay;

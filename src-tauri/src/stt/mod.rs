@@ -1,3 +1,3 @@
-// Speech-to-text subsystem re-exports
-pub mod lifecycle;
-pub mod whisper;
+//! Legacy speech model paths (replaced by the catalog in Phase 4).
+
+pub mod paths;

@@ -6,7 +6,6 @@ use tauri::{Emitter, Manager};
 
 use crate::models::{DownloadProgress, ModelsStatus, SpeechModelFileStatus};
 use crate::state::AppState;
-use crate::stt::whisper::WhisperEngine;
 
 fn selected_speech_model_name(state: &AppState) -> String {
     let model = state
@@ -14,120 +13,9 @@ fn selected_speech_model_name(state: &AppState) -> String {
         .lock()
         .ok()
         .and_then(|db| crate::db::queries::get_setting(&db, "speech_model").ok())
-        .unwrap_or_else(|| crate::stt::whisper::DEFAULT_STT_MODEL.to_string());
+        .unwrap_or_else(|| crate::stt::paths::DEFAULT_STT_MODEL.to_string());
 
-    crate::stt::whisper::normalize_stt_model_name(&model).to_string()
-}
-
-pub(crate) async fn ensure_speech_model_loaded(
-    app_handle: &tauri::AppHandle,
-    state: &AppState,
-) -> Result<std::sync::Arc<WhisperEngine>, String> {
-    let desired_model = selected_speech_model_name(state);
-
-    if let Ok(guard) = state.whisper.lock() {
-        if let Some(engine) = guard.as_ref() {
-            let loaded = state
-                .loaded_speech_model
-                .lock()
-                .ok()
-                .and_then(|g| g.clone());
-            if loaded.as_deref() == Some(desired_model.as_str()) {
-                return Ok(engine.clone());
-            }
-        }
-    }
-
-    // Wrong model cached or none loaded — drop the stale engine first.
-    if let Ok(mut guard) = state.whisper.lock() {
-        if guard.take().is_some() {
-            if let Ok(mut loaded) = state.loaded_speech_model.lock() {
-                *loaded = None;
-            }
-        }
-    }
-
-    // First touch since startup or eviction: tell the frontend so it can
-    // surface a brief "loading" indicator instead of looking frozen.
-    let _ = app_handle.emit(
-        crate::stt::lifecycle::MODEL_STATE_EVENT,
-        crate::stt::lifecycle::ModelStatePayload {
-            loaded: false,
-            state: "loading".to_string(),
-        },
-    );
-
-    let model_name = selected_speech_model_name(state);
-    let model_name_for_load = model_name.clone();
-    let load_handle = app_handle.clone();
-    let loaded_engine = tokio::task::spawn_blocking(move || {
-        crate::load_speech_model_from_setting(&load_handle, &model_name_for_load)
-    })
-    .await
-    .map_err(|e| format!("STT load task panicked: {e}"))??;
-
-    let mut guard = state
-        .whisper
-        .lock()
-        .map_err(|e| format!("STT lock failed: {e}"))?;
-    if guard.is_none() {
-        *guard = Some(loaded_engine.clone());
-        if let Ok(mut loaded) = state.loaded_speech_model.lock() {
-            *loaded = Some(model_name);
-        }
-    }
-    drop(guard);
-
-    state.lifecycle.emit_state(app_handle, true);
-
-    if let Ok(guard) = state.whisper.lock() {
-        if let Some(engine) = guard.as_ref() {
-            return Ok(engine.clone());
-        }
-    }
-    Ok(loaded_engine)
-}
-
-/// Lazily load the Silero VAD model if a model file is present on disk.
-/// Returns Ok(()) if Silero is loaded or unavailable (energy fallback is
-/// always usable). Idempotent and cheap to call repeatedly.
-pub(crate) async fn ensure_vad_loaded(
-    app_handle: &tauri::AppHandle,
-    state: &AppState,
-) -> Result<(), String> {
-    if state.vad.lock().map(|g| g.is_some()).unwrap_or(false) {
-        return Ok(());
-    }
-
-    let vad_path = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("models")
-        .join(crate::stt::whisper::SILERO_VAD_FILENAME);
-
-    if !vad_path.exists() {
-        return Ok(());
-    }
-
-    let vad_mutex = state.vad.clone();
-    tokio::task::spawn_blocking(move || -> Result<(), String> {
-        match crate::audio::vad::SileroVad::new(&vad_path) {
-            Ok(vad) => {
-                if let Ok(mut g) = vad_mutex.lock() {
-                    if g.is_none() {
-                        *g = Some(vad);
-                    }
-                }
-                Ok(())
-            }
-            Err(e) => Err(format!("Failed to load Silero VAD: {e}")),
-        }
-    })
-    .await
-    .map_err(|e| format!("VAD load task panicked: {e}"))??;
-
-    Ok(())
+    crate::stt::paths::normalize_stt_model_name(&model).to_string()
 }
 
 /// Cancel an in-progress model download.
@@ -151,7 +39,7 @@ pub async fn download_speech_model(
     state.download_cancel.store(false, Ordering::SeqCst);
 
     let model_name = selected_speech_model_name(state.inner());
-    let model_files = crate::stt::whisper::stt_model_files(&model_name);
+    let model_files = crate::stt::paths::stt_model_files(&model_name);
 
     if model_files.is_empty() {
         return Err(format!("Unknown STT model: {model_name}"));
@@ -166,7 +54,7 @@ pub async fn download_speech_model(
     std::fs::create_dir_all(&models_dir)
         .map_err(|e| format!("Failed to create models dir: {e}"))?;
 
-    let model_dir_name = crate::stt::whisper::stt_model_dir_name(&model_name);
+    let model_dir_name = crate::stt::paths::stt_model_dir_name(&model_name);
     let model_dir = models_dir.join(&model_dir_name);
     std::fs::create_dir_all(&model_dir).map_err(|e| format!("Failed to create model dir: {e}"))?;
 
@@ -182,7 +70,7 @@ pub async fn download_speech_model(
 
     for (filename, url) in &model_files {
         let dest_path = model_dir.join(filename);
-        let min_size = crate::stt::whisper::minimum_valid_stt_model_file_size(filename);
+        let min_size = crate::stt::paths::minimum_valid_stt_model_file_size(filename);
 
         if dest_path.exists() {
             let size = std::fs::metadata(&dest_path).map(|m| m.len()).unwrap_or(0);
@@ -317,12 +205,12 @@ pub async fn download_speech_model(
         );
     }
 
-    let vad_path = models_dir.join(crate::stt::whisper::SILERO_VAD_FILENAME);
+    let vad_path = models_dir.join(crate::stt::paths::SILERO_VAD_FILENAME);
     if !vad_path.exists() {
         log::info!("Downloading Silero VAD model...");
         let client = reqwest::Client::new();
         let resp = client
-            .get(crate::stt::whisper::SILERO_VAD_URL)
+            .get(crate::stt::paths::SILERO_VAD_URL)
             .send()
             .await
             .map_err(|e| format!("Silero VAD download failed: {e}"))?;
@@ -360,7 +248,7 @@ pub async fn check_speech_model_file_exists(
     state: tauri::State<'_, AppState>,
 ) -> Result<SpeechModelFileStatus, String> {
     let model_name = selected_speech_model_name(state.inner());
-    let dir_name = crate::stt::whisper::stt_model_dir_name(&model_name);
+    let dir_name = crate::stt::paths::stt_model_dir_name(&model_name);
 
     let models_dir = app_handle
         .path()
@@ -370,7 +258,7 @@ pub async fn check_speech_model_file_exists(
 
     let model_dir = models_dir.join(&dir_name);
 
-    if crate::stt::whisper::is_valid_stt_model_dir(&model_dir) {
+    if crate::stt::paths::is_valid_stt_model_dir(&model_dir) {
         let total_size: u64 = std::fs::read_dir(&model_dir)
             .map(|entries| {
                 entries
@@ -402,9 +290,12 @@ pub async fn delete_speech_model(
 ) -> Result<(), String> {
     let model = selected_speech_model_name(state.inner());
 
-    state.lifecycle.evict_now(&app_handle);
+    let models = state.models.clone();
+    tokio::task::spawn_blocking(move || models.evict_blocking())
+        .await
+        .map_err(|e| e.to_string())?;
 
-    let dir_name = crate::stt::whisper::stt_model_dir_name(&model);
+    let dir_name = crate::stt::paths::stt_model_dir_name(&model);
     let models_dir = app_handle
         .path()
         .app_data_dir()
@@ -421,12 +312,12 @@ pub async fn delete_speech_model(
         .map(|entries| {
             entries
                 .filter_map(|entry| entry.ok())
-                .any(|entry| crate::stt::whisper::is_valid_stt_model_dir(&entry.path()))
+                .any(|entry| crate::stt::paths::is_valid_stt_model_dir(&entry.path()))
         })
         .unwrap_or(false);
 
     if !has_other_models {
-        let vad_path = models_dir.join(crate::stt::whisper::SILERO_VAD_FILENAME);
+        let vad_path = models_dir.join(crate::stt::paths::SILERO_VAD_FILENAME);
         if vad_path.is_file() {
             std::fs::remove_file(&vad_path)
                 .map_err(|e| format!("Failed to delete Silero VAD model: {e}"))?;
@@ -437,66 +328,20 @@ pub async fn delete_speech_model(
     Ok(())
 }
 
-/// Reload speech models from disk into AppState.
+/// Drop the loaded model and load the configured one again.
 #[tauri::command]
 pub async fn reload_models(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut errors: Vec<String> = Vec::new();
-
-    let speech_model_loaded = state.whisper.lock().map(|g| g.is_some()).unwrap_or(false);
-    log::info!("RELOAD: STT currently loaded: {speech_model_loaded}");
-
-    if let Ok(mut guard) = state.whisper.lock() {
-        guard.take();
-    }
-    if let Ok(mut loaded) = state.loaded_speech_model.lock() {
-        *loaded = None;
-    }
-
-    if let Err(e) = ensure_speech_model_loaded(&app_handle, state.inner()).await {
-        errors.push(e);
-    }
-
-    let vad_loaded = state.vad.lock().map(|g| g.is_some()).unwrap_or(false);
-
-    if !vad_loaded {
-        let models_dir = app_handle
-            .path()
-            .app_data_dir()
-            .map_err(|e: tauri::Error| e.to_string())?
-            .join("models");
-
-        let vad_path = models_dir.join(crate::stt::whisper::SILERO_VAD_FILENAME);
-        if vad_path.exists() {
-            let vad_mutex = state.vad.clone();
-            let vad_result = tokio::task::spawn_blocking(move || {
-                match crate::audio::vad::SileroVad::new(&vad_path) {
-                    Ok(vad) => {
-                        if let Ok(mut g) = vad_mutex.lock() {
-                            *g = Some(vad);
-                        }
-                        Ok(())
-                    }
-                    Err(e) => Err(format!("Failed to load Silero VAD: {e}")),
-                }
-            })
-            .await
-            .map_err(|e| format!("VAD load task panicked: {e}"))?;
-
-            if let Err(e) = vad_result {
-                log::warn!("{e}");
-            } else {
-                log::info!("RELOAD: Silero VAD loaded successfully");
-            }
-        }
-    }
-
-    if !errors.is_empty() {
-        return Err(errors.join("; "));
-    }
-    Ok(())
+    let spec = crate::resolve_model_spec(&app_handle)?;
+    let models = state.models.clone();
+    tokio::task::spawn_blocking(move || {
+        models.evict_blocking();
+        models.ensure_loaded_blocking(&spec).map(|_| ())
+    })
+    .await
+    .map_err(|e| format!("Reload task failed: {e}"))?
 }
 
 /// Check which models are currently loaded.
@@ -504,11 +349,18 @@ pub async fn reload_models(
 pub async fn check_models_status(
     state: tauri::State<'_, AppState>,
 ) -> Result<ModelsStatus, String> {
-    let speech_model_loaded = state.whisper.lock().map(|g| g.is_some()).unwrap_or(false);
+    let speech_model_loaded = state.models.loaded_id().is_some();
 
     Ok(ModelsStatus {
         speech_model_loaded,
     })
+}
+
+/// Model load state payload for the frontend `model-state` listener.
+#[derive(serde::Serialize, Clone)]
+pub struct ModelStatePayload {
+    pub loaded: bool,
+    pub state: String,
 }
 
 /// Return the current model load state for the frontend `model-state`
@@ -516,9 +368,9 @@ pub async fn check_models_status(
 #[tauri::command]
 pub async fn get_model_state(
     state: tauri::State<'_, AppState>,
-) -> Result<crate::stt::lifecycle::ModelStatePayload, String> {
-    let loaded = state.whisper.lock().map(|g| g.is_some()).unwrap_or(false);
-    Ok(crate::stt::lifecycle::ModelStatePayload {
+) -> Result<ModelStatePayload, String> {
+    let loaded = state.models.loaded_id().is_some();
+    Ok(ModelStatePayload {
         loaded,
         state: if loaded { "loaded" } else { "unloaded" }.to_string(),
     })
