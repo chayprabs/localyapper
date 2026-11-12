@@ -112,6 +112,7 @@ macro_rules! app_commands {
             commands::recording::cancel_recording,
             commands::recording::overlay_copy,
             commands::recording::overlay_dismiss,
+            commands::recording::overlay_current_view,
             commands::models::download_speech_model,
             commands::models::cancel_model_download,
             commands::models::reload_models,

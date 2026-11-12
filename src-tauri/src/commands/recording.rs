@@ -38,3 +38,17 @@ pub async fn overlay_dismiss(state: tauri::State<'_, AppState>) -> Result<(), St
     state.controller.send(Msg::OverlayDismiss);
     Ok(())
 }
+
+/// The view the overlay should show now. The page asks once when it loads,
+/// so a view sent before its listener existed is not lost.
+#[tauri::command]
+pub async fn overlay_current_view(
+    state: tauri::State<'_, AppState>,
+) -> Result<crate::platform::overlay::ViewPayload, String> {
+    Ok(state
+        .controller
+        .query()
+        .await
+        .and_then(|s| s.last_view)
+        .unwrap_or(crate::platform::overlay::ViewPayload::Hidden))
+}

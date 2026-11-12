@@ -69,7 +69,16 @@ function setLevel(level: number): void {
   });
 }
 
-void listen<View>("overlay-view", (e) => render(e.payload));
+let gotEvent = false;
+void listen<View>("overlay-view", (e) => {
+  gotEvent = true;
+  render(e.payload);
+}).then(() =>
+  // A view sent before this listener existed would be lost: ask for it.
+  invoke<View>("overlay_current_view").then((v) => {
+    if (!gotEvent) render(v);
+  }),
+);
 void listen<number>("overlay-level", (e) => {
   setLevel(e.payload);
   if (window.__LY_TEST__) void invoke("test_overlay_seen", { kind: null, level: e.payload });

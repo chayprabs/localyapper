@@ -17,11 +17,23 @@ fn edit() -> HWND {
 }
 
 fn bring_to_front(hwnd: HWND) {
-    // SAFETY: plain window-management calls on our own windows.
+    use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    // SAFETY: plain window-management calls. Windows only lets the
+    // foreground process change the foreground window, so the helper
+    // briefly attaches its input queue to the current foreground thread.
     unsafe {
-        let _ = ShowWindow(hwnd, SW_SHOW);
+        let fg = GetForegroundWindow();
+        let fg_thread = GetWindowThreadProcessId(fg, None);
+        let me = GetCurrentThreadId();
+        let attached =
+            fg_thread != 0 && fg_thread != me && AttachThreadInput(me, fg_thread, true).as_bool();
+        let _ = ShowWindow(hwnd, SW_RESTORE);
+        let _ = BringWindowToTop(hwnd);
         let _ = SetForegroundWindow(hwnd);
         let _ = SetFocus(edit());
+        if attached {
+            let _ = AttachThreadInput(me, fg_thread, false);
+        }
     }
 }
 

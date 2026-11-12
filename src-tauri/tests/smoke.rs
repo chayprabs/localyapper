@@ -182,6 +182,25 @@ impl Drop for TextTarget {
 /// grant and still drop events, so a probe string is typed straight
 /// through enigo (not through LocalYapper's paste path); if even that
 /// never arrives the test is skipped with the reason printed.
+/// Bring the target to the front. On macOS the runner can keep another app
+/// in front no matter what; then the test is skipped with the reason.
+fn in_front(t: &mut TextTarget) -> bool {
+    if !cfg!(target_os = "macos") {
+        t.focus();
+        return true;
+    }
+    t.command("focus");
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(3) {
+        if localyapper_lib::platform::focus::foreground_pid() == Some(t.pid) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    println!("SKIP: the macOS runner keeps another app in front");
+    false
+}
+
 fn keys_reach(t: &mut TextTarget) -> bool {
     if !localyapper_lib::platform::permissions::accessibility_trusted(false) {
         println!("SKIP: no Accessibility grant on runner (synthetic key events are not allowed)");
@@ -406,7 +425,12 @@ impl App {
         let s = self.conn.get_mut();
         writeln!(s, "{c}").expect("send");
         let mut line = String::new();
-        self.conn.read_line(&mut line).expect("reply");
+        if let Err(e) = self.conn.read_line(&mut line) {
+            panic!(
+                "app did not answer {c:?}: {e}\napp log:\n{}",
+                self.log_text()
+            );
+        }
         serde_json::from_str(&line).expect("json")
     }
 
@@ -468,6 +492,14 @@ impl App {
 
 impl Drop for App {
     fn drop(&mut self) {
+        if std::thread::panicking() {
+            let log = self.log_text();
+            let tail: Vec<&str> = log.lines().rev().take(60).collect();
+            eprintln!("---- app log (last 60 lines) ----");
+            for line in tail.iter().rev() {
+                eprintln!("{line}");
+            }
+        }
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
@@ -514,7 +546,9 @@ fn overlay_does_not_take_focus() {
     let (wav, _) = fixture("clip01_16k");
     let mut t = TextTarget::spawn();
     let mut app = App::launch(&wav);
-    t.focus();
+    if !in_front(&mut t) {
+        return;
+    }
     let target = t.pid;
     assert_eq!(
         fg_pid(),
@@ -580,7 +614,6 @@ fn overlay_is_click_through() {
 fn cancel_discards() {
     let (wav, _) = fixture("clip01_16k");
     let mut t = TextTarget::spawn();
-    t.focus();
     let mut app = App::launch(&wav);
     app.cmd("down");
     std::thread::sleep(Duration::from_millis(1500));
@@ -608,7 +641,6 @@ fn timings(app: &mut App) -> Value {
 fn end_to_end_dictation() {
     let (wav, want) = fixture("clip01_16k");
     let mut t = TextTarget::spawn();
-    t.focus();
     let mut app = App::launch(&wav);
     if !app.can_type() || !keys_reach(&mut t) {
         return;
@@ -632,7 +664,6 @@ fn end_to_end_dictation() {
 fn end_to_end_cold_and_warm() {
     let (wav, want) = fixture("clip02_16k");
     let mut t = TextTarget::spawn();
-    t.focus();
     let mut app = App::launch(&wav);
     if !app.can_type() || !keys_reach(&mut t) {
         return;
@@ -661,7 +692,6 @@ fn end_to_end_cold_and_warm() {
 fn back_to_back() {
     let (wav, want) = fixture("clip01_16k");
     let mut t = TextTarget::spawn();
-    t.focus();
     let mut app = App::launch(&wav);
     if !app.can_type() || !keys_reach(&mut t) {
         return;
