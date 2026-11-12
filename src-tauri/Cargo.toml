@@ -19,6 +19,9 @@ sherpa-static = ["sherpa-onnx/static"]
 # Point SHERPA_ONNX_LIB_DIR at a folder with libsherpa-onnx-c-api and
 # libonnxruntime (for example from the sherpa-onnx-core wheel).
 sherpa-shared = ["sherpa-onnx/shared"]
+# Test-only hooks: fake audio source and the controller test channel.
+# Never enabled in release builds.
+test-hooks = []
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -47,6 +50,7 @@ futures-util = "0.3"
 # mimalloc tames fragmentation from sherpa-onnx's short-burst alloc/free
 # pattern. The system allocator on Windows in particular tends to hold on
 # to freed ONNX scratch space, which would defeat the idle-unload work.
+ringbuf = "0.4"
 mimalloc = { version = "0.1", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
