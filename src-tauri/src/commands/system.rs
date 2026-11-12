@@ -20,6 +20,14 @@ pub async fn get_focused_app() -> Result<String, String> {
 }
 
 /// Returns system permissions status (mic + accessibility).
+/// Input device names, the system default first.
+#[tauri::command]
+pub async fn list_input_devices() -> Result<Vec<String>, String> {
+    tokio::task::spawn_blocking(crate::platform::audio_in::list_input_devices)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn check_permissions() -> Result<PermissionsStatus, String> {
     Ok(PermissionsStatus {
