@@ -8,6 +8,8 @@ mod models;
 pub mod platform;
 mod state;
 mod stt;
+#[cfg(feature = "test-hooks")]
+mod test_hooks;
 mod tray;
 
 // Replace the system allocator with mimalloc. sherpa-onnx allocates and
@@ -24,12 +26,19 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
+/// The app's data folder. Test builds can point it elsewhere with
+/// LOCALYAPPER_DATA_DIR so smoke tests never touch a real profile.
+pub(crate) fn data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    #[cfg(feature = "test-hooks")]
+    if let Some(dir) = std::env::var_os("LOCALYAPPER_DATA_DIR") {
+        return Ok(PathBuf::from(dir));
+    }
+    app.path().app_data_dir().map_err(|e| e.to_string())
+}
+
 /// Directory holding downloaded speech models.
 pub(crate) fn models_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|d| d.join("models"))
-        .map_err(|e| e.to_string())
+    data_dir(app).map(|d| d.join("models"))
 }
 
 /// Resolve the `speech_model` setting to files on disk.
@@ -95,16 +104,54 @@ pub(crate) fn show_or_create_main_window(app: &tauri::AppHandle) {
     }
 }
 
+/// The IPC command list. Test builds add the overlay test hook.
+macro_rules! app_commands {
+    ($($extra:path),* $(,)?) => {
+        tauri::generate_handler![
+            commands::recording::paste_last,
+            commands::recording::cancel_recording,
+            commands::recording::overlay_copy,
+            commands::recording::overlay_dismiss,
+            commands::models::download_speech_model,
+            commands::models::cancel_model_download,
+            commands::models::reload_models,
+            commands::models::check_models_status,
+            commands::models::get_model_state,
+            commands::models::check_speech_model_file_exists,
+            commands::models::delete_speech_model,
+            commands::history::get_history,
+            commands::history::delete_history_entry,
+            commands::history::clear_history,
+            commands::history::get_stats,
+            commands::settings::get_setting,
+            commands::settings::set_setting,
+            commands::settings::get_all_settings,
+            commands::hotkeys::update_hotkey,
+            commands::hotkeys::reset_hotkeys,
+            commands::hotkeys::set_hotkey_probe,
+            commands::system::check_permissions,
+            commands::system::list_input_devices,
+            commands::system::request_microphone_permission,
+            commands::system::request_accessibility_permission,
+            commands::system::get_paused_state,
+            commands::system::open_accessibility_settings,
+            commands::system::open_mic_settings,
+            $($extra,)*
+        ]
+    };
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let cli_action = controller::CliAction::from_args(&std::env::args().collect::<Vec<_>>());
 
-    if let Err(e) = tauri::Builder::default()
-        // Registered first: a second launch hands its arguments to this
-        // instance and exits.
-        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+    // Registered first: a second launch hands its arguments to this
+    // instance and exits.
+    #[allow(unused_mut)]
+    let mut builder =
+        tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             match controller::CliAction::from_args(&args) {
                 Some(action) => app
                     .state::<AppState>()
@@ -112,22 +159,31 @@ pub fn run() {
                     .send(controller::Msg::Cli(action)),
                 None => show_or_create_main_window(app),
             }
-        }))
+        }));
+    // The overlay becomes a non-activating NSPanel on macOS.
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_nspanel::init());
+    }
+
+    if let Err(e) = builder
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
         .setup(move |app| -> Result<(), Box<dyn std::error::Error>> {
-            let app_data_dir = app.path().app_data_dir().map_err(|e| {
+            let app_data_dir = data_dir(app.handle()).map_err(|e| {
                 log::error!("Failed to resolve app data directory: {e}");
-                Box::new(e) as Box<dyn std::error::Error>
+                e
             })?;
 
             let conn = db::open_database(&app_data_dir).map_err(|e| {
                 log::error!("Failed to initialize database: {e}");
                 Box::new(e) as Box<dyn std::error::Error>
             })?;
+            #[cfg(feature = "test-hooks")]
+            test_hooks::apply_test_settings(&conn);
             let settings_map: HashMap<String, String> =
                 db::queries::get_all_settings(&conn).unwrap_or_default();
             let auto_start_enabled = settings_map
@@ -145,12 +201,19 @@ pub fn run() {
                 log::warn!("Speech model files not found at startup");
             }
 
+            let controller_settings = controller::ControllerSettings::from_map(&settings_map);
+            // The overlay window is created here, hidden, so a key press
+            // never waits for a WebView to start.
+            if let Err(e) = platform::overlay::webview::build(app.handle()) {
+                log::error!("overlay: could not create the window: {e}");
+            }
             let started = controller::start(controller::ControllerParts {
                 app: app.handle().clone(),
-                settings: controller::ControllerSettings::from_map(&settings_map),
                 overlay: Arc::new(platform::overlay::webview::WebviewOverlay::new(
                     app.handle().clone(),
+                    controller_settings.overlay,
                 )),
+                settings: controller_settings,
                 resolve_model: Box::new(resolve_model_spec),
                 vad_model: vad_model_path(app.handle()),
                 hotkeys: {
@@ -168,6 +231,12 @@ pub fn run() {
                 download_cancel: Arc::new(AtomicBool::new(false)),
                 hotkeys: started.hotkeys,
             });
+
+            #[cfg(feature = "test-hooks")]
+            test_hooks::start(
+                app.handle().clone(),
+                app.state::<AppState>().controller.clone(),
+            );
 
             if let Some(action) = cli_action {
                 app.state::<AppState>()
@@ -216,34 +285,16 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::recording::paste_last,
-            commands::recording::cancel_recording,
-            commands::models::download_speech_model,
-            commands::models::cancel_model_download,
-            commands::models::reload_models,
-            commands::models::check_models_status,
-            commands::models::get_model_state,
-            commands::models::check_speech_model_file_exists,
-            commands::models::delete_speech_model,
-            commands::history::get_history,
-            commands::history::delete_history_entry,
-            commands::history::clear_history,
-            commands::history::get_stats,
-            commands::settings::get_setting,
-            commands::settings::set_setting,
-            commands::settings::get_all_settings,
-            commands::hotkeys::update_hotkey,
-            commands::hotkeys::reset_hotkeys,
-            commands::hotkeys::set_hotkey_probe,
-            commands::system::check_permissions,
-            commands::system::list_input_devices,
-            commands::system::request_microphone_permission,
-            commands::system::request_accessibility_permission,
-            commands::system::get_paused_state,
-            commands::system::open_accessibility_settings,
-            commands::system::open_mic_settings,
-        ])
+        .invoke_handler({
+            #[cfg(feature = "test-hooks")]
+            {
+                app_commands!(test_hooks::test_overlay_seen)
+            }
+            #[cfg(not(feature = "test-hooks"))]
+            {
+                app_commands!()
+            }
+        })
         .run(tauri::generate_context!())
     {
         log::error!("Error while running Tauri application: {e}");

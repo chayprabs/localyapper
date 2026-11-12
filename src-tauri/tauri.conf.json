@@ -43,22 +43,8 @@
         "decorations": false,
         "visible": false,
         "url": "/"
-      },
-      {
-        "label": "overlay",
-        "title": "LocalYapper Overlay",
-        "width": 400,
-        "height": 120,
-        "resizable": false,
-        "decorations": false,
-        "transparent": true,
-        "shadow": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "visible": false,
-        "focus": false,
-        "url": "/overlay.html"
       }
-    ]
+    ],
+    "macOSPrivateApi": true
   }
 }

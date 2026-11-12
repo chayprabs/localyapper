@@ -2,7 +2,7 @@
 use std::sync::atomic::Ordering;
 
 use futures_util::StreamExt;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 use crate::models::{DownloadProgress, ModelsStatus, SpeechModelFileStatus};
 use crate::state::AppState;
@@ -45,11 +45,7 @@ pub async fn download_speech_model(
         return Err(format!("Unknown STT model: {model_name}"));
     }
 
-    let models_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("models");
+    let models_dir = crate::models_dir(&app_handle)?;
 
     std::fs::create_dir_all(&models_dir)
         .map_err(|e| format!("Failed to create models dir: {e}"))?;
@@ -228,11 +224,7 @@ pub async fn check_speech_model_file_exists(
     let model_name = selected_speech_model_name(state.inner());
     let dir_name = crate::stt::paths::stt_model_dir_name(&model_name);
 
-    let models_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("models");
+    let models_dir = crate::models_dir(&app_handle)?;
 
     let model_dir = models_dir.join(&dir_name);
 
@@ -274,11 +266,7 @@ pub async fn delete_speech_model(
         .map_err(|e| e.to_string())?;
 
     let dir_name = crate::stt::paths::stt_model_dir_name(&model);
-    let models_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("models");
+    let models_dir = crate::models_dir(&app_handle)?;
 
     let model_dir = models_dir.join(&dir_name);
     if model_dir.is_dir() {

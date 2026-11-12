@@ -13,7 +13,7 @@ use crate::platform::focus::{self, ForegroundApp};
 use crate::platform::hotkey::{HotkeyBackend, HotkeyId};
 use crate::platform::inject::{self, InjectOptions, Outcome, PasteMethod};
 use crate::platform::memory;
-use crate::platform::overlay::OverlayBackend;
+use crate::platform::overlay::{OverlayBackend, OverlayConfig, OverlayPosition};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -45,6 +45,10 @@ pub enum Msg {
     Cli(CliAction),
     /// Wizard hotkey test: record presses emit `hotkey-detected` only.
     HotkeyProbe(bool),
+    /// The overlay's Copy button: put the error's text on the clipboard.
+    OverlayCopy,
+    /// The overlay's dismiss button.
+    OverlayDismiss,
     SetPaused(bool),
     /// Settings changed in the database: re-read them.
     ReloadSettings,
@@ -97,6 +101,11 @@ pub struct Snapshot {
     pub last_view: Option<crate::platform::overlay::ViewPayload>,
     pub last_timings: Option<StageTimings>,
     pub dictations: u64,
+    /// Where the overlay is, if shown.
+    pub overlay_rect: Option<crate::platform::overlay::OverlayRect>,
+    /// Record-key events received (after any repeat filter).
+    pub record_downs: u64,
+    pub record_ups: u64,
 }
 
 /// Cheap, cloneable sender used by every producer.
@@ -135,7 +144,7 @@ pub struct ControllerSettings {
     pub trailing_space: bool,
     pub hotkey_cancel: String,
     pub sound_cues: bool,
-    pub overlay_enabled: bool,
+    pub overlay: OverlayConfig,
     pub paste_method: PasteMethod,
     pub restore_clipboard: bool,
     pub clipboard_restore_delay_ms: u64,
@@ -150,7 +159,7 @@ impl Default for ControllerSettings {
             trailing_space: true,
             hotkey_cancel: "Escape".into(),
             sound_cues: false,
-            overlay_enabled: true,
+            overlay: OverlayConfig::default(),
             paste_method: PasteMethod::Auto,
             restore_clipboard: true,
             clipboard_restore_delay_ms: 250,
@@ -189,7 +198,13 @@ impl ControllerSettings {
             s.hotkey_cancel = c.to_string();
         }
         s.sound_cues = flag("sound_cues", false);
-        s.overlay_enabled = flag("overlay_enabled", true);
+        s.overlay = OverlayConfig {
+            enabled: flag("overlay_enabled", true),
+            position: get("overlay_position")
+                .and_then(|p| OverlayPosition::parse(p, get("overlay_custom")))
+                .unwrap_or_default(),
+            preview: flag("overlay_preview", true),
+        };
         s.paste_method = get("paste_method")
             .and_then(PasteMethod::parse)
             .unwrap_or(PasteMethod::Auto);
@@ -247,6 +262,8 @@ pub struct Controller {
     last_down_ms: u64,
     /// Wizard hotkey test in progress.
     probe: bool,
+    record_downs: u64,
+    record_ups: u64,
     captures: HashMap<SessionId, CaptureFlags>,
     current_id: Option<SessionId>,
     timing: Timing,
@@ -314,6 +331,8 @@ pub fn start(parts: ControllerParts) -> Result<Started, String> {
         hotkeys: hotkeys.clone(),
         last_down_ms: 0,
         probe: false,
+        record_downs: 0,
+        record_ups: 0,
         captures: HashMap::new(),
         current_id: None,
         timing: Timing::default(),
@@ -346,6 +365,11 @@ impl Controller {
     }
 
     fn on_msg(&mut self, msg: Msg) {
+        match &msg {
+            Msg::Session(Event::RecordDown { .. }) => self.record_downs += 1,
+            Msg::Session(Event::RecordUp { .. }) => self.record_ups += 1,
+            _ => {}
+        }
         match msg {
             Msg::Session(Event::InjectDone { id, result }) => self.on_inject_done(id, result),
             Msg::Session(Event::RecordDown { .. }) if self.probe => {
@@ -383,6 +407,18 @@ impl Controller {
             }
             Msg::OpenApp => crate::show_or_create_main_window(&self.app),
             Msg::Cli(action) => self.cli(action),
+            Msg::OverlayCopy => {
+                if let Some(crate::platform::overlay::ViewPayload::Error {
+                    text: Some(text), ..
+                }) = &self.last_view
+                {
+                    if let Err(e) = inject::set_clipboard_text(text) {
+                        log::warn!("overlay copy: {e}");
+                    }
+                }
+                self.overlay.hide();
+            }
+            Msg::OverlayDismiss => self.overlay.hide(),
             Msg::HotkeyProbe(on) => {
                 self.probe = on;
                 if on {
@@ -404,6 +440,9 @@ impl Controller {
                     last_view: self.last_view.clone(),
                     last_timings: self.last_timings.clone(),
                     dictations: self.dictations,
+                    overlay_rect: self.overlay.rect(),
+                    record_downs: self.record_downs,
+                    record_ups: self.record_ups,
                 });
             }
         }
@@ -441,6 +480,9 @@ impl Controller {
             .and_then(|c| crate::db::queries::get_all_settings(&c).ok())
             .unwrap_or_default();
         let next = ControllerSettings::from_map(&map);
+        if next.overlay != self.settings.overlay {
+            self.overlay.configure(next.overlay);
+        }
         if next.session != self.settings.session {
             self.feed(Event::ConfigChanged(next.session.clone()));
         }
@@ -493,9 +535,7 @@ impl Controller {
             }
             Effect::Overlay(view) => {
                 self.last_view = Some((&view).into());
-                if self.settings.overlay_enabled || view == session::View::Hidden {
-                    self.overlay.show(&view);
-                }
+                self.overlay.show(&view);
             }
             Effect::Tray(t) => crate::tray::set_state(&self.app, t),
             Effect::Cue(c) => self.cue(c),

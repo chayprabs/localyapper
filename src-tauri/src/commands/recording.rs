@@ -24,3 +24,17 @@ pub async fn cancel_recording(state: tauri::State<'_, AppState>) -> Result<(), S
     state.controller.send(Msg::Session(Event::Cancel));
     Ok(())
 }
+
+/// The overlay's Copy button.
+#[tauri::command]
+pub async fn overlay_copy(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    state.controller.send(Msg::OverlayCopy);
+    Ok(())
+}
+
+/// The overlay's dismiss button.
+#[tauri::command]
+pub async fn overlay_dismiss(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    state.controller.send(Msg::OverlayDismiss);
+    Ok(())
+}

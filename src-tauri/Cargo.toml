@@ -34,7 +34,7 @@ required-features = ["test-hooks"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = { version = "2", features = [] }
@@ -95,6 +95,8 @@ objc2 = "0.6"
 objc2-app-kit = "0.3"
 block2 = "0.6"
 objc2-foundation = "0.3"
+# Non-activating NSPanel for the overlay (plan P3.3).
+tauri-nspanel = "2.1"
 
 # Release profile tuned for a small, fast binary. Panics are aborts because
 # the app does not unwind across the sherpa-onnx FFI boundary; aborting is
