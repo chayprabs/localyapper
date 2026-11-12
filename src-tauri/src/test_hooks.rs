@@ -89,6 +89,23 @@ fn handle_line(line: &str, app: &AppHandle, ctl: &ControllerHandle) -> serde_jso
             ctl.send(Msg::Session(Event::Cancel));
             json!({"ok": true})
         }
+        "open_settings" => {
+            crate::show_or_create_main_window(app);
+            json!({"ok": true})
+        }
+        "close_settings" => {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.destroy();
+            }
+            json!({"ok": true})
+        }
+        "destroy_overlay" => {
+            // For the P6.3 measurement: what the overlay WebView costs.
+            if let Some(w) = app.get_webview_window("overlay") {
+                let _ = w.destroy();
+            }
+            json!({"ok": true})
+        }
         "windows" => {
             let labels: Vec<String> = app.webview_windows().into_keys().collect();
             json!({"ok": true, "windows": labels})
