@@ -1,20 +1,20 @@
-# LocalYapper Rebuild Plan
+# LocalYapper Rebuild Plan (v2)
 
-**Audience:** the implementing agent. Read this whole file before touching code.
-**Written against:** commit `2115b4b` (version 1.0.0), branch `claude/optimistic-brahmagupta-lhsm71`.
-**Status of this document:** it is a plan, produced by reading every source file. Nothing in it has been implemented yet.
+**Audience:** the implementing agent. Read sections 0 to 4 fully before touching code. The appendices are reference material to use when you reach the matching task.
+**Written against:** commit `2115b4b` (version 1.0.0).
+**What this is:** a build plan produced by reading every source file and by checking the dependency APIs against their published sources. Nothing in the app has been changed yet. Appendices A to C contain code that was compiled and tested (26 tests, clippy clean) as a standalone crate. Appendices D to G are sketches that were not compiled.
 
 ---
 
-## 0. How to use this plan
+## 0. Ground rules
 
-1. Work phase by phase, in order. Each phase ends with a gate. Do not start the next phase until the gate passes.
-2. One commit per numbered task (for example `P1.3`), with the task id in the commit message.
-3. After every task run the verification commands in section 13.
-4. The owner has granted full freedom to change architecture, dependencies, models and UI. Where this plan conflicts with `CLAUDE.md` or `AGENTS.md`, this plan wins, and task `P7.9` updates those files to match.
-5. Items marked **VERIFY** are facts that could not be confirmed while writing this plan (the planning session had no access to huggingface.co, github.com release assets or the sherpa-onnx docs site). Confirm each one before building on it. If a VERIFY item turns out false, use the stated fallback.
-6. Items marked **OWNER** need a decision or a secret from the repository owner. Do not block on them: build everything around them and list them in your final report.
-7. Much of this app is platform code for Windows and macOS. If you are running in a Linux container you cannot exercise it. Compile-check it through CI, keep it behind small traits, and record every piece that was written without being run in `docs/MANUAL_QA.md` so the owner can test it on real hardware. Never report untested platform code as working.
+1. Work in phase order. Each phase has a gate. Do not start the next phase until the gate passes.
+2. One commit per task id (for example `P1.3`), with the id in the commit message.
+3. Run section 14 after every task.
+4. The owner has granted full freedom over architecture, dependencies, models and UI. Where this plan conflicts with `CLAUDE.md` or `AGENTS.md`, this plan wins. Task `P7.9` rewrites those files.
+5. Decisions in this plan are final unless a gate fails. Do not reopen them, and do not add features that are not listed.
+6. **You cannot run Windows or macOS code from a Linux container.** Compile-check it through CI, keep it behind the traits defined here, and list every piece you wrote without running in `docs/MANUAL_QA.md`. Never report unrun platform code as working.
+7. Items marked **OWNER** need a secret or a decision from the repository owner. Build around them and list them in your final report.
 
 ### Rules that stay
 
@@ -27,442 +27,444 @@
 
 ### Rules that change
 
-- "Text injection must remain clipboard save -> set -> paste -> restore" becomes: that flow is the default, and direct typing is an allowed fallback and a user setting (section 6).
-- "sherpa-onnx 1.12" becomes sherpa-onnx 2.0.x (task `P0.2`).
-- "Parakeet only" becomes a small verified model catalog with automatic selection (section 7).
-- The overlay stops being React.
+| Old rule | New rule |
+|---|---|
+| Injection must be clipboard save, set, paste, restore | That flow is the default. Direct typing and copy-only are allowed fallbacks and user settings |
+| sherpa-onnx 1.12 | sherpa-onnx 2.0.x |
+| Parakeet only | A small verified catalog with automatic choice |
+| Overlay is a React page | Overlay is a plain TypeScript page driven from Rust |
 
 ---
 
-## 1. Product target and acceptance criteria
+## 1. Acceptance criteria
 
-The owner's target, turned into things that can be measured.
-
-| # | Criterion | How it is measured |
+| # | Criterion | Measured by |
 |---|---|---|
-| A1 | Pressing the record hotkey starts audio capture within 150 ms and shows the overlay within 150 ms | Stage timings in the log (`P1.11`) |
-| A2 | The overlay shows a waveform driven by the real microphone level | Manual QA, plus a unit test of the level meter |
-| A3 | After the hotkey is released, text appears in the previously focused app in under 2 s at the median and under 5 s in the worst supported case (cold model, 60 s of speech, 4-core laptop CPU) | Stage timings in the log, bench harness (`P0.3`) |
-| A4 | Focus never leaves the target app during dictation | Manual QA on each OS |
-| A5 | The user's clipboard content is the same after dictation as before | Automated on Linux under Xvfb, manual elsewhere |
-| A6 | Every setting shown in the UI changes backend behaviour immediately, and survives restart | One test per setting key (`P5.2`) |
-| A7 | Idle footprint with the settings window closed and models evicted: main process under 40 MB private memory, no settings WebView alive | `scripts/measure-memory` (`P6.6`) |
-| A8 | Windows installer under 25 MB, models downloaded on first run with checksum verification | CI size check (`P7.6`) |
-| A9 | A second launch focuses the running instance instead of starting another | Manual QA |
-| A10 | Works on Windows 10+, macOS 12+, Linux X11. Linux Wayland works with documented limits | Manual QA matrix |
+| A1 | Hotkey press starts audio capture within 150 ms and shows the overlay within 150 ms | Stage timings in the log (`P1.11`) |
+| A2 | The overlay waveform follows the real microphone level | Manual QA, level-meter unit test |
+| A3 | After release, text is in the target app in under 2 s at the median, and under 5 s in the worst supported case (cold model, 60 s of speech, 4-core laptop) | Stage timings, bench harness (`P0.3`) |
+| A4 | Focus never leaves the target app | Manual QA per OS |
+| A5 | The clipboard holds the same content after dictation as before | Automated under Xvfb, manual elsewhere |
+| A6 | Every setting in the UI changes backend behaviour at once and survives restart | One test per key (`P5.2`) |
+| A7 | Idle, settings closed, model evicted: main process under 40 MB private memory and no settings WebView alive | `scripts/measure-memory` (`P6.6`) |
+| A8 | Windows installer under 25 MB. Models download on first run and are checksum-verified | CI size check (`P7.6`) |
+| A9 | A second launch focuses the running instance | Manual QA |
+| A10 | Works on Windows 10+, macOS 12+, Linux X11. Wayland works with the documented limits | Manual QA matrix |
 
-A3 depends on the CPU. Treat the numbers as the budget the design is built to, and report the measured values honestly.
+A3 depends on the CPU. These are the numbers the design is built to. Report measured values, whatever they are.
 
-### Latency budget (10 s utterance, 4-core laptop, cold model)
+### Where the time goes (10 s utterance, 4-core laptop, cold model)
 
-| Stage | Budget | Design decision that makes it possible |
+| Stage | Budget | What makes it possible |
 |---|---|---|
-| Hotkey press to capture running | 150 ms | Dedicated audio thread that is already alive, stream built on press |
-| Hotkey press to model ready | 1.5 s, in parallel with speech | Model load starts on **press**, not on release |
-| Speech segments transcribed while the user is still talking | n/a | Streaming VAD plus incremental transcription |
-| Release to last segment decoded | 0.3 to 1.5 s | Only the tail segment (15 s at most) is left to decode |
-| Paste | 150 ms | Modifier-release wait, physical-key paste, clipboard restore done afterwards in the background |
+| Press to capture running | 150 ms | Audio thread already alive, only the stream is built on press |
+| Press to model ready | 1.5 s, hidden behind the user's own speech | Model load starts on press |
+| Decoding during speech | none added | Segments are decoded as they close |
+| Release to last text | 0.3 to 1.5 s | Only the tail segment (15 s at most) is left |
+| Paste | 150 ms | Clipboard restore happens afterwards, off the critical path |
 
-Today the model loads after release, the whole recording is decoded in one pass, and the state machine then sleeps for 3 s. Fixing those three things is most of A3.
+The current app loads the model after release, decodes the whole recording in one pass, then sleeps 3 s. Those three things are most of the gap to A3.
 
 ---
 
-## 2. Findings: what is wrong today
+## 2. Findings in the current code
 
-Every item was read in the source. File references are `path:line` at commit `2115b4b`.
+Each item was read in the source at commit `2115b4b`.
 
 ### 2.1 Bugs that break the core flow
 
 | ID | Finding | Where |
 |---|---|---|
-| F1 | Audio stream is always built as `f32`. Devices whose default format is `i16` or `u16` (common on Linux ALSA and on some Windows drivers) fail with "Failed to build audio stream", so dictation never starts | `src-tauri/src/audio/capture.rs:114-117` |
-| F2 | Resampling is linear interpolation with no low-pass filter, so 44.1/48 kHz input aliases into the 16 kHz signal and accuracy drops. The last sample of each callback is dropped and the phase is clamped, which adds a discontinuity every buffer | `capture.rs:141-159` |
-| F3 | The real-time audio callback allocates two `Vec`s, takes two mutexes, and silently drops audio when `try_lock` fails | `capture.rs:124-171` |
-| F4 | `cpal::Stream` is forced `Send + Sync` with `unsafe impl`. It is not safe on every backend | `capture.rs:23-30` |
-| F5 | After a successful paste the state machine sleeps 3 s before returning to idle. Any hotkey press in that window is ignored | `src-tauri/src/hotkey/manager.rs:591-592` |
-| F6 | Each press and release is handled in its own spawned task, so a quick tap can run the release handler before the press handler | `manager.rs:124-133` |
-| F7 | The model is loaded only after recording stops, so the first dictation after start or after the 60 s idle eviction pays a full 458 MB model load before any decoding | `src-tauri/src/commands/recording.rs:52` |
-| F8 | The overlay is shown from JavaScript after an event round trip and two settings reads, using `show()`. There is no `focusable: false` or non-activating style, so on Windows and macOS the overlay can take focus and the paste then goes nowhere | `src/hooks/useOverlayState.ts:62-86`, `src-tauri/tauri.conf.json:42-55` |
-| F9 | Paste sends `Key::Unicode('v')`. On non-Latin or remapped keyboard layouts this is not the physical V key and the paste fails | `src-tauri/src/injection/injector.rs:50` |
-| F10 | Paste fires while the user may still be holding the hotkey's modifiers, turning Ctrl+V into Ctrl+Alt+V and similar | `injector.rs:47-62` |
-| F11 | Clipboard is restored 80 ms after paste. Slow apps read the clipboard after that and paste the old content. Only text is saved, so a copied image or file is lost | `injector.rs:7,31,64,75` |
-| F12 | Linux X11 shells out to `xclip` and `xdotool`, Wayland to `wl-copy` and `wtype`. None are declared as package dependencies. The process spawn adds latency | `injector.rs:83-211` |
-| F13 | Global shortcuts do not work on Wayland at all (`tauri-plugin-global-shortcut` is X11 only on Linux). The README claims Wayland support | `manager.rs:118` |
-| F14 | `parakeet-0.6b` is listed as a model but cannot work: the download URL points at a repo with no single `model.onnx`, and the loader only builds a `nemo_ctc` config while that model is a transducer | `src-tauri/src/stt/whisper.rs:51-60,149-151` |
-| F15 | A model file counts as valid when it is larger than 1 MB. A truncated download passes, then the recogniser fails to load forever | `whisper.rs:66-91` |
-| F16 | macOS bundle has no `Info.plist` with `NSMicrophoneUsageDescription` and no entitlements, so microphone access is denied or the app is killed | no `src-tauri/Info.plist` |
-| F17 | Silero VAD keeps only detected speech, with a 0.5 threshold and no padding. Word onsets get clipped. If VAD reports no speech, the recording is discarded even when it has clear energy | `src-tauri/src/audio/vad.rs:39-47,100-124` |
-| F18 | The whole recording (up to 120 s) is decoded in one pass. Memory use of these models grows faster than linearly with length, so long dictations spike RAM and are slow | `whisper.rs:193-195` |
-| F19 | The 30 s pipeline timeout does not cancel the blocking work, and it includes model load time | `manager.rs:469-497` |
-| F20 | Two concurrent callers of `ensure_speech_model_loaded` can both load the model | `src-tauri/src/commands/models.rs:22-89` |
+| F1 | The input stream is always built as `f32`. Devices whose default format is `i16` or `u16` fail to open, so dictation never starts | `src-tauri/src/audio/capture.rs:114-117` |
+| F2 | Resampling is linear interpolation with no low-pass filter, so 44.1/48 kHz input aliases and accuracy drops. One sample is dropped and the phase reset at every buffer boundary | `capture.rs:141-159` |
+| F3 | The audio callback allocates, takes two mutexes, and silently drops audio when `try_lock` fails | `capture.rs:124-171` |
+| F4 | `cpal::Stream` is forced `Send + Sync` with `unsafe impl` | `capture.rs:23-30` |
+| F5 | After a paste the state machine sleeps 3 s before going idle. Presses in that window are ignored | `src-tauri/src/hotkey/manager.rs:591-592` |
+| F6 | Press and release are each handled in their own spawned task, so a fast tap can run the release before the press | `manager.rs:124-133` |
+| F7 | The model loads only after recording stops. The first dictation after start, and after each 60 s idle eviction, pays a full 458 MB load before decoding | `src-tauri/src/commands/recording.rs:52` |
+| F8 | The overlay is shown from JavaScript, after an event round trip and two settings reads, with `show()`. The window has no non-activating style, so it can take focus and the paste goes nowhere | `src/hooks/useOverlayState.ts:62-86`, `src-tauri/tauri.conf.json:42-55` |
+| F9 | Paste sends `Key::Unicode('v')`. On Windows that is typed as a character, not the V key, so Ctrl+V fails on non-Latin layouts | `src-tauri/src/injection/injector.rs:50` |
+| F10 | Paste fires while the user may still hold the hotkey's modifiers | `injector.rs:47-62` |
+| F11 | The clipboard is restored 80 ms after paste. Slow apps then paste the old content. Only text is saved, so a copied image is lost | `injector.rs:7,31,64,75` |
+| F12 | Linux shells out to `xclip`, `xdotool`, `wl-copy`, `wtype`. None is a declared dependency | `injector.rs:83-211` |
+| F13 | Global shortcuts do not work on Wayland. The `global-hotkey` crate has Windows, macOS and X11 back ends only | `manager.rs:118` |
+| F14 | `parakeet-0.6b` is offered but cannot work. Its URL has no single `model.onnx`, and the loader only builds a CTC config while that model is a transducer | `src-tauri/src/stt/whisper.rs:51-60,149-151` |
+| F15 | A model file is "valid" when larger than 1 MB, so a truncated download passes and then fails to load forever | `whisper.rs:66-91` |
+| F16 | The macOS bundle has no `Info.plist` microphone usage string and no entitlements | no `src-tauri/Info.plist` |
+| F17 | VAD keeps only detected speech with no padding, which clips word starts. If VAD finds nothing the recording is discarded even when it has clear energy | `src-tauri/src/audio/vad.rs:39-47,100-124` |
+| F18 | Up to 120 s is decoded in one pass. Memory and time grow faster than linearly with length | `whisper.rs:193-195` |
+| F19 | The 30 s pipeline timeout does not cancel the blocking work, and it includes model load | `manager.rs:469-497` |
+| F20 | Two callers of `ensure_speech_model_loaded` can both load the model | `src-tauri/src/commands/models.rs:22-89` |
+| F21 | **Linux X11 hold-to-talk stops by itself.** `global-hotkey` 0.7 forwards every X11 `KeyRelease`. X11 auto-repeat sends release/press pairs while a key is held, so a fake release arrives after the keyboard repeat delay | `global-hotkey-0.7.0/src/platform_impl/x11/mod.rs:262-292` |
 
 ### 2.2 Efficiency problems
 
 | ID | Finding | Where |
 |---|---|---|
-| E1 | The settings window is declared in config with `visible: false`, so its WebView is created on every start and stays alive until the user opens and closes it once. Idle RAM is far higher than the docs claim | `tauri.conf.json:28-40` |
-| E2 | The app downloads the fp32 model (458 MB on disk and roughly that much in RAM) when an int8 build of the same model exists at about a quarter of the size (**VERIFY**) | `whisper.rs:41-50` |
-| E3 | The overlay loads React, ReactDOM and Jotai (about 200 KB of JS) to draw one pill | `src/overlay-main.tsx` |
-| E4 | Pipeline events go to every window with `app.emit` | `manager.rs:670` |
-| E5 | Dropping the engine does not guarantee memory returns to the OS. Nothing measures it | `src-tauri/src/stt/lifecycle.rs:92-118` |
-| E6 | The waveform is a CSS animation unrelated to the microphone | `src/components/overlay/Waveform.tsx` |
+| E1 | The settings window is in the config with `visible: false`, so its WebView is created at every start and stays alive until the user opens and closes it | `tauri.conf.json:28-40` |
+| E2 | The fp32 model is downloaded (458 MB on disk, about that in RAM) | `whisper.rs:41-50` |
+| E3 | The overlay loads React and Jotai (about 200 KB of JS) to draw one pill | `src/overlay-main.tsx` |
+| E4 | Pipeline events are broadcast to every window | `manager.rs:670` |
+| E5 | Nothing checks that memory returns to the OS after eviction | `src-tauri/src/stt/lifecycle.rs:92-118` |
+| E6 | The waveform is a CSS loop unrelated to the microphone | `src/components/overlay/Waveform.tsx` |
 | E7 | `blank_penalty: 1.2` is an untested tweak that can insert tokens | `whisper.rs:160` |
-| E8 | No release build size or memory measurement in CI | `.github/workflows/release.yml` |
 
-### 2.3 Missing features and settings
+### 2.3 Missing features
 
 | ID | Finding |
 |---|---|
-| M1 | No single-instance guard. Two copies fight over hotkeys and the database |
-| M2 | Launch-at-login is forced on at first start with no consent and no UI to turn it off (`src-tauri/src/lib.rs:198-215`) |
-| M3 | No microphone selection, no handling of device unplug during recording |
-| M4 | No model choice in the UI at all. `speech_model` can only be changed by editing the database |
-| M5 | No general settings page: no paste method, no clipboard options, no overlay position, no history retention, no sounds, no theme |
-| M6 | `set_setting` accepts any key and any value with no validation and no side effects (`src-tauri/src/commands/settings.rs:16-24`) |
-| M7 | No log file. Release builds on Windows have no console, so there is nothing to attach to a bug report |
-| M8 | No updater, no code signing. macOS builds are blocked by Gatekeeper and lose the Accessibility grant on every build. Windows shows SmartScreen |
-| M9 | Dashboard "today" uses UTC, so it is wrong for most users (`src-tauri/src/db/queries.rs:79`) |
-| M10 | History is kept forever in plain text with no retention or opt-out |
-| M11 | Overlay position is stored in physical pixels with no check that it is still on a connected monitor. Default is (100, 100) |
-| M12 | Dead IPC surface: `start_recording`, `stop_recording`, `run_pipeline` (takes audio as a JSON number array), `inject_text`, `get_focused_app` are registered and never called by the frontend (`lib.rs:233-239`) |
-| M13 | The cancel key (Escape by default) is grabbed globally for the whole recording, including long hands-free sessions, so it never reaches the focused app |
-| M14 | Models are fetched from mutable `resolve/main` URLs with no checksum. Silero VAD is fetched from GitHub with no checksum |
+| M1 | No single-instance guard |
+| M2 | Launch at login is forced on at first start, with no UI to turn it off (`src-tauri/src/lib.rs:198-215`) |
+| M3 | No microphone choice, no handling of a device that disappears |
+| M4 | No model choice in the UI |
+| M5 | No general settings: paste method, clipboard, overlay position, history retention, sounds, theme |
+| M6 | `set_setting` accepts any key and value, with no validation and no effect (`src-tauri/src/commands/settings.rs:16-24`) |
+| M7 | No log file. Release builds on Windows have no console |
+| M8 | No updater, no code signing |
+| M9 | Dashboard "today" uses UTC (`src-tauri/src/db/queries.rs:79`) |
+| M10 | History is kept forever with no retention or opt-out |
+| M11 | Overlay position is stored in physical pixels with no monitor check. Default is (100, 100) |
+| M12 | Unused IPC commands are registered: `start_recording`, `stop_recording`, `run_pipeline`, `inject_text`, `get_focused_app` (`lib.rs:233-239`) |
+| M13 | Escape is grabbed globally for the whole recording, including long hands-free sessions |
+| M14 | Models come from mutable `resolve/main` URLs with no checksum |
 | M15 | No third-party notices. The Parakeet models are CC-BY-4.0 and need attribution |
-| M16 | Version is `1.0.0` in manifests while `CLAUDE.md` says "v0.1.0 release candidate". Five overlapping audit documents contradict each other |
-| M17 | Types are named `WhisperEngine` and live in `whisper.rs` though nothing is Whisper |
-| M18 | Rust tests cover only helpers. There is no test that pushes audio through the pipeline. The 600 lines of "manual tests" inside `injector.rs` and `capture.rs` are Windows-only and ignored |
+| M16 | Version is `1.0.0` in the manifests and "v0.1.0 release candidate" in `CLAUDE.md`. Five audit documents contradict each other |
+| M17 | The engine type is named `WhisperEngine` in `whisper.rs` |
+| M18 | No test pushes audio through the pipeline |
 
-### 2.4 What is fine and should be kept
+### 2.4 Keep these
 
-- SQLite schema for `transcription_history` and `settings`, and the WAL pragmas.
+- The SQLite tables and WAL pragmas.
 - mimalloc as the global allocator.
-- Tray menu structure and the destroy-on-close behaviour of the settings window.
-- The settings UI look (see `DESIGN_SYSTEM.md`), the wizard flow, the history and dashboard pages.
-- History is saved before injection, so a failed paste never loses the text.
-- Hotkey update with rollback on registration failure (`src-tauri/src/commands/hotkeys.rs:86-121`).
-- The release profile (`lto = "fat"`, `codegen-units = 1`, `panic = "abort"`, `strip`).
+- The tray menu and destroy-on-close for the settings window.
+- The settings look (`DESIGN_SYSTEM.md`), the wizard flow, the history and dashboard pages.
+- History is saved before injection.
+- Hotkey update with rollback (`src-tauri/src/commands/hotkeys.rs:86-121`).
+- The release profile.
 
 ---
 
-## 3. Target architecture
+## 3. Facts checked against dependency sources
 
-### 3.1 Process model
+These were read in the crate sources from crates.io. Build on them without re-checking.
 
-One Rust process. Threads and tasks:
+| Fact | Source |
+|---|---|
+| Tauri 2.10.3 has `WebviewWindowBuilder::focusable(bool)`, `WebviewWindow::set_focusable`, `set_ignore_cursor_events`, and config keys `focusable` and `create` per window | `tauri-2.10.3/src/webview/webview_window.rs:607,2085,2155`, `tauri-utils/src/config.rs` |
+| On Windows a non-focusable tao window gets `WS_EX_NOACTIVATE`. tao still calls `ShowWindow(SW_SHOW)` unless an internal marker is set, so show the overlay yourself with `SW_SHOWNOACTIVATE` (Appendix F) | `tao-0.34.6/src/platform_impl/windows/window_state.rs:296-333` |
+| On Linux `focusable(false)` maps to GTK `accept_focus(false)`. On macOS it makes the window refuse key status | `tao-0.34.6/src/platform_impl/{linux,macos}/window.rs` |
+| `global-hotkey` 0.7 emits `Released` on Windows (by polling the key), macOS and X11. Windows registers with `MOD_NOREPEAT`. X11 has no auto-repeat handling (F21). There is no Wayland back end | `global-hotkey-0.7.0/src/platform_impl/` |
+| enigo 0.2.1: on Windows `Key::Other(v)` sends virtual-key `v`, and `Key::Unicode` is sent as a character. On macOS `raw(keycode, dir)` sends that hardware key code. On Linux with the default `xdo` feature `raw()` is `todo!()` and **panics**, so never call it there | `enigo-0.2.1/src/keycodes.rs:1021-1025`, `src/macos/macos_impl.rs:495`, `src/linux/xdo.rs:235-240` |
+| enigo 0.2.1 has optional features `wayland` and `libei` | `enigo-0.2.1/Cargo.toml` |
+| arboard 3.6.1: `Clipboard::set()` returns a builder with `.text()`, `.html()`, `.image()`. `exclude_from_history()` exists on all three desktop platforms through `SetExtWindows`, `SetExtApple`, `SetExtLinux`. Windows also has `exclude_from_monitoring()` and `exclude_from_cloud()` | `arboard-3.6.1/src/lib.rs:166-246`, `src/platform/` |
+| sherpa-onnx 2.0.1 is the current release. Its `LinearResampler::create(in_hz, out_hz)` is band-limited (cut-off 0.99 x Nyquist of the lower rate, 6 zero crossings). Use it. No other resampler is needed | `sherpa-onnx-2.0.1/src/resampler.rs:19-37` |
+| sherpa-onnx 2.0.1 offline config has `transducer { encoder, decoder, joiner }`, `nemo_ctc { model }`, `moonshine { preprocessor, encoder, uncached_decoder, cached_decoder, merged_decoder }`, and `model_type`. Parakeet TDT needs `model_type = "nemo_transducer"`. Its file names are `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx`, `tokens.txt` | `sherpa-onnx-2.0.1/src/offline_asr.rs:49-63,164-171,656-671` |
+| `OfflineRecognizer`, `OfflineStream`, `VoiceActivityDetector` are `Send + Sync` in the crate, so the app's own `unsafe impl` lines can go | `offline_asr.rs:685-686`, `vad.rs:196-197` |
+| `VoiceActivityDetector` has `accept_waveform`, `is_empty`, `front() -> Option<SpeechSegment>`, `pop`, `flush`, `detected`, `reset`. `SpeechSegment` has `start() -> i64` (absolute sample index) and `samples()` | `sherpa-onnx-2.0.1/src/vad.rs:169-269` |
+| `sherpa-onnx-sys` downloads prebuilt static libraries from github.com releases at build time. `SHERPA_ONNX_ARCHIVE_DIR` or `SHERPA_ONNX_LIB_DIR` point it at a local copy | `sherpa-onnx-sys-2.0.1/build.rs:45-46,130-200` |
+| cpal 0.15.3 sample formats: `I8, I16, I32, I64, U8, U16, U32, U64, F32, F64` | `cpal-0.15.3/src/samples_formats.rs` |
+| `tauri-nspanel` 2.1 is on crates.io. It has `PanelBuilder`, `PanelLevel`, and the `tauri_panel!` macro with config keys such as `can_become_key_window` and `is_floating_panel` | crate README |
+| `tauri-plugin-single-instance` 2.5: `init(|app, args, cwd| ...)` | `src/lib.rs:50` |
+| ringbuf 0.4: `HeapRb::<f32>::new(n)`, `split()`, `push_slice`, `pop_slice`, `occupied_len`, with `use ringbuf::traits::*` | crate README and `src/traits/` |
+| The frontend lint, typecheck and production build pass at `2115b4b` | run during planning |
 
-| Unit | Kind | Owns | Lifetime |
+Known model repository names (from the sherpa-onnx crate docs): `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8`, `sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8`, `sherpa-onnx-moonshine-tiny-en-int8`.
+
+**Not confirmed** (huggingface.co and github.com release assets were unreachable while planning): the exact name and size of the int8 build of Parakeet 110m, the size of each model file, and every checksum. Task `P0.4` resolves these with a script, so no guessing is needed.
+
+---
+
+## 4. Target architecture
+
+### 4.1 Threads
+
+| Unit | Kind | Owns | Lives |
 |---|---|---|---|
-| Controller | one tokio task with an `mpsc` inbox | the dictation state machine | whole app |
-| Audio thread | OS thread | the `cpal` stream, a lock-free ring buffer producer | whole app, stream only while recording |
-| Segmenter | OS thread | resampler, streaming VAD, segment queue | per recording |
-| STT worker | OS thread | the recogniser | from model load to eviction |
-| Injector | `spawn_blocking` | clipboard and key events | per injection |
+| Controller | one tokio task with an `mpsc` inbox | the `Session` state machine (Appendix A) | whole app |
+| Audio thread | OS thread | the `cpal` stream and the ring-buffer producer | whole app. The stream exists only while recording |
+| Segmenter | OS thread | ring-buffer consumer, resampler, VAD, rolling buffer | one per recording |
+| STT worker | OS thread | the recogniser, a queue of segments | from first use to eviction |
+| Injector | `spawn_blocking` | clipboard and key events | one per paste |
 
-Everything talks to the controller through one typed event channel. The controller is the only writer of dictation state. This removes the atomics and the task-ordering races in `hotkey/manager.rs`.
+Every unit reports to the controller through one channel of `session::Event`. The controller is the only owner of dictation state. It calls `Session::handle(event)` and executes the returned `Effect`s in order. No other code decides what happens next.
 
-### 3.2 Module layout
+### 4.2 Module layout
 
 ```
 src-tauri/src/
   lib.rs                 setup and wiring only
   error.rs
+  controller.rs          runs Session, executes Effects, owns timers
   settings/
-    mod.rs               typed Settings struct, load, validate, apply, change events
-    keys.rs              one const per key, default, validator
-  core/                  NO tauri imports allowed in this tree
-    session.rs           pure state machine: (State, Event) -> (State, Vec<Effect>)
+    mod.rs               typed Settings, load, validate, apply hooks
+    keys.rs              one entry per key: type, default, validator
+  core/                  no `tauri` imports anywhere in this tree
+    session.rs           Appendix A, verbatim
     audio/
-      ring.rs            SPSC ring buffer
-      convert.rs         sample format and channel downmix
-      resample.rs        band-limited resampler to 16 kHz
-      level.rs           RMS and peak meter for the overlay
-      segmenter.rs       streaming VAD -> speech segments
+      convert.rs         sample format to f32, downmix to mono
+      level.rs           RMS meter
+      rolling.rs         Appendix B, verbatim
+      segmenter.rs       Appendix D.1
     stt/
-      catalog.rs         model manifest: ids, files, sha256, sizes, family
-      engine.rs          SpeechEngine trait and sherpa implementation
-      manager.rs         load once, warm up, idle eviction, memory trim
-    text/
-      join.rs            join segment texts, spacing, trailing space
+      catalog.rs         model manifest
+      engine.rs          Appendix D.2
+      manager.rs         load once, warm up, evict, trim
     download.rs          resumable verified downloader
   platform/
-    audio_in.rs          cpal device listing and stream (audio thread)
-    hotkey/              global shortcut backends
-    inject/              clipboard and paste backends per OS
-    overlay/             OverlayBackend trait and implementations
-    focus.rs             foreground app detection
+    audio_in.rs          cpal devices and stream
+    hotkey/
+      mod.rs             HotkeyBackend trait
+      shortcut.rs        tauri-plugin-global-shortcut back end
+      repeat_filter.rs   Appendix C, verbatim (used on Linux X11)
+      portal.rs          Wayland GlobalShortcuts portal
+    inject/              Appendix E
+    overlay/             Appendix F
+    focus.rs
     permissions.rs
-    memory.rs            working-set trim per OS
-  controller.rs          runs session.rs, executes Effects
-  commands/              thin IPC handlers only
+    memory.rs
+  commands/              thin IPC handlers
   db/
   tray/
 ```
 
-`core/` has unit tests that run on any machine with no audio device and no display. That is where most of the test value is.
+### 4.3 Controller responsibilities
 
-### 3.3 The state machine
+The controller translates between the pure state machine and the world:
 
-States: `Idle`, `Recording { mode: Hold | TapPending | HandsFree }`, `Finishing` (released, waiting for tail decode), `Injecting`.
+| Effect | What the controller does |
+|---|---|
+| `StartCapture { id }` | Read the foreground app into `target_app` first. Then tell the audio thread to open the stream and spawn the segmenter for `id` |
+| `EnsureModelLoaded` | `manager.ensure_loaded()` on the STT worker. On failure send `ModelFailed` |
+| `StopCapture { id }` | Stop the stream. The segmenter flushes, queues the tail, and sends `CaptureEnded` |
+| `DiscardCapture { id }` | Stop the stream, drop the segmenter, clear queued segments for `id` |
+| `Overlay(view)` | `overlay.show(view)` or `hide()`. `Done` and `NoSpeech` start a hide timer owned by the overlay back end |
+| `Tray(state)` | Swap the tray icon and tooltip |
+| `Cue(kind)` | Play the cue if `sound_cues` is on |
+| `RegisterCancelKey` / `UnregisterCancelKey` | Register or unregister the combo held in a controller field, never re-read from settings |
+| `StartTimer { kind, id, after_ms }` | `tokio::time::sleep`, then send `Event::Timer { kind, id }` |
+| `Inject { id, text }` | Apply `trailing_space`, call the injector on a blocking thread, send `InjectDone` |
+| `SaveHistory { text, audio_ms }` | Insert the row with `target_app` |
+| `ScheduleEvict` | Reset the idle-eviction timer |
 
-Events: `RecordDown`, `RecordUp`, `CancelKey`, `MaxDurationReached`, `SegmentReady(audio)`, `SegmentText(index, text)`, `CaptureFailed(reason)`, `ModelReady`, `ModelFailed(reason)`, `InjectDone(result)`, `Pause(bool)`, `Tick`.
+Timestamps passed in `RecordDown` and `RecordUp` are milliseconds from one `Instant` taken at start-up.
 
-Effects: `StartCapture`, `StopCapture`, `DiscardCapture`, `LoadModel`, `Transcribe(index, audio)`, `ShowOverlay(view)`, `HideOverlay`, `Inject(text)`, `SaveHistory`, `ScheduleEvict`, `RegisterCancelKey`, `UnregisterCancelKey`, `PlayCue(kind)`, `SetTray(state)`.
-
-Required behaviour:
-
-- `Injecting -> Idle` happens the moment injection returns. The overlay preview runs on its own timer and never blocks a new recording. A `RecordDown` during the preview starts a new recording and replaces the preview.
-- Three activation modes, chosen by the `activation_mode` setting: `hold` (press and hold), `toggle` (press to start, press to stop), `hybrid` (today's behaviour: hold, or double-tap for hands-free).
-- A repeat `RecordDown` while already recording in hold mode is ignored (key auto-repeat).
-- Timing uses `Instant`, not wall-clock time.
-- `session.rs` is pure. Write table-driven tests for every transition, including the out-of-order cases (up before down, cancel during finishing, model failure during recording).
-
----
-
-## 4. Audio capture and segmentation
-
-### P1 tasks (audio half)
-
-- **P1.1 Audio thread.** A long-lived thread owns the `cpal` stream so it is never sent across threads. Commands in: `Start { device }`, `Stop`, `Shutdown`. Delete the `unsafe impl Send/Sync for StreamHandle`.
-- **P1.2 Sample formats.** Match on `SupportedStreamConfig::sample_format()` and build the stream for `F32`, `I16`, `U16`, `I32`, `U8`, `I8`, `I24` where cpal offers it. Convert to `f32` in `[-1, 1]`. Fixes F1.
-- **P1.3 Callback discipline.** The callback only downmixes to mono into a stack or pre-allocated buffer and pushes into the SPSC ring. No allocation, no mutex, no logging. On overflow, count the dropped samples in an atomic and report it after the recording. Fixes F3.
-- **P1.4 Resampler.** Do it on the segmenter thread. Use `rubato` (sinc or FFT fixed-in) or `sherpa_onnx::LinearResampler` (which is the Kaldi band-limited resampler despite the name, **VERIFY** in `resampler.rs` of the crate). Test with a 1 kHz sine at 48 kHz and at 44.1 kHz: output frequency within 1 Hz, level within 0.5 dB, and a 10 kHz tone at 48 kHz attenuated by at least 40 dB. Fixes F2.
-- **P1.5 Level meter.** Compute RMS over 20 ms windows on the segmenter thread, smooth it, and publish at 30 Hz to the overlay only. Stop publishing when not recording.
-- **P1.6 Streaming segmenter.** Feed 16 kHz audio to the VAD in 512-sample windows as it arrives. Parameters to start from: threshold 0.4, minimum silence 0.35 s, minimum speech 0.15 s, maximum segment 15 s. Add 200 ms of pre-roll and 150 ms of post-roll to every segment, taken from a rolling buffer. Emit `SegmentReady` as each segment closes. On stop, flush and emit the tail.
-- **P1.7 No-speech safety net.** If the VAD produced no segment but the recording is longer than 0.4 s and its RMS is above the noise threshold, send the whole recording as one segment. Fixes the false "No speech detected" in F17.
-- **P1.8 Device handling.** Setting `input_device` holds a device name or `default`. If the named device is missing, fall back to default and tell the UI. The stream error callback sends `CaptureFailed` so the overlay shows the reason instead of hanging. Add `list_input_devices` IPC.
-- **P1.9 Recording length.** Remove the three separate 120 s constants. One setting `max_recording_seconds`, default 600, range 30 to 3600. Because segments are decoded and dropped as they close, memory no longer grows with recording length. Keep the warning state for the last 15 s.
-
-Silero VAD is small (about 2 MB, **VERIFY**). Ship it inside the installer under `src-tauri/resources/` so it is always present, and delete the runtime VAD download. Keep the energy VAD only as the fallback if the bundled file fails to load.
+The segmenter sends `SegmentQueued { id, index }` when it hands a segment to the STT worker. The worker sends `SegmentText { id, index, text }`. Late messages from an old `id` are ignored by the state machine, which is why cancel needs no locking.
 
 ---
 
-## 5. Speech engine
+## 5. Phase 0: baseline
 
-### P1 tasks (engine half)
+- **P0.1 Baseline.** Run section 14 on a clean checkout and record the results in the first commit message.
+- **P0.2 Upgrade sherpa-onnx** from 1.12.34 to 2.0.x with the default `static` feature. The offline ASR and VAD APIs have the same shape. If the Windows static-CRT link fails in CI, pin back to 1.12.34 (it already has the CTC, transducer and Moonshine v1 configs) and continue.
+- **P0.3 Bench harness.** `src-tauri/examples/bench.rs`. Input: a model id, a model directory, a folder of `*.wav` with matching `*.txt`. Output per run: load ms, warm-up ms, real-time factor per clip, peak resident memory, word error rate. Run with 1, 2 and 4 threads. Write results to `docs/MODEL_BENCHMARK.md`. Add a manually triggered CI job that runs it.
+- **P0.4 Model manifest script.** `scripts/gen-model-manifest.py` (Appendix G). It asks the Hugging Face API for the pinned commit, file sizes and SHA-256 of each candidate repository and writes `src-tauri/models.json`. Commit the output. If your environment cannot reach huggingface.co, commit the script, add the manual CI job that runs it and uploads the result, and tell the owner to run it. Until the file exists, the app keeps the current fp32 110m entry so nothing is blocked.
+- **P0.5 CI split.** `ci.yml`: lint, typecheck, fmt, clippy, tests on Linux, Windows and macOS with `Swatinem/rust-cache`. `release.yml`: tag builds only.
 
-- **P1.10 Engine trait.** `trait SpeechEngine { fn transcribe(&self, samples: &[f32]) -> Result<String>; }` with a sherpa implementation that builds the right config per model family (`NemoCtc`, `Transducer`, `Moonshine`). Rename `WhisperEngine` to `SherpaEngine`, `stt/whisper.rs` to `core/stt/engine.rs`. Remove `blank_penalty` unless the benchmark in `P0.3` shows it helps.
-- **P1.11 Manager.** One async mutex guards loading so only one load can run. API: `ensure_loaded()` (idempotent, returns when ready), `transcribe(segment)`, `evict()`. On `RecordDown` the controller calls `ensure_loaded()` immediately. After loading, run one decode of 0.5 s of silence to warm the runtime. Log stage timings for every dictation in one line: `capture_start_ms, model_ready_ms, segments, audio_ms, decode_ms_total, tail_decode_ms, inject_ms, release_to_text_ms`. Never log transcript text.
-- **P1.12 Incremental transcription.** Segments are decoded in order on the STT worker as they arrive. On release only the tail remains. `core/text/join.rs` joins segment texts with single spaces, trims, and applies the `trailing_space` setting.
-- **P1.13 Threads.** `num_threads = min(4, physical cores)`. Use physical cores, not logical, to avoid oversubscription on SMT CPUs.
-- **P1.14 Eviction.** Setting `idle_unload_seconds`: 0 (never), 30, 120 (default), 300, 900. On eviction drop the recogniser and the VAD, then call `platform::memory::trim()`: `mi_collect(true)` everywhere, plus `SetProcessWorkingSetSize(-1, -1)` or `EmptyWorkingSet` on Windows and `malloc_trim(0)` on glibc Linux. Measure resident memory before and after and log both. If memory does not come back, find out why before moving on (E5).
-- **P1.15 Cancellation.** A cancelled recording drops queued segments and ignores results from a decode already in flight. Replace the 30 s timeout with a watchdog on the decode of a single segment (30 s per 15 s segment means the machine is too slow: surface a clear error that suggests a smaller model).
-
-### Gate for phase 1
-
-- `cargo test` passes with no audio device.
-- An integration test feeds WAV fixtures through `convert -> resample -> segmenter -> engine -> join` using a fake audio source, and checks word error rate against the reference transcript. It runs only when `LOCALYAPPER_TEST_MODEL_DIR` is set. CI sets it and caches the model.
-- Fixtures: 5 to 10 short public-domain clips (LibriSpeech test-clean is CC-BY-4.0, record the attribution), including one at 44.1 kHz stereo, one 16-bit, one with a 3 s pause in the middle, and one of 90 s.
+**Gate:** CI green on three OSes.
 
 ---
 
-## 6. Hotkeys, injection, focus, permissions
+## 6. Phase 1: pipeline
 
-### P2 tasks
+Copy Appendix A, B and C into place first. They compile and their tests pass as written.
 
-- **P2.1 Hotkey backend trait.** `trait HotkeyBackend { register(id, combo), unregister(id), events() }`. Implementations:
-  - `GlobalShortcutBackend`: the existing plugin, for Windows, macOS and Linux X11. Its callback only sends `RecordDown` / `RecordUp` into the controller channel, preserving order (fixes F6).
-  - `PortalBackend`: Linux Wayland through the `org.freedesktop.portal.GlobalShortcuts` portal using the `ashpd` crate. Works on KDE Plasma 6, GNOME 48+ and Hyprland (**VERIFY** current support).
-  - `CliBackend`: always available. `localyapper --toggle`, `--start`, `--stop`, `--cancel` are forwarded to the running instance by the single-instance plugin (`P7.1`), so any desktop can bind them to a key. This is the documented fallback where the portal is missing.
-- **P2.2 Default record hotkey.** Keep `F8` on Windows and Linux. On macOS default to `Alt+Space` (Option+Space), since F8 is a media key there. The wizard's hotkey step must make the user press the key and see it detected before continuing.
-- **P2.3 Cancel key.** Setting `cancel_key_enabled` (default true). Register it only while recording, and in hands-free mode only if the user enabled `cancel_key_in_hands_free` (default false) so Escape keeps working in the focused app (M13). The controller remembers exactly which combo it registered and unregisters that one.
-- **P2.4 Pause.** Pausing unregisters only the record, cancel and paste-last keys. Open-app stays registered.
-- **P2.5 Injection rewrite.** One `Injector` trait with per-OS backends, all in-process:
-  1. Wait until all modifier keys are physically up, polling for at most 400 ms (`GetAsyncKeyState` on Windows, `CGEventSourceFlagsState` on macOS, XQueryKeymap on X11). Fixes F10.
-  2. Save the clipboard: text, HTML and image where `arboard` supports them. Skip the save when `restore_clipboard` is off.
-  3. Set the text. Mark it as transient so clipboard managers skip it: on Windows add the `ExcludeClipboardContentFromMonitorProcessing` and `CanIncludeInClipboardHistory` formats, on macOS the `org.nspasteboard.TransientType` type.
-  4. Send paste using the **physical** V key: virtual key `0x56` on Windows, key code `9` on macOS, the keycode that maps to keysym `v` in the current X11 layout or else keycode 55. Fixes F9.
-  5. Return success to the controller now. Restore the clipboard from a background thread after `clipboard_restore_delay_ms` (default 250, range 100 to 2000). Fixes F11.
-- **P2.6 Paste method setting.** `paste_method`: `auto` (default), `ctrl_v`, `ctrl_shift_v`, `shift_insert`, `type` (send the text as key events with no clipboard use), `clipboard_only` (copy and notify, no key events). `auto` uses Ctrl+Shift+V when the focused app is a known terminal on Linux and Windows (list in `platform/focus.rs`), Cmd+V on macOS, Ctrl+V otherwise.
-- **P2.7 Linux backends.** X11: `arboard` plus `enigo` (x11rb or libxdo), no shell-outs. Wayland: `arboard` with its `wayland-data-control` feature for the clipboard, and for keys try in order `enigo` with its Wayland/libei feature, then `wtype`, `ydotool`, `dotool` if installed. If none works, fall back to `clipboard_only` and say so in the overlay. Declare the packages in the deb `depends` / `recommends` (`P7.5`). Fixes F12.
-- **P2.8 Focus detection.** Capture the foreground app (name, and window handle on Windows) on `RecordDown` before any overlay call. macOS: replace the `osascript` spawn with `NSWorkspace.frontmostApplication` through `objc2`. On Windows, if the target window belongs to an elevated process and LocalYapper is not elevated, input is blocked by the OS: detect it and show "Cannot type into an administrator window" with the copy button.
-- **P2.9 Permissions.** macOS: add `src-tauri/Info.plist` with `NSMicrophoneUsageDescription`, add `entitlements.plist` with `com.apple.security.device.audio-input`, wire both in `tauri.conf.json`. Request microphone access through AVFoundation in the wizard, not by opening a stream and hoping. Check Accessibility with `AXIsProcessTrustedWithOptions` and prompt. Poll in the wizard so the step advances when the grant lands. Fixes F16. Windows: detect the microphone privacy switch being off (stream open fails with access denied) and link to `ms-settings:privacy-microphone`.
-- **P2.10 Remove dead IPC.** Delete `start_recording`, `stop_recording`, `run_pipeline`, `inject_text`, `get_focused_app` and their TypeScript wrappers (M12). Keep `paste_last` and `cancel_recording`, routed through the controller.
+- **P1.1 Audio thread** (`platform/audio_in.rs`). A thread created at start-up owns the stream so it never crosses threads. Commands: `Start { device, producer }`, `Stop`, `Shutdown`. Delete the `unsafe impl Send/Sync for StreamHandle`.
+- **P1.2 Sample formats.** Match on `sample_format()` and build a typed stream for `F32`, `I16`, `U16`, `I32`, `U8`, `I8`. Convert with `core/audio/convert.rs` (`i16 / 32768.0`, `(u16 - 32768) / 32768.0`, and so on). Return a clear error for any other format.
+- **P1.3 Callback.** Downmix to mono into a fixed stack buffer in chunks and `push_slice` into a `ringbuf` producer sized for 2 s at the native rate. No allocation, lock or log in the callback. Count overflowed samples in an atomic and log the count once after the recording.
+- **P1.4 Segmenter** (Appendix D.1). Pops from the ring, resamples to 16 kHz with `sherpa_onnx::LinearResampler`, feeds the VAD in 512-sample windows, cuts padded segments from the rolling buffer.
+- **P1.5 Level meter.** RMS over 20 ms windows computed in the segmenter, smoothed with attack 0.6 and release 0.15, sent to the overlay at 30 Hz as one `f32` in `[0, 1]`.
+- **P1.6 VAD parameters.** Threshold 0.4, minimum silence 0.35 s, minimum speech 0.15 s, maximum segment 15 s, pre-roll 200 ms, post-roll 150 ms. Tune only with the bench fixtures, and record any change in `docs/MODEL_BENCHMARK.md`.
+- **P1.7 No-speech safety net.** If the recording is longer than 0.4 s, the VAD produced no segment, and overall RMS is above 0.01, send the last 15 s as one segment.
+- **P1.8 Devices.** Setting `input_device` is `default` or a device name. If the named device is missing, use the default and emit a warning event. The stream error callback sends `CaptureFailed`. Add IPC `list_input_devices`.
+- **P1.9 Length.** One setting, `max_recording_seconds`, default 600, range 30 to 3600. Delete the three hard-coded 120 s limits.
+- **P1.10 Engine** (Appendix D.2). Rename `WhisperEngine` to `SherpaEngine` in `core/stt/engine.rs`. Build the config from the catalog family. Drop `blank_penalty`.
+- **P1.11 Manager.** A `tokio::sync::Mutex` around loading, so only one load runs. `ensure_loaded()` is idempotent. After loading, decode 0.5 s of silence once. Log one line per dictation: `capture_start_ms model_ready_ms segments audio_ms decode_ms tail_decode_ms inject_ms release_to_text_ms`. Never log text.
+- **P1.12 Threads.** `num_threads = min(4, physical cores)`.
+- **P1.13 Eviction.** `idle_unload_seconds`: 0 (never), 30, 120 (default), 300, 900. On eviction drop the recogniser and VAD, then `platform::memory::trim()`: `mi_collect(true)`, plus `EmptyWorkingSet` on Windows and `malloc_trim(0)` on glibc. Log resident memory before and after. If it does not drop, find out why before continuing.
+- **P1.14 Controller.** Implement section 4.3. Delete `hotkey/manager.rs`, `stt/lifecycle.rs`, `state::HotkeyState`, and the dictation logic in `commands/recording.rs`.
+- **P1.15 Bundle the VAD.** Put `silero_vad.onnx` in `src-tauri/resources/` and load it from the resource directory. Delete the runtime VAD download and keep the energy VAD as the fallback if loading fails.
 
-### Gate for phase 2
+**Gate:**
 
-- State-machine tests cover all three activation modes.
-- On Linux under Xvfb: an automated test opens a text widget, runs the injector, and asserts the widget text and that the clipboard was restored.
-- `docs/MANUAL_QA.md` has a checklist for Windows and macOS covering focus, modifiers held, non-Latin layout, terminal paste, elevated window, and clipboard with an image.
+- `cargo test` passes with no audio device and no display.
+- An integration test feeds WAV fixtures through `convert`, resample, segmenter, engine and join with a fake audio source and checks word error rate. It runs when `LOCALYAPPER_TEST_MODEL_DIR` is set. CI sets it and caches the model.
+- Fixtures: 5 to 10 LibriSpeech test-clean clips (CC-BY-4.0, add the attribution) including one at 44.1 kHz stereo, one 16-bit, one with a 3 s pause, and one 90 s clip made by joining clips.
+- Resampler test: a 1 kHz sine at 48 kHz comes out at 1 kHz within 1 Hz and 0.5 dB. A 10 kHz sine at 48 kHz comes out at least 40 dB down.
 
 ---
 
-## 7. Model catalog and selection
+## 7. Phase 2: hotkeys, injection, permissions
 
-### 7.1 Candidates
+- **P2.1 Hotkey back ends.** `trait HotkeyBackend { fn register(&self, id: HotkeyId, combo: &str) -> Result<()>; fn unregister(&self, id: HotkeyId) -> Result<()>; }`. Back ends send `RecordDown`, `RecordUp`, `Cancel` and the other actions into the controller channel from the callback itself. Do not spawn a task per event.
+  - `shortcut.rs`: `tauri-plugin-global-shortcut` for Windows, macOS and X11. On Linux, wrap the record key in `RepeatFilter::new(30)` and run a 10 ms timer only while a release is pending (fixes F21).
+  - `portal.rs`: on Wayland use the `org.freedesktop.portal.GlobalShortcuts` portal through `ashpd`. If the portal is missing, report it in the UI and point to the CLI.
+  - CLI: `localyapper --toggle | --start | --stop | --cancel`, forwarded to the running instance by the single-instance plugin (`P7.1`). Any desktop can bind these.
+- **P2.2 Defaults.** Record: `F8` on Windows and Linux, `Alt+Space` on macOS. The wizard requires the user to press the key and see it detected.
+- **P2.3 Cancel key.** Settings `cancel_key_enabled` (true) and `cancel_key_in_hands_free` (false). The state machine already implements the policy.
+- **P2.4 Pause.** Unregister record, cancel and paste-last. Keep open-app.
+- **P2.5 Injection** (Appendix E). One function per OS, all in-process.
+- **P2.6 Paste method.** `paste_method`: `auto` (default), `ctrl_v`, `ctrl_shift_v`, `shift_insert`, `type`, `clipboard_only`. `auto` means Cmd+V on macOS, Ctrl+Shift+V when the focused app is a known terminal on Windows or Linux, Ctrl+V otherwise.
+- **P2.7 Focus** (`platform/focus.rs`). Read the foreground app on `StartCapture` before any overlay call. On macOS replace the `osascript` process with `NSWorkspace.frontmostApplication` through `objc2-app-kit`. On Windows, if the foreground window belongs to an elevated process and LocalYapper is not elevated, skip the paste and show "Cannot type into an administrator window" with the copy button.
+- **P2.8 Permissions.** macOS: add `src-tauri/Info.plist` with `NSMicrophoneUsageDescription`, add `entitlements.plist` with `com.apple.security.device.audio-input`, reference both from `tauri.conf.json`. Request microphone access through AVFoundation in the wizard. Check Accessibility with `AXIsProcessTrustedWithOptions` (prompt true) and poll every second in the wizard so the step advances on grant. Windows: when the stream fails with access denied, link to `ms-settings:privacy-microphone`.
+- **P2.9 Remove dead IPC.** Delete `start_recording`, `stop_recording`, `run_pipeline`, `inject_text`, `get_focused_app` and their TypeScript wrappers. Route `paste_last` and `cancel_recording` through the controller.
 
-All run through sherpa-onnx on CPU. Sizes and accuracy figures are from memory and third-party pages and are **VERIFY** items. `P0.3` replaces them with measured numbers.
+**Gate:**
 
-| Id | Family | Languages | Disk (approx.) | Role |
+- Under Xvfb, a test opens a GTK or xterm text target, runs the injector, and asserts the target text and that the clipboard was restored.
+- `docs/MANUAL_QA.md` has Windows and macOS checklists: focus kept, modifiers held at release, non-Latin layout, terminal paste, elevated window, clipboard holding an image.
+
+---
+
+## 8. Phase 3: overlay
+
+- **P3.1 Trait.** `trait OverlayBackend { fn show(&self, view: &View); fn level(&self, v: f32); fn hide(&self); }`. First implementation: `WebviewOverlay` (Appendix F).
+- **P3.2 Rust owns the window.** Rust positions and shows it. The page only renders what it is told. Nothing in the page calls `show()`, `hide()` or `setPosition()`.
+- **P3.3 Never take focus.** Build with `.focusable(false)`. Windows: show with `SW_SHOWNOACTIVATE` (Appendix F). macOS: convert to a non-activating `NSPanel` with `tauri-nspanel`, floating level, joins all spaces, visible over full-screen apps. Linux X11: `focusable(false)`, `skip_taskbar(true)`, `always_on_top(true)`. Wayland: the compositor places the window, accept that.
+- **P3.4 Click-through.** `set_ignore_cursor_events(true)` except in views with a button (`Error` with text).
+- **P3.5 Placement.** `overlay_position`: `bottom_center` (default), `top_center`, `custom`. Compute against the monitor under the cursor, in logical pixels, 48 px margin. `custom` stores a fraction of the work area and falls back to the default if it is off-screen. Size the window to the pill plus shadow.
+- **P3.6 Page.** Rewrite `overlay.html` and `src/overlay-main.ts` in plain TypeScript and CSS, no React, no Jotai. Target under 10 KB of JS. Five bars scaled by `level` events. Honour `prefers-reduced-motion` and `prefers-color-scheme`.
+- **P3.7 Views.** Exactly the `session::View` enum. Send with `emit_to("overlay", "overlay-view", view)` and `emit_to("overlay", "overlay-level", f32)`. `Done` hides after 1.2 s when `overlay_preview` is on, at once when off. `NoSpeech` hides after 1.5 s. `Error` with text stays until dismissed or the next recording.
+- **P3.8 Tray.** Three icons: idle, recording, processing. Add macOS template variants. The tray is the indicator that never depends on a WebView.
+- **P3.9 Cues.** `sound_cues` (default off). Two short embedded PCM clips played through a `cpal` output stream.
+- **P3.10 Off switch.** `overlay_enabled` (default true).
+
+**Gate:** manual QA per OS: the overlay shows over a full-screen app, the caret stays in the target app, clicks pass through the pill, the bars follow the voice.
+
+---
+
+## 9. Phase 4: models
+
+### 9.1 Catalog
+
+| Id | sherpa family | Languages | Role |
+|---|---|---|---|
+| `parakeet-110m` | `nemo_ctc` | English | **Default.** Use the int8 build if `P0.4` finds one and the bench shows its word error rate within 1.0 point of fp32. Otherwise keep fp32 |
+| `parakeet-0.6b-v3` | `transducer`, `model_type = "nemo_transducer"`, int8 | 25 European languages, auto-detected | Offered as "Higher accuracy and more languages" on machines with 16 GB RAM or more |
+| `moonshine-tiny-en` | `moonshine`, int8 | English | Used on machines with less than 6 GB RAM |
+
+Do not add Whisper, and do not add `parakeet-0.6b-v2`: v3 covers English too. A model is dropped from the catalog if its bench real-time factor on 4 threads is above 0.3, since it would break A3.
+
+- **P4.1 Manifest.** `core/stt/catalog.rs` embeds `models.json` with `include_str!`. Per model: id, name, family, languages, licence, files. Per file: URL pinned to a commit (`resolve/<sha>/<path>`), size, SHA-256.
+- **P4.2 Downloader.** One shared `reqwest::Client`. Stream to `<file>.part`, resume with `Range`. A `200` reply to a range request means restart from zero. A `416` means verify what is on disk. Hash while writing. On completion check size and SHA-256, then rename. Progress events use real totals. Check free disk space first. Cancel keeps the `.part` file. Test against a local HTTP server: resume, corruption, cancel, 416.
+- **P4.3 Validity.** Installed means every file matches the manifest size and a `.verified` marker written after the hash check is present.
+- **P4.4 Automatic choice.** `speech_model = auto` resolves by total RAM: under 6 GB `moonshine-tiny-en`, otherwise `parakeet-110m`. Read RAM with `GlobalMemoryStatusEx`, `sysctl hw.memsize`, or `/proc/meminfo`. No new dependency.
+- **P4.5 Models page.** Each model shows size, languages, state and actions (download, use, delete). Switching evicts the old model. Deleting the active model returns the app to "needs download".
+- **P4.6 Migration.** An existing `models/parakeet-tdt-ctc-110m/model.onnx` keeps working as a legacy install. If the catalog default becomes int8, show a one-time offer to switch and free the space. Map the removed `parakeet-0.6b` id to `auto`.
+
+**Gate:** downloader tests pass. A fresh profile downloads, verifies, and dictates.
+
+---
+
+## 10. Phase 5: settings
+
+- **P5.1 Typed settings.** `settings/keys.rs` lists every key with type, default and validator. `set_setting` rejects unknown keys and bad values. A cached `Settings` struct sits behind an `RwLock` in `AppState`, so hot paths never query SQLite.
+- **P5.2 Apply hooks.** Every write runs the key's hook and emits `settings-changed`. Write one test per key that proves the hook runs.
+- **P5.3 Migrations.** Use `PRAGMA user_version`. Version 1 is today's schema. Version 2 adds the new keys, removes `overlay_x` and `overlay_y`, sets `auto_start` to its current OS state.
+
+### Settings
+
+| Page | Key | Values | Default | Hook |
 |---|---|---|---|---|
-| `parakeet-110m-int8` | NeMo CTC (`nemo_ctc`) | English | 130 MB | **Default.** Best accuracy per MB of RAM, punctuation and capitals built in |
-| `parakeet-0.6b-v3-int8` | NeMo transducer (`transducer`, `model_type = "nemo_transducer"`) | 25 European languages, auto-detected | 650 to 700 MB | Best accuracy, and the multilingual option, for machines with 16 GB RAM or more |
-| `parakeet-0.6b-v2-int8` | NeMo transducer | English | 650 MB | Only keep if the benchmark shows it clearly beats v3 on English |
-| `moonshine-base-en` | Moonshine | English | 60 to 130 MB | Low-memory option for machines with 4 GB RAM or less |
+| General | `auto_start` | bool | false, asked in the wizard | autostart plugin with `--autostart` |
+| General | `theme` | `system`, `light`, `dark` | `system` | both windows |
+| General | `update_check` | `off`, `on_start` | `off` | `P7.4` |
+| Dictation | `activation_mode` | `hold`, `toggle`, `hybrid` | `hybrid` | `Event::ConfigChanged` |
+| Dictation | `hotkey_record`, `hotkey_cancel`, `hotkey_paste_last`, `hotkey_open_app` | combo | per OS | re-register with rollback |
+| Dictation | `cancel_key_enabled`, `cancel_key_in_hands_free` | bool | true, false | `Event::ConfigChanged` |
+| Dictation | `max_recording_seconds` | 30 to 3600 | 600 | `Event::ConfigChanged` |
+| Dictation | `trailing_space` | bool | true | injector |
+| Audio | `input_device` | `default` or name | `default` | audio thread |
+| Audio | `sound_cues` | bool | false | controller |
+| Output | `paste_method` | see `P2.6` | `auto` | injector |
+| Output | `restore_clipboard` | bool | true | injector |
+| Output | `clipboard_restore_delay_ms` | 100 to 2000 | 250 | injector |
+| Speech | `speech_model` | `auto` or id | `auto` | evict and reload |
+| Speech | `idle_unload_seconds` | 0, 30, 120, 300, 900 | 120 | manager |
+| Overlay | `overlay_enabled` | bool | true | overlay back end |
+| Overlay | `overlay_position` | `bottom_center`, `top_center`, `custom` | `bottom_center` | overlay back end |
+| Overlay | `overlay_preview` | bool | true | overlay back end |
+| Privacy | `history_enabled` | bool | true | `Event::ConfigChanged` |
+| Privacy | `history_retention_days` | 0, 7, 30, 90 | 0 | prune at start and daily |
 
-Repository names to check on Hugging Face under `csukuangfj/` and in the `asr-models` release of `k2-fsa/sherpa-onnx`: `sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8`, `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8`, `sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8`, `sherpa-onnx-moonshine-base-en-int8`. If the 110m int8 build does not exist or loses more than 1 point of word error rate against fp32, keep fp32 as the default and say so in the UI.
+- **P5.4 Pages.** Sidebar: Dashboard, History, Dictation, Audio, Speech, General. Reuse the existing components. Every control saves on change and shows the backend error inline.
+- **P5.5 Audio page.** Device list, live meter, and a "Test dictation" box that runs the real pipeline and shows the text and stage timings.
+- **P5.6 About.** Version, data folder, log folder, "Copy diagnostics" (OS, CPU, RAM, model, last timings, never text), notices, "Reset all settings".
+- **P5.7 Wizard.** Welcome, Microphone, Accessibility (macOS), Hotkey, Speech model, Try it, Done (with the launch-at-login checkbox). Retry on every failure. Resume at the saved step.
+- **P5.8 History.** Local-time grouping, search, copy, delete, export through a save dialog, clear all. Store `created_at` as UTC ISO-8601 with `Z`.
+- **P5.9 Stats.** Pass local day and week boundaries from Rust (`chrono::Local`) into the queries.
+- **P5.10 Dark theme** with CSS variables.
 
-Do not add Whisper. It is slower on CPU at equal accuracy and it hallucinates on silence.
-
-### P0 tasks
-
-- **P0.1 Baseline.** Run section 13 on a clean checkout and record the results. The frontend lint, typecheck and build passed when this plan was written. Rust could not be built in the planning session because the sherpa-onnx build script downloads its libraries from github.com.
-- **P0.2 Upgrade sherpa-onnx** from 1.12.34 to the latest 2.0.x (2.0.1 when this was written), keeping the `static` feature. The crate's public API for offline ASR and VAD has the same shape. 2.0 adds Moonshine v2 config (`merged_decoder`) and TEN VAD. If the upgrade breaks the Windows static CRT link, stay on 1.12.34: it already supports the CTC and transducer families.
-- **P0.3 Bench harness.** `src-tauri/examples/bench.rs`: for a model directory and a folder of WAV plus reference text, print load time, warm-up time, real-time factor per clip, peak resident memory, and word error rate. Run it for every candidate, with 1, 2 and 4 threads. Write the table to `docs/MODEL_BENCHMARK.md`. This decides the catalog. If you cannot download models in your environment, write the harness, wire it into CI as a manually triggered job, and leave the decision table for the owner to fill in, keeping the defaults above.
-- **P0.4 CI baseline.** Split `release.yml` into `ci.yml` (lint, typecheck, fmt, clippy, tests on Linux, Windows and macOS, cached with `Swatinem/rust-cache`) and `release.yml` (tag builds only).
-
-### P4 tasks
-
-- **P4.1 Manifest.** `core/stt/catalog.rs` holds, per model: id, display name, family, languages, licence, approximate RAM, and for each file the URL pinned to a commit hash (`resolve/<sha>/...`, never `main`), exact size and SHA-256. Fixes M14.
-- **P4.2 Downloader.** One shared `reqwest::Client`. Stream to `<file>.part`, resume with `Range`, handle a `200` reply to a range request by restarting, handle `416` by verifying what is on disk. Hash while writing. On completion compare size and SHA-256, then rename atomically. Progress events carry real totals from the manifest. Check free disk space first. Cancel keeps the `.part` file so the download can resume. Test against a local HTTP server: resume, corruption, cancel, 416.
-- **P4.3 Validity.** A model is installed only if every file matches the manifest size. Verify SHA-256 once after download and store a marker file. Fixes F15.
-- **P4.4 Automatic choice.** First run: read total RAM and physical cores (`sysinfo` crate with only the needed features, or direct OS calls to avoid the dependency). Rule: less than 6 GB RAM -> `moonshine-base-en`. Otherwise `parakeet-110m-int8`. Offer `parakeet-0.6b-v3-int8` as "Higher accuracy / other languages" when RAM is 16 GB or more. The wizard shows the pick and its size, with a link to change it. Setting `speech_model` = `auto` or an explicit id.
-- **P4.5 Models UI.** List every catalog model with size, languages, RAM estimate, state (not downloaded, downloading, installed, active), and actions (download, use, delete). Switching model evicts the old one. Deleting the active model is allowed and returns the app to the "needs download" state.
-- **P4.6 Migration.** An existing `models/parakeet-tdt-ctc-110m/model.onnx` (fp32) stays usable as a legacy install. Show a one-time offer: "Switch to the smaller build and free about 330 MB". Remove the `parakeet-0.6b` id and map it to `auto`.
-
----
-
-## 8. Overlay and feedback
-
-### P3 tasks
-
-- **P3.1 Backend trait.** `trait OverlayBackend { show(view), update(view), level(f32), hide() }`. First implementation: `WebviewOverlay`. The trait exists so a native overlay can replace it per platform later (`P6.5`).
-- **P3.2 Rust drives the window.** Rust positions and shows the overlay on `RecordDown`. The page only renders. No IPC round trip before the window appears. Fixes F8.
-- **P3.3 Never take focus.** Windows: build with `focusable(false)` if the Tauri version in use has it (**VERIFY** on `WebviewWindowBuilder` for the locked Tauri version), and in all cases set `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW` on the HWND and show with `SW_SHOWNOACTIVATE`. macOS: convert the window to a non-activating `NSPanel` with the `tauri-nspanel` crate, level above full-screen apps, collection behaviour `canJoinAllSpaces | fullScreenAuxiliary`. Linux X11: window type hint `notification` or `utility`, `skip_taskbar`, `accept_focus(false)`. Linux Wayland: a client cannot position its own window, so use `gtk-layer-shell` when the compositor supports it and otherwise accept compositor placement.
-- **P3.4 Click-through.** `set_ignore_cursor_events(true)` while listening and processing. Turn it off only in states that have a button (paste failed, copy).
-- **P3.5 Placement.** Setting `overlay_position`: `bottom_center` (default), `top_center`, `custom`. Compute against the monitor that holds the focused window, in logical pixels, with a margin. `custom` stores a position as a fraction of the monitor work area, and falls back to `bottom_center` if the result is off-screen. Fixes M11. Size the window to the pill, not 400 x 120.
-- **P3.6 Vanilla page.** Rewrite `overlay.html` as plain TypeScript and CSS: no React, no Jotai, no Tailwind runtime classes beyond what is compiled in. Target under 10 KB of JS. A canvas or five `div` bars driven by `level` events gives the real waveform (E6). Respect `prefers-reduced-motion` and `prefers-color-scheme`.
-- **P3.7 Views.** `listening`, `hands_free`, `stopping_soon` (countdown), `loading_model`, `processing`, `done` (short preview, default 1.2 s, setting `overlay_preview` on/off), `no_speech`, `error { message, text?, can_copy }`. Send events with `emit_to("overlay", ...)` only.
-- **P3.8 Tray state.** Three tray icons: idle, recording, processing. Switch them from the controller. This is the instant indicator that does not depend on any WebView. Add the template icon variant for macOS.
-- **P3.9 Sound cues.** Setting `sound_cues` (default off). Two short embedded PCM clips (start, stop) played through `cpal` output on the audio thread. No new audio dependency.
-- **P3.10 Overlay off.** Setting `overlay_enabled` (default true). When off, only the tray icon and optional sounds signal state.
-
-### Gate for phase 3
-
-Manual QA on each OS: overlay appears over a full-screen app, the target app keeps its caret, clicking through the pill reaches the app below, the waveform follows the voice.
+**Gate:** every table row has a hook test and a line in `docs/MANUAL_QA.md`. No control exists without a backend effect.
 
 ---
 
-## 9. Settings
+## 11. Phase 6: memory and size
 
-### 9.1 Typed settings
+- **P6.1** Set `"create": false` on the `main` window in `tauri.conf.json` and build it only for the wizard or when the user opens it. Keep destroy-on-close.
+- **P6.2** With `--autostart`, never create the settings window.
+- **P6.3** Create the overlay at start. Destroy it after 10 minutes without a dictation and recreate it in the background on the next press. Recording never waits for it. Measure the saving on Windows: if it is under 30 MB, keep the overlay alive and delete this code.
+- **P6.4** No timers, polling or animation while idle. Idle CPU must read 0.0 %.
+- **P6.5 Native overlay (only after owner sign-off).** A second `OverlayBackend` without a WebView: a layered window drawn with `tiny-skia` on Windows, an `NSPanel` with Core Animation layers on macOS. Do not start it until the owner has confirmed the WebView overlay works on that platform.
+- **P6.6** `scripts/measure-memory.ps1` and `.sh` print private memory of the main process and each WebView helper in three states: idle and evicted, model loaded, settings open. Put the results in `docs/PERFORMANCE.md` and replace the unmeasured claims in the README.
+- **P6.7** Run `cargo bloat --release --crates`. Remove `tauri-plugin-notification`, `futures-util`, `anyhow`, `env_logger` if unused. Trim `chrono` and `tokio` features. Keep `opt-level = 3`.
+- **P6.8** Replace the 50 KB logo PNG with an SVG or a smaller PNG.
 
-- **P5.1** `settings/keys.rs` defines every key with its type, default and validator. `set_setting` rejects unknown keys and invalid values with a clear error. Reads go through a cached `Settings` struct held in `AppState` behind an `RwLock`, refreshed on write, so hot paths never touch SQLite.
-- **P5.2** Every write runs the key's `apply` hook (re-register hotkeys, toggle autostart, move the overlay, reschedule eviction, prune history) and emits `settings-changed`. Write one test per key that proves the hook runs.
-- **P5.3** Database migrations move to `PRAGMA user_version` with numbered steps. Migration 1 is the current schema. Migration 2 renames and adds keys for this plan and removes `overlay_x`, `overlay_y`.
-
-### 9.2 Final settings list
-
-| Page | Key | Type / values | Default | Effect |
-|---|---|---|---|---|
-| General | `auto_start` | bool | false, asked in the wizard | Autostart plugin, launched with `--autostart` so the window stays closed |
-| General | `theme` | `system`, `light`, `dark` | `system` | Settings window and overlay |
-| General | `update_check` | `off`, `on_start` | `off` | See `P7.4` |
-| Dictation | `activation_mode` | `hold`, `toggle`, `hybrid` | `hybrid` | State machine |
-| Dictation | `hotkey_record`, `hotkey_cancel`, `hotkey_paste_last`, `hotkey_open_app` | combo | per OS | Hotkey backend |
-| Dictation | `cancel_key_enabled`, `cancel_key_in_hands_free` | bool | true, false | `P2.3` |
-| Dictation | `max_recording_seconds` | 30 to 3600 | 600 | Controller |
-| Dictation | `trailing_space` | bool | true | `core/text/join.rs` |
-| Audio | `input_device` | `default` or device name | `default` | Audio thread |
-| Audio | `sound_cues` | bool | false | `P3.9` |
-| Output | `paste_method` | see `P2.6` | `auto` | Injector |
-| Output | `restore_clipboard` | bool | true | Injector |
-| Output | `clipboard_restore_delay_ms` | 100 to 2000 | 250 | Injector |
-| Speech | `speech_model` | `auto` or catalog id | `auto` | Manager |
-| Speech | `idle_unload_seconds` | 0, 30, 120, 300, 900 | 120 | Manager |
-| Overlay | `overlay_enabled` | bool | true | Overlay backend |
-| Overlay | `overlay_position` | `bottom_center`, `top_center`, `custom` | `bottom_center` | `P3.5` |
-| Overlay | `overlay_preview` | bool | true | `P3.7` |
-| Privacy | `history_enabled` | bool | true | Controller skips `SaveHistory` when false |
-| Privacy | `history_retention_days` | 0 (forever), 7, 30, 90 | 0 | Prune at start and daily |
-| Internal | `setup_complete`, `setup_step`, `sidebar_collapsed` | | | unchanged |
-
-### P5 UI tasks
-
-- **P5.4** Sidebar becomes: Dashboard, History, Dictation (hotkeys, mode, output), Audio, Speech, General (start-up, theme, overlay, privacy, updates, about). Use the existing components and `DESIGN_SYSTEM.md`. Every control saves on change and shows the backend error inline if the save fails.
-- **P5.5** Audio page: device dropdown, live level meter, and a "Test dictation" box that runs the real pipeline and shows the text and the stage timings.
-- **P5.6** About section: version, data folder button, logs folder button, "Copy diagnostics" (OS, CPU, RAM, model, last stage timings, no transcript text), third-party notices, "Reset all settings".
-- **P5.7** Wizard order: Welcome, Microphone (permission plus level meter), Accessibility (macOS only), Hotkey (must be pressed to continue), Speech model (automatic pick, size, download), Try it (dictate into a text box), Done (launch-at-login checkbox). Add a "Retry" on every failure. Resume at the saved step.
-- **P5.8** History: local-time grouping, search box (SQL `LIKE` with an index-free scan is fine at this size), per-entry copy and delete, export to a text or JSON file through a save dialog, clear all. Store `created_at` as UTC ISO-8601 with a `Z`.
-- **P5.9** Dashboard stats: compute "today" and "this week" from local time by passing the local day boundaries from Rust (`chrono::Local`) into the query. Fixes M9.
-- **P5.10** Dark theme for the settings window, driven by CSS variables.
-
-### Gate for phase 5
-
-Every row in the table above has a test for its apply hook and a line in `docs/MANUAL_QA.md`. No control exists in the UI without a backend effect.
+**Gate:** `docs/PERFORMANCE.md` has measured numbers that meet A7, or explains the gap.
 
 ---
 
-## 10. Memory, CPU and size
+## 12. Phase 7: packaging and release
 
-### P6 tasks
+- **P7.1 Single instance.** `tauri-plugin-single-instance` registered first. No arguments: open settings. With a CLI flag: forward to the controller.
+- **P7.2 Logging.** `tauri-plugin-log`, two files of 1 MB at most, `info`, or `debug` with `LOCALYAPPER_DEBUG=1`. Never log transcript or clipboard text.
+- **P7.3 Autostart.** Remove the forced enable in `lib.rs:198-215`. Follow the setting only.
+- **P7.4 Updates.** `tauri-plugin-updater` with signed artifacts from GitHub Releases. Off by default, with a manual "Check now". State in the UI that this is a network call. **OWNER:** generate the key pair and add `TAURI_SIGNING_PRIVATE_KEY`. Until then keep the UI hidden.
+- **P7.5 Bundles.** Windows: NSIS, `installMode: currentUser`, `compression: lzma`, WebView2 `downloadBootstrapper`. macOS: DMG per architecture, plist and entitlements, hardened runtime, minimum 12.0. Linux: deb with `depends` `libwebkit2gtk-4.1-0, libasound2, libxdo3` and `recommends` `wl-clipboard, wtype`, plus rpm and AppImage. All: bundle `silero_vad.onnx` and `THIRD_PARTY_NOTICES.md`.
+- **P7.6 CI.** Fail the release if the Windows installer is over 25 MB. Run tests on three OSes. Run the model integration test on Linux with a cached model. Use the tag's own release notes file.
+- **P7.7 Signing.** **OWNER:** Apple Developer ID and a Windows signing certificate. Wire the CI steps so they run when the secrets exist. Document unsigned install steps until then.
+- **P7.8 Notices.** `THIRD_PARTY_NOTICES.md`: Parakeet (NVIDIA, CC-BY-4.0), Moonshine (MIT), Silero VAD (MIT), sherpa-onnx (Apache-2.0), ONNX Runtime (MIT), the test fixtures, and the generated Rust and npm licence lists.
+- **P7.9 Docs.** Delete `docs/FINAL_AUDIT.md`, `docs/PRODUCT_AUDIT.md`, `docs/PROJECT_COMPLETION.md`, `docs/RELEASE_NOTES_v0.1.0.md`. Rewrite `README.md`, `CLAUDE.md`, `AGENTS.md`, `docs/BUILD.md`, `docs/MANUAL_QA.md`. Add `docs/ARCHITECTURE.md`, `docs/PERFORMANCE.md`, `docs/MODEL_BENCHMARK.md`.
+- **P7.10 Version.** `2.0.0`.
 
-- **P6.1 No settings WebView at start.** Remove the `main` window from `tauri.conf.json` (or set `"create": false`) and build it only when the wizard is needed or the user opens it. Fixes E1. Keep destroy-on-close.
-- **P6.2 Start minimised.** With `--autostart`, never create the settings window.
-- **P6.3 Overlay lifetime.** Setting-free behaviour: the overlay WebView is created at start (so the first press is instant) and destroyed after 10 minutes without a dictation. The next press recreates it in the background. Recording does not wait for it, and the tray icon shows state at once. Measure whether this actually lowers total memory on Windows, where WebView2 processes are shared. If destroying it saves less than 30 MB, keep it alive and delete this task's code.
-- **P6.4 Idle CPU.** No timers, polling or animation frames while idle. The level-event stream and overlay animations stop when the overlay hides. Check with a profiler or `top`: idle CPU must read 0.0 %.
-- **P6.5 Native overlay (stretch, per platform).** A second `OverlayBackend` that draws the pill without a WebView: on Windows a layered window updated with `UpdateLayeredWindow` from a `tiny-skia` pixmap, on macOS an `NSPanel` with Core Animation layers. With it, the app holds no WebView at all while idle. Only start this after the owner confirms the WebView overlay works on that platform, and keep `WebviewOverlay` as the fallback.
-- **P6.6 Measurement.** `scripts/measure-memory.{ps1,sh}` starts the app, waits, and prints private memory for the main process and each WebView helper in three states: idle with models evicted, model loaded, settings window open. Record results in `docs/PERFORMANCE.md`. Replace the unmeasured claims in the README with these numbers.
-- **P6.7 Binary size.** Audit `cargo bloat --release --crates`. Likely wins: drop `tauri-plugin-notification` if the tray and overlay cover its one use, drop `futures-util` if the downloader no longer needs it, drop `anyhow` if unused, trim `chrono` and `tokio` features, make sure `reqwest` has no default features. Keep `opt-level = 3` for the app. Do not trade decode speed for size.
-- **P6.8 Frontend size.** Settings bundle: keep code-splitting. Drop Recharts from the docs if it is not used (it is not in `package.json`). The 50 KB logo PNG becomes an SVG or a smaller PNG.
+**Gate:** a tag build produces installers for every target.
 
----
+### Dependency changes
 
-## 11. Packaging, updates, CI, docs
+| Change | Task |
+|---|---|
+| `sherpa-onnx` 1.12 to 2.0 | `P0.2` |
+| add `ringbuf = "0.4"` | `P1.3` |
+| add `sha2` | `P4.2` |
+| add `tauri-plugin-single-instance`, `tauri-plugin-log`, `tauri-plugin-updater`, `tauri-plugin-dialog` | `P7.1`, `P7.2`, `P7.4`, `P5.8` |
+| add `tauri-nspanel = "2.1"` and `objc2-app-kit` (macOS), `ashpd` (Linux) | `P3.3`, `P2.7`, `P2.1` |
+| `windows` features: add `Win32_UI_Input_KeyboardAndMouse`, `Win32_System_ProcessStatus`, `Win32_Security`, `Win32_System_SystemInformation` | `P2.5`, `P1.13`, `P2.7`, `P4.4` |
+| `arboard`: add feature `wayland-data-control` | `P2.5` |
+| `enigo`: add feature `wayland` on Linux | `P2.5` |
+| remove `env_logger`, and `tauri-plugin-notification`, `futures-util`, `anyhow` if unused | `P6.7` |
 
-### P7 tasks
-
-- **P7.1 Single instance.** Add `tauri-plugin-single-instance` as the first plugin. A second launch with no arguments opens the settings window of the first. With `--toggle`, `--start`, `--stop`, `--cancel` it forwards the command to the controller (`P2.1`). Fixes M1.
-- **P7.2 Logging.** Replace `env_logger` with `tauri-plugin-log`: file in the app log directory, 2 files of 1 MB at most, level `info`, level `debug` with `LOCALYAPPER_DEBUG=1`. Never log transcript text or clipboard content. Fixes M7.
-- **P7.3 Autostart.** Stop enabling it at start (`lib.rs:198-215`). It follows the `auto_start` setting only, and passes `--autostart`.
-- **P7.4 Updates.** Add `tauri-plugin-updater` with signed artifacts from GitHub Releases. Default is off. "Check for updates" in General does a manual check. This is the only network call besides model downloads: state that in the UI next to the toggle. **OWNER:** generate the updater key pair and add `TAURI_SIGNING_PRIVATE_KEY` to the repository secrets. Until then leave the plugin wired but the endpoint empty and the UI hidden.
-- **P7.5 Bundles.**
-  - Windows: NSIS, `installMode: currentUser`, `compression: lzma`, WebView2 `downloadBootstrapper`. Add an ARM64 build if the sherpa-onnx static library for `win-arm64` links.
-  - macOS: DMG per architecture, `Info.plist` and entitlements from `P2.9`, hardened runtime, minimum system version 12.
-  - Linux: deb with `depends` on `libwebkit2gtk-4.1-0`, `libasound2`, `libxdo3`, and `recommends` on `wl-clipboard`, `wtype`. Add rpm. Keep AppImage and note that it is large because it carries WebKit.
-  - All: bundle `silero_vad.onnx` and `THIRD_PARTY_NOTICES.md` as resources.
-- **P7.6 CI checks.** Fail the release job if the Windows installer is over 25 MB. Upload size numbers as a job summary. Run `cargo test` on all three OSes. Run the model integration test on Linux with a cached model. Use the tag's release notes file instead of the hard-coded `RELEASE_NOTES_v1.0.0.md`.
-- **P7.7 Signing.** **OWNER:** Apple Developer ID for notarisation and a Windows code-signing certificate (or Azure Trusted Signing). Without them macOS users must clear quarantine by hand and lose the Accessibility grant on each update, and Windows shows SmartScreen. Wire the CI steps so they activate when the secrets exist. Document the unsigned-install steps in the README until then.
-- **P7.8 Notices.** `THIRD_PARTY_NOTICES.md`: Parakeet models (NVIDIA, CC-BY-4.0), Moonshine (MIT), Silero VAD (MIT), sherpa-onnx (Apache-2.0), ONNX Runtime (MIT), test fixtures. Generate the Rust and npm dependency licence list with `cargo about` and `license-checker` in CI. Fixes M15.
-- **P7.9 Docs.** Delete `docs/FINAL_AUDIT.md`, `docs/PRODUCT_AUDIT.md`, `docs/PROJECT_COMPLETION.md`, `docs/RELEASE_NOTES_v0.1.0.md`. Rewrite `README.md`, `CLAUDE.md`, `AGENTS.md`, `docs/BUILD.md`, `docs/MANUAL_QA.md` to describe the rebuilt app. Add `docs/ARCHITECTURE.md` (section 3 of this plan, updated to what was built), `docs/PERFORMANCE.md`, `docs/MODEL_BENCHMARK.md`. Fixes M16.
-- **P7.10 Version.** Release the rebuild as `2.0.0`, since settings keys, model ids and defaults change.
+Do not add `rubato`, `sysinfo` or `rdev`.
 
 ---
 
-## 12. Phase order and gates
+## 13. Phase order and stopping points
 
 | Phase | Content | Gate |
 |---|---|---|
-| P0 | Baseline, sherpa-onnx upgrade, bench harness, CI split | CI green on three OSes, bench table exists or is handed to the owner |
-| P1 | Audio thread, formats, resampler, segmenter, engine manager, incremental decode, controller and state machine | Headless pipeline test passes, stage timings logged |
-| P2 | Hotkey backends, injection rewrite, focus, permissions, dead IPC removed | Xvfb injection test passes, manual checklist written |
-| P3 | Overlay backend, non-activating window, vanilla page, tray states, cues | Manual QA per OS |
-| P4 | Catalog, verified downloader, automatic choice, models UI, migration | Downloader tests pass against a local server |
-| P5 | Typed settings, all pages, wizard, history, stats, dark theme | One apply-hook test per key |
-| P6 | Window lifetimes, eviction and trim, measurements, size work | `docs/PERFORMANCE.md` has measured numbers that meet A7 or explain the gap |
-| P7 | Single instance, logging, autostart, updater, bundles, CI, notices, docs, version | Tagged build produces installers for all targets |
-| P8 | Full acceptance run of section 1 on real hardware | Owner sign-off |
+| P0 | Baseline, upgrade, bench, manifest script, CI | CI green |
+| P1 | Audio, segmenter, engine, controller | Headless pipeline test |
+| P2 | Hotkeys, injection, permissions | Xvfb injection test |
+| P3 | Overlay, tray, cues | Manual QA |
+| P4 | Catalog, downloader, models UI | Downloader tests |
+| P5 | Settings, pages, wizard, history | Hook test per key |
+| P6 | Window lifetimes, eviction, measurement, size | Measured numbers |
+| P7 | Packaging, logging, updater, docs | Installers built |
+| P8 | Section 1 on real hardware | Owner sign-off |
 
-P1 and P2 together are what make the app work. If time is short, stop after P3: at that point the core loop meets A1 to A5 and the rest is settings and polish.
-
-Suggested dependency changes, all in `src-tauri/Cargo.toml`:
-
-| Change | Reason |
-|---|---|
-| `sherpa-onnx` 1.12 -> 2.0 | `P0.2` |
-| add `rubato` (or use the sherpa resampler) | `P1.4` |
-| add `ringbuf` | `P1.3` |
-| add `sha2` | `P4.2` |
-| add `tauri-plugin-single-instance`, `tauri-plugin-log`, `tauri-plugin-updater`, `tauri-plugin-dialog` | `P7.1`, `P7.2`, `P7.4`, `P5.8` |
-| add `tauri-nspanel` (macOS), `objc2` crates (macOS), `ashpd` (Linux), `gtk-layer-shell` (Linux, optional feature) | `P3.3`, `P2.8`, `P2.1` |
-| extend `windows` features: `Win32_UI_Input_KeyboardAndMouse`, `Win32_System_DataExchange`, `Win32_System_ProcessStatus`, `Win32_Security` | `P2.5`, `P2.8`, `P1.14` |
-| `arboard` features: `image-data`, `wayland-data-control` | `P2.5`, `P2.7` |
-| remove `env_logger`, and `tauri-plugin-notification`, `futures-util`, `anyhow` if they end up unused | `P6.7` |
+If you must stop early, stop after P3. At that point the core loop meets A1 to A5.
 
 ---
 
-## 13. Verification commands
-
-Run after every task:
+## 14. Verification commands
 
 ```bash
 npm run lint && npx tsc --noEmit
@@ -480,33 +482,1307 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-With a model available:
-
 ```bash
 LOCALYAPPER_TEST_MODEL_DIR=/path/to/model cargo test --manifest-path src-tauri/Cargo.toml -- --include-ignored pipeline
 ```
 
-Building the Rust side needs network access to `github.com` release assets, because `sherpa-onnx-sys` downloads its prebuilt libraries. If that host is blocked, download the archive elsewhere and set `SHERPA_ONNX_ARCHIVE_DIR` or `SHERPA_ONNX_LIB_DIR`. Model downloads need `huggingface.co`.
+Building the Rust crate needs network access to github.com release assets for the sherpa-onnx libraries. If that is blocked, set `SHERPA_ONNX_ARCHIVE_DIR` to a folder holding the archive.
 
 ---
 
-## 14. Things deliberately left out
+## 15. Left out on purpose
 
 | Item | Why |
 |---|---|
-| LLM clean-up, cloud STT, BYOK | Out of scope by product decision |
-| Learning corrections and a personal dictionary | Removed on purpose earlier. A static find-and-replace list would be easy to add in `core/text/` later if the owner asks |
-| GPU execution providers (DirectML, CoreML, CUDA) | CPU int8 already meets the latency budget, and GPU providers add installer size and driver-specific failures. Revisit only if the benchmark shows the budget is missed |
-| Streaming partial text into the target app while speaking | Needs a streaming model with worse accuracy, and rewriting text in a foreign app is fragile |
-| Bare modifier or Fn key as the hotkey | Needs low-level keyboard hooks on every OS. Worth doing later behind the `HotkeyBackend` trait |
-| Mobile targets | Not a desktop dictation use case |
+| LLM clean-up, cloud STT, BYOK | Product decision |
+| Learning corrections, personal dictionary | Removed on purpose earlier |
+| GPU providers | CPU int8 meets the budget. GPU adds installer size and driver failures |
+| Streaming partial text into the target app | Needs a streaming model with worse accuracy, and editing text in a foreign app is fragile |
+| Bare modifier or Fn as the hotkey | Needs low-level keyboard hooks on each OS. Can be added later as another `HotkeyBackend` |
+| Starting a new recording while the previous tail is decoding | The window is short. The state machine drops the press |
+
+## 16. Owner inputs
+
+1. Updater key pair (`P7.4`).
+2. Apple Developer ID and Windows signing certificate (`P7.7`).
+3. A real-hardware pass on Windows and macOS with `docs/MANUAL_QA.md`.
+4. Sign-off on the WebView overlay before the native overlay (`P6.5`) is considered.
+5. Running the manifest and bench CI jobs if the agent's environment cannot reach huggingface.co.
 
 ---
 
-## 15. Owner decisions and inputs needed
+## Appendix A: `core/session.rs` (compiled, 20 tests pass)
 
-1. Updater signing key pair (`P7.4`).
-2. Apple Developer ID and Windows code-signing certificate (`P7.7`).
-3. Confirmation of the default model after `docs/MODEL_BENCHMARK.md` is filled in (section 7).
-4. A real-hardware test pass on Windows and macOS using `docs/MANUAL_QA.md`, since platform code written in a Linux container is compile-checked only.
-5. Whether the native no-WebView overlay (`P6.5`) is worth the extra platform code once the measured numbers from `P6.6` are in.
+Copy verbatim. Do not add I/O to this file.
+
+```rust
+//! Dictation state machine. Pure: no I/O, no clocks, no tauri.
+//! The controller feeds `Event`s (with a monotonic millisecond timestamp
+//! where needed) and executes the returned `Effect`s in order.
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ActivationMode {
+    /// Record while the key is held.
+    Hold,
+    /// Press to start, press again to stop.
+    Toggle,
+    /// Hold to record; a quick double-tap latches hands-free.
+    Hybrid,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Config {
+    pub mode: ActivationMode,
+    pub tap_threshold_ms: u64,
+    pub double_tap_window_ms: u64,
+    pub max_recording_ms: u64,
+    pub warning_before_end_ms: u64,
+    pub cancel_key_enabled: bool,
+    pub cancel_key_in_hands_free: bool,
+    pub history_enabled: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            mode: ActivationMode::Hybrid,
+            tap_threshold_ms: 250,
+            double_tap_window_ms: 350,
+            max_recording_ms: 600_000,
+            warning_before_end_ms: 15_000,
+            cancel_key_enabled: true,
+            cancel_key_in_hands_free: false,
+            history_enabled: true,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecKind {
+    Hold,
+    TapPending,
+    HandsFree,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TimerKind {
+    TapWindow,
+    Warning,
+    MaxDuration,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum View {
+    Hidden,
+    Listening,
+    HandsFree,
+    StoppingSoon { remaining_ms: u64 },
+    Processing,
+    Done { text: String },
+    NoSpeech,
+    Error { message: String, text: Option<String> },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Tray {
+    Idle,
+    Recording,
+    Processing,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cue {
+    Start,
+    Stop,
+}
+
+/// Session ids make every late message from an older recording harmless.
+pub type SessionId = u64;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Event {
+    RecordDown { at_ms: u64 },
+    RecordUp { at_ms: u64 },
+    /// Cancel hotkey or the `cancel_recording` IPC command.
+    Cancel,
+    Timer { kind: TimerKind, id: SessionId },
+    /// The segmenter closed a speech segment and queued it for decoding.
+    SegmentQueued { id: SessionId, index: usize },
+    SegmentText { id: SessionId, index: usize, text: String },
+    /// Capture stopped and flushed; `segments` is the final segment count.
+    CaptureEnded { id: SessionId, segments: usize, audio_ms: u64 },
+    CaptureFailed { id: SessionId, message: String },
+    ModelFailed { message: String },
+    InjectDone { id: SessionId, result: Result<(), String> },
+    SetPaused(bool),
+    ConfigChanged(Config),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Effect {
+    StartCapture { id: SessionId },
+    /// Stop the stream, flush the segmenter, then send `CaptureEnded`.
+    StopCapture { id: SessionId },
+    /// Stop the stream and drop everything queued for this session.
+    DiscardCapture { id: SessionId },
+    EnsureModelLoaded,
+    ScheduleEvict,
+    Overlay(View),
+    Tray(Tray),
+    Cue(Cue),
+    RegisterCancelKey,
+    UnregisterCancelKey,
+    StartTimer { kind: TimerKind, id: SessionId, after_ms: u64 },
+    Inject { id: SessionId, text: String },
+    SaveHistory { text: String, audio_ms: u64 },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum State {
+    Idle,
+    Recording {
+        id: SessionId,
+        kind: RecKind,
+        pressed_at_ms: u64,
+        texts: Vec<Option<String>>,
+        cancel_registered: bool,
+    },
+    Finishing {
+        id: SessionId,
+        texts: Vec<Option<String>>,
+        total: Option<usize>,
+        audio_ms: u64,
+    },
+    Injecting {
+        id: SessionId,
+        text: String,
+    },
+}
+
+pub struct Session {
+    cfg: Config,
+    state: State,
+    next_id: SessionId,
+    paused: bool,
+}
+
+impl Session {
+    pub fn new(cfg: Config) -> Self {
+        Self { cfg, state: State::Idle, next_id: 1, paused: false }
+    }
+
+    pub fn is_idle(&self) -> bool {
+        self.state == State::Idle
+    }
+
+    pub fn is_recording(&self) -> bool {
+        matches!(self.state, State::Recording { .. })
+    }
+
+    pub fn handle(&mut self, event: Event) -> Vec<Effect> {
+        let mut fx = Vec::new();
+        match event {
+            Event::ConfigChanged(cfg) => self.cfg = cfg,
+            Event::SetPaused(p) => {
+                self.paused = p;
+                if p {
+                    self.abort(&mut fx, View::Hidden);
+                }
+            }
+            Event::RecordDown { at_ms } => self.on_down(at_ms, &mut fx),
+            Event::RecordUp { at_ms } => self.on_up(at_ms, &mut fx),
+            Event::Cancel => self.abort(&mut fx, View::Hidden),
+            Event::Timer { kind, id } => self.on_timer(kind, id, &mut fx),
+            Event::SegmentQueued { id, index } => {
+                if let Some(texts) = self.texts_for(id) {
+                    if texts.len() <= index {
+                        texts.resize(index + 1, None);
+                    }
+                }
+            }
+            Event::SegmentText { id, index, text } => {
+                if let Some(texts) = self.texts_for(id) {
+                    if texts.len() <= index {
+                        texts.resize(index + 1, None);
+                    }
+                    texts[index] = Some(text);
+                }
+                self.try_complete(&mut fx);
+            }
+            Event::CaptureEnded { id, segments, audio_ms } => {
+                if let State::Finishing { id: cur, texts, total, audio_ms: a } = &mut self.state {
+                    if *cur == id {
+                        texts.resize(segments, None);
+                        *total = Some(segments);
+                        *a = audio_ms;
+                    }
+                }
+                self.try_complete(&mut fx);
+            }
+            Event::CaptureFailed { id, message } => {
+                if self.current_id() == Some(id) && !matches!(self.state, State::Injecting { .. }) {
+                    self.abort(&mut fx, View::Error { message, text: None });
+                }
+            }
+            Event::ModelFailed { message } => {
+                if matches!(self.state, State::Recording { .. } | State::Finishing { .. }) {
+                    self.abort(&mut fx, View::Error { message, text: None });
+                }
+            }
+            Event::InjectDone { id, result } => {
+                if let State::Injecting { id: cur, text } = &self.state {
+                    if *cur == id {
+                        let text = text.clone();
+                        self.state = State::Idle;
+                        fx.push(Effect::Tray(Tray::Idle));
+                        fx.push(Effect::Overlay(match result {
+                            Ok(()) => View::Done { text },
+                            Err(message) => View::Error { message, text: Some(text) },
+                        }));
+                        fx.push(Effect::ScheduleEvict);
+                    }
+                }
+            }
+        }
+        fx
+    }
+
+    fn current_id(&self) -> Option<SessionId> {
+        match &self.state {
+            State::Idle => None,
+            State::Recording { id, .. }
+            | State::Finishing { id, .. }
+            | State::Injecting { id, .. } => Some(*id),
+        }
+    }
+
+    fn texts_for(&mut self, id: SessionId) -> Option<&mut Vec<Option<String>>> {
+        match &mut self.state {
+            State::Recording { id: cur, texts, .. } | State::Finishing { id: cur, texts, .. }
+                if *cur == id =>
+            {
+                Some(texts)
+            }
+            _ => None,
+        }
+    }
+
+    fn wants_cancel_key(&self, kind: RecKind) -> bool {
+        self.cfg.cancel_key_enabled
+            && (kind != RecKind::HandsFree || self.cfg.cancel_key_in_hands_free)
+    }
+
+    fn on_down(&mut self, at_ms: u64, fx: &mut Vec<Effect>) {
+        match &mut self.state {
+            State::Idle => {
+                if self.paused {
+                    fx.push(Effect::Overlay(View::Error {
+                        message: "Dictation is paused. Resume from the tray menu.".into(),
+                        text: None,
+                    }));
+                    return;
+                }
+                let id = self.next_id;
+                self.next_id += 1;
+                let kind = match self.cfg.mode {
+                    ActivationMode::Toggle => RecKind::HandsFree,
+                    ActivationMode::Hold | ActivationMode::Hybrid => RecKind::Hold,
+                };
+                let cancel = self.wants_cancel_key(kind);
+                self.state = State::Recording {
+                    id,
+                    kind,
+                    pressed_at_ms: at_ms,
+                    texts: Vec::new(),
+                    cancel_registered: cancel,
+                };
+                // Capture first: nothing may delay the microphone.
+                fx.push(Effect::StartCapture { id });
+                fx.push(Effect::EnsureModelLoaded);
+                fx.push(Effect::Tray(Tray::Recording));
+                fx.push(Effect::Overlay(View::Listening));
+                fx.push(Effect::Cue(Cue::Start));
+                if cancel {
+                    fx.push(Effect::RegisterCancelKey);
+                }
+                let max = self.cfg.max_recording_ms;
+                let warn = max.saturating_sub(self.cfg.warning_before_end_ms);
+                if warn > 0 && warn < max {
+                    fx.push(Effect::StartTimer { kind: TimerKind::Warning, id, after_ms: warn });
+                }
+                fx.push(Effect::StartTimer { kind: TimerKind::MaxDuration, id, after_ms: max });
+            }
+            State::Recording { kind, cancel_registered, .. } => match *kind {
+                // Key auto-repeat while held.
+                RecKind::Hold => {}
+                RecKind::TapPending => {
+                    *kind = RecKind::HandsFree;
+                    let keep = self.cfg.cancel_key_enabled && self.cfg.cancel_key_in_hands_free;
+                    if *cancel_registered && !keep {
+                        *cancel_registered = false;
+                        fx.push(Effect::UnregisterCancelKey);
+                    }
+                    fx.push(Effect::Overlay(View::HandsFree));
+                }
+                RecKind::HandsFree => self.finish(fx),
+            },
+            // A press while the tail is decoding or pasting is dropped.
+            State::Finishing { .. } | State::Injecting { .. } => {}
+        }
+    }
+
+    fn on_up(&mut self, at_ms: u64, fx: &mut Vec<Effect>) {
+        let State::Recording { id, kind, pressed_at_ms, .. } = &mut self.state else {
+            return;
+        };
+        if *kind != RecKind::Hold {
+            return;
+        }
+        let held = at_ms.saturating_sub(*pressed_at_ms);
+        if self.cfg.mode == ActivationMode::Hybrid && held <= self.cfg.tap_threshold_ms {
+            *kind = RecKind::TapPending;
+            fx.push(Effect::StartTimer {
+                kind: TimerKind::TapWindow,
+                id: *id,
+                after_ms: self.cfg.double_tap_window_ms,
+            });
+        } else {
+            self.finish(fx);
+        }
+    }
+
+    fn on_timer(&mut self, timer: TimerKind, timer_id: SessionId, fx: &mut Vec<Effect>) {
+        let State::Recording { id, kind, .. } = &self.state else {
+            return;
+        };
+        if *id != timer_id {
+            return;
+        }
+        match timer {
+            TimerKind::TapWindow => {
+                if *kind == RecKind::TapPending {
+                    self.abort(fx, View::Hidden);
+                }
+            }
+            TimerKind::Warning => fx.push(Effect::Overlay(View::StoppingSoon {
+                remaining_ms: self.cfg.warning_before_end_ms,
+            })),
+            TimerKind::MaxDuration => self.finish(fx),
+        }
+    }
+
+    fn finish(&mut self, fx: &mut Vec<Effect>) {
+        let State::Recording { id, texts, cancel_registered, .. } = &mut self.state else {
+            return;
+        };
+        let id = *id;
+        if *cancel_registered {
+            fx.push(Effect::UnregisterCancelKey);
+        }
+        let texts = std::mem::take(texts);
+        self.state = State::Finishing { id, texts, total: None, audio_ms: 0 };
+        fx.push(Effect::StopCapture { id });
+        fx.push(Effect::Cue(Cue::Stop));
+        fx.push(Effect::Tray(Tray::Processing));
+        fx.push(Effect::Overlay(View::Processing));
+    }
+
+    /// Leave any non-idle, non-injecting state without producing text.
+    fn abort(&mut self, fx: &mut Vec<Effect>, view: View) {
+        match &self.state {
+            State::Idle | State::Injecting { .. } => return,
+            State::Recording { id, cancel_registered, .. } => {
+                if *cancel_registered {
+                    fx.push(Effect::UnregisterCancelKey);
+                }
+                fx.push(Effect::DiscardCapture { id: *id });
+            }
+            State::Finishing { id, .. } => fx.push(Effect::DiscardCapture { id: *id }),
+        }
+        self.state = State::Idle;
+        fx.push(Effect::Tray(Tray::Idle));
+        fx.push(Effect::Overlay(view));
+        fx.push(Effect::ScheduleEvict);
+    }
+
+    fn try_complete(&mut self, fx: &mut Vec<Effect>) {
+        let State::Finishing { id, texts, total: Some(total), audio_ms } = &self.state else {
+            return;
+        };
+        if texts.len() < *total || texts.iter().take(*total).any(Option::is_none) {
+            return;
+        }
+        let id = *id;
+        let audio_ms = *audio_ms;
+        let text = join_segments(texts.iter().flatten().map(String::as_str));
+        if text.is_empty() {
+            self.state = State::Idle;
+            fx.push(Effect::Tray(Tray::Idle));
+            fx.push(Effect::Overlay(View::NoSpeech));
+            fx.push(Effect::ScheduleEvict);
+            return;
+        }
+        // History first, so a failed paste never loses the words.
+        if self.cfg.history_enabled {
+            fx.push(Effect::SaveHistory { text: text.clone(), audio_ms });
+        }
+        fx.push(Effect::Inject { id, text: text.clone() });
+        self.state = State::Injecting { id, text };
+    }
+}
+
+/// Join per-segment transcripts with single spaces, dropping empties.
+pub fn join_segments<'a>(parts: impl Iterator<Item = &'a str>) -> String {
+    let mut out = String::new();
+    for part in parts {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        if !out.is_empty() {
+            out.push(' ');
+        }
+        out.push_str(part);
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn s(mode: ActivationMode) -> Session {
+        Session::new(Config { mode, ..Config::default() })
+    }
+
+    fn has(fx: &[Effect], want: &Effect) -> bool {
+        fx.iter().any(|e| e == want)
+    }
+
+    /// Drive a recording that is already in Finishing to completion.
+    fn complete(sess: &mut Session, id: SessionId, texts: &[&str]) -> Vec<Effect> {
+        let mut all = Vec::new();
+        for (i, t) in texts.iter().enumerate() {
+            all.extend(sess.handle(Event::SegmentQueued { id, index: i }));
+            all.extend(sess.handle(Event::SegmentText { id, index: i, text: (*t).into() }));
+        }
+        all.extend(sess.handle(Event::CaptureEnded { id, segments: texts.len(), audio_ms: 1000 }));
+        all
+    }
+
+    #[test]
+    fn hold_mode_happy_path() {
+        let mut x = s(ActivationMode::Hold);
+        let fx = x.handle(Event::RecordDown { at_ms: 0 });
+        assert_eq!(fx[0], Effect::StartCapture { id: 1 });
+        assert_eq!(fx[1], Effect::EnsureModelLoaded);
+        assert!(has(&fx, &Effect::Overlay(View::Listening)));
+        assert!(has(&fx, &Effect::RegisterCancelKey));
+
+        // Even a very short hold finishes in Hold mode.
+        let fx = x.handle(Event::RecordUp { at_ms: 100 });
+        assert!(has(&fx, &Effect::StopCapture { id: 1 }));
+        assert!(has(&fx, &Effect::UnregisterCancelKey));
+
+        let fx = complete(&mut x, 1, &["Hello there.", " How are you?"]);
+        assert!(has(&fx, &Effect::Inject { id: 1, text: "Hello there. How are you?".into() }));
+        assert!(has(
+            &fx,
+            &Effect::SaveHistory { text: "Hello there. How are you?".into(), audio_ms: 1000 }
+        ));
+
+        let fx = x.handle(Event::InjectDone { id: 1, result: Ok(()) });
+        assert!(has(&fx, &Effect::Overlay(View::Done { text: "Hello there. How are you?".into() })));
+        // Idle immediately: no post-inject lockout.
+        assert!(x.is_idle());
+        let fx = x.handle(Event::RecordDown { at_ms: 5000 });
+        assert_eq!(fx[0], Effect::StartCapture { id: 2 });
+    }
+
+    #[test]
+    fn auto_repeat_down_is_ignored_while_holding() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        assert!(x.handle(Event::RecordDown { at_ms: 30 }).is_empty());
+        assert!(x.is_recording());
+    }
+
+    #[test]
+    fn up_before_down_is_ignored() {
+        let mut x = s(ActivationMode::Hybrid);
+        assert!(x.handle(Event::RecordUp { at_ms: 0 }).is_empty());
+        assert!(x.is_idle());
+    }
+
+    #[test]
+    fn hybrid_single_tap_cancels_after_window() {
+        let mut x = s(ActivationMode::Hybrid);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        let fx = x.handle(Event::RecordUp { at_ms: 120 });
+        assert_eq!(fx, vec![Effect::StartTimer { kind: TimerKind::TapWindow, id: 1, after_ms: 350 }]);
+        let fx = x.handle(Event::Timer { kind: TimerKind::TapWindow, id: 1 });
+        assert!(has(&fx, &Effect::DiscardCapture { id: 1 }));
+        assert!(has(&fx, &Effect::Overlay(View::Hidden)));
+        assert!(x.is_idle());
+    }
+
+    #[test]
+    fn hybrid_double_tap_latches_then_tap_stops() {
+        let mut x = s(ActivationMode::Hybrid);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        x.handle(Event::RecordUp { at_ms: 100 });
+        let fx = x.handle(Event::RecordDown { at_ms: 250 });
+        assert!(has(&fx, &Effect::Overlay(View::HandsFree)));
+        // Escape goes back to the focused app in hands-free by default.
+        assert!(has(&fx, &Effect::UnregisterCancelKey));
+        // The stale tap timer and the second release do nothing.
+        assert!(x.handle(Event::Timer { kind: TimerKind::TapWindow, id: 1 }).is_empty());
+        assert!(x.handle(Event::RecordUp { at_ms: 300 }).is_empty());
+        assert!(x.is_recording());
+        let fx = x.handle(Event::RecordDown { at_ms: 9000 });
+        assert!(has(&fx, &Effect::StopCapture { id: 1 }));
+        // The cancel key was already released: not unregistered twice.
+        assert!(!has(&fx, &Effect::UnregisterCancelKey));
+    }
+
+    #[test]
+    fn hybrid_long_hold_finishes_on_release() {
+        let mut x = s(ActivationMode::Hybrid);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        let fx = x.handle(Event::RecordUp { at_ms: 251 });
+        assert!(has(&fx, &Effect::StopCapture { id: 1 }));
+    }
+
+    #[test]
+    fn toggle_mode_press_press() {
+        let mut x = s(ActivationMode::Toggle);
+        let fx = x.handle(Event::RecordDown { at_ms: 0 });
+        assert!(!has(&fx, &Effect::RegisterCancelKey));
+        assert!(x.handle(Event::RecordUp { at_ms: 80 }).is_empty());
+        assert!(x.is_recording());
+        let fx = x.handle(Event::RecordDown { at_ms: 4000 });
+        assert!(has(&fx, &Effect::StopCapture { id: 1 }));
+    }
+
+    #[test]
+    fn cancel_while_recording_discards() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        let fx = x.handle(Event::Cancel);
+        assert!(has(&fx, &Effect::DiscardCapture { id: 1 }));
+        assert!(has(&fx, &Effect::UnregisterCancelKey));
+        assert!(x.is_idle());
+        // Late results from the cancelled session are ignored.
+        assert!(x.handle(Event::SegmentText { id: 1, index: 0, text: "x".into() }).is_empty());
+        assert!(x
+            .handle(Event::CaptureEnded { id: 1, segments: 1, audio_ms: 10 })
+            .is_empty());
+    }
+
+    #[test]
+    fn cancel_while_finishing_discards() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        x.handle(Event::RecordUp { at_ms: 900 });
+        let fx = x.handle(Event::Cancel);
+        assert!(has(&fx, &Effect::DiscardCapture { id: 1 }));
+        assert!(x.is_idle());
+    }
+
+    #[test]
+    fn text_arriving_before_and_after_release_in_any_order() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        x.handle(Event::SegmentQueued { id: 1, index: 0 });
+        x.handle(Event::SegmentText { id: 1, index: 0, text: "one".into() });
+        x.handle(Event::SegmentQueued { id: 1, index: 1 });
+        x.handle(Event::RecordUp { at_ms: 5000 });
+        // Capture ends before the last two texts arrive, out of order.
+        assert!(x
+            .handle(Event::CaptureEnded { id: 1, segments: 3, audio_ms: 5000 })
+            .is_empty());
+        assert!(x.handle(Event::SegmentText { id: 1, index: 2, text: "three".into() }).is_empty());
+        let fx = x.handle(Event::SegmentText { id: 1, index: 1, text: "two".into() });
+        assert!(has(&fx, &Effect::Inject { id: 1, text: "one two three".into() }));
+    }
+
+    #[test]
+    fn no_segments_means_no_speech() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        x.handle(Event::RecordUp { at_ms: 900 });
+        let fx = x.handle(Event::CaptureEnded { id: 1, segments: 0, audio_ms: 900 });
+        assert!(has(&fx, &Effect::Overlay(View::NoSpeech)));
+        assert!(x.is_idle());
+    }
+
+    #[test]
+    fn empty_transcripts_mean_no_speech() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        x.handle(Event::RecordUp { at_ms: 900 });
+        let fx = complete(&mut x, 1, &["  ", ""]);
+        assert!(has(&fx, &Effect::Overlay(View::NoSpeech)));
+        assert!(!fx.iter().any(|e| matches!(e, Effect::Inject { .. })));
+    }
+
+    #[test]
+    fn max_duration_finishes_and_warning_shows() {
+        let mut x = s(ActivationMode::Toggle);
+        let fx = x.handle(Event::RecordDown { at_ms: 0 });
+        assert!(has(&fx, &Effect::StartTimer { kind: TimerKind::Warning, id: 1, after_ms: 585_000 }));
+        assert!(has(
+            &fx,
+            &Effect::StartTimer { kind: TimerKind::MaxDuration, id: 1, after_ms: 600_000 }
+        ));
+        let fx = x.handle(Event::Timer { kind: TimerKind::Warning, id: 1 });
+        assert_eq!(fx, vec![Effect::Overlay(View::StoppingSoon { remaining_ms: 15_000 })]);
+        let fx = x.handle(Event::Timer { kind: TimerKind::MaxDuration, id: 1 });
+        assert!(has(&fx, &Effect::StopCapture { id: 1 }));
+    }
+
+    #[test]
+    fn stale_timers_from_an_old_session_are_ignored() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        x.handle(Event::Cancel);
+        x.handle(Event::RecordDown { at_ms: 1000 });
+        assert!(x.handle(Event::Timer { kind: TimerKind::MaxDuration, id: 1 }).is_empty());
+        assert!(x.is_recording());
+    }
+
+    #[test]
+    fn capture_and_model_failures_surface_and_reset() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        let fx = x.handle(Event::CaptureFailed { id: 1, message: "No microphone".into() });
+        assert!(has(
+            &fx,
+            &Effect::Overlay(View::Error { message: "No microphone".into(), text: None })
+        ));
+        assert!(x.is_idle());
+
+        x.handle(Event::RecordDown { at_ms: 10 });
+        x.handle(Event::RecordUp { at_ms: 900 });
+        let fx = x.handle(Event::ModelFailed { message: "Model missing".into() });
+        assert!(has(&fx, &Effect::DiscardCapture { id: 2 }));
+        assert!(x.is_idle());
+        // A model failure while idle is not shown.
+        assert!(x.handle(Event::ModelFailed { message: "x".into() }).is_empty());
+    }
+
+    #[test]
+    fn inject_failure_keeps_text_for_copy() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        x.handle(Event::RecordUp { at_ms: 900 });
+        complete(&mut x, 1, &["keep me"]);
+        let fx = x.handle(Event::InjectDone { id: 1, result: Err("blocked".into()) });
+        assert!(has(
+            &fx,
+            &Effect::Overlay(View::Error { message: "blocked".into(), text: Some("keep me".into()) })
+        ));
+        assert!(x.is_idle());
+    }
+
+    #[test]
+    fn presses_during_finishing_and_injecting_are_dropped() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        x.handle(Event::RecordUp { at_ms: 900 });
+        assert!(x.handle(Event::RecordDown { at_ms: 950 }).is_empty());
+        complete(&mut x, 1, &["a"]);
+        assert!(x.handle(Event::RecordDown { at_ms: 960 }).is_empty());
+        // Cancel cannot interrupt a paste that is already in flight.
+        assert!(x.handle(Event::Cancel).is_empty());
+    }
+
+    #[test]
+    fn paused_blocks_start_and_pausing_aborts() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        let fx = x.handle(Event::SetPaused(true));
+        assert!(has(&fx, &Effect::DiscardCapture { id: 1 }));
+        let fx = x.handle(Event::RecordDown { at_ms: 10 });
+        assert!(matches!(fx.as_slice(), [Effect::Overlay(View::Error { .. })]));
+        x.handle(Event::SetPaused(false));
+        assert_eq!(x.handle(Event::RecordDown { at_ms: 20 })[0], Effect::StartCapture { id: 2 });
+    }
+
+    #[test]
+    fn history_can_be_disabled() {
+        let mut x = Session::new(Config {
+            mode: ActivationMode::Hold,
+            history_enabled: false,
+            ..Config::default()
+        });
+        x.handle(Event::RecordDown { at_ms: 0 });
+        x.handle(Event::RecordUp { at_ms: 900 });
+        let fx = complete(&mut x, 1, &["secret"]);
+        assert!(!fx.iter().any(|e| matches!(e, Effect::SaveHistory { .. })));
+        assert!(has(&fx, &Effect::Inject { id: 1, text: "secret".into() }));
+    }
+
+    #[test]
+    fn join_trims_and_skips_empty() {
+        assert_eq!(join_segments(["  a ", "", "b", "   "].into_iter()), "a b");
+        assert_eq!(join_segments(std::iter::empty()), "");
+    }
+}
+```
+
+## Appendix B: `core/audio/rolling.rs` (compiled, 2 tests pass)
+
+```rust
+//! Rolling 16 kHz buffer addressed by absolute sample index.
+//!
+//! The VAD reports each speech segment as (absolute start, length). This
+//! buffer keeps recent audio so a segment can be cut with pre- and
+//! post-roll padding, and forgets audio that can no longer be needed, so
+//! memory stays flat however long the recording runs.
+
+use std::collections::VecDeque;
+
+pub struct RollingBuffer {
+    buf: VecDeque<f32>,
+    /// Absolute index of `buf[0]`.
+    base: u64,
+}
+
+impl RollingBuffer {
+    pub fn new() -> Self {
+        Self { buf: VecDeque::new(), base: 0 }
+    }
+
+    /// Absolute index one past the newest sample.
+    pub fn end(&self) -> u64 {
+        self.base + self.buf.len() as u64
+    }
+
+    pub fn len(&self) -> usize {
+        self.buf.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.buf.is_empty()
+    }
+
+    pub fn push(&mut self, samples: &[f32]) {
+        self.buf.extend(samples.iter().copied());
+    }
+
+    /// Copy `[start - pre, start + len + post)`, clamped to what is held.
+    /// `floor` is the lowest index allowed, used to stop the pre-roll from
+    /// reaching back into the previous segment.
+    pub fn slice_padded(&self, start: u64, len: u64, pre: u64, post: u64, floor: u64) -> Vec<f32> {
+        let lo = start.saturating_sub(pre).max(floor).max(self.base);
+        let hi = (start + len + post).min(self.end());
+        if hi <= lo {
+            return Vec::new();
+        }
+        let a = (lo - self.base) as usize;
+        let b = (hi - self.base) as usize;
+        self.buf.range(a..b).copied().collect()
+    }
+
+    /// Forget everything before absolute index `keep_from`.
+    pub fn drop_before(&mut self, keep_from: u64) {
+        let n = keep_from.saturating_sub(self.base).min(self.buf.len() as u64) as usize;
+        self.buf.drain(..n);
+        self.base += n as u64;
+    }
+}
+
+impl Default for RollingBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ramp(from: u32, to: u32) -> Vec<f32> {
+        (from..to).map(|v| v as f32).collect()
+    }
+
+    #[test]
+    fn slices_with_padding_and_clamps() {
+        let mut r = RollingBuffer::new();
+        r.push(&ramp(0, 100));
+        assert_eq!(r.slice_padded(10, 5, 3, 2, 0), ramp(7, 17));
+        // Pre-roll clamps at the start, post-roll at the end.
+        assert_eq!(r.slice_padded(1, 2, 10, 0, 0), ramp(0, 3));
+        assert_eq!(r.slice_padded(95, 5, 0, 50, 0), ramp(95, 100));
+        // Floor stops pre-roll overlapping the previous segment.
+        assert_eq!(r.slice_padded(10, 5, 8, 0, 6), ramp(6, 15));
+    }
+
+    #[test]
+    fn drop_before_keeps_absolute_indexing() {
+        let mut r = RollingBuffer::new();
+        r.push(&ramp(0, 100));
+        r.drop_before(40);
+        assert_eq!(r.len(), 60);
+        assert_eq!(r.end(), 100);
+        r.push(&ramp(100, 120));
+        assert_eq!(r.slice_padded(50, 3, 0, 0, 0), ramp(50, 53));
+        // Asking for forgotten audio returns what is left.
+        assert_eq!(r.slice_padded(30, 15, 0, 0, 0), ramp(40, 45));
+        assert!(r.slice_padded(0, 10, 0, 0, 0).is_empty());
+        // Dropping past the end or backwards is safe.
+        r.drop_before(10);
+        assert_eq!(r.len(), 80);
+        r.drop_before(10_000);
+        assert!(r.is_empty());
+        assert_eq!(r.end(), 120);
+    }
+}
+```
+
+## Appendix C: `platform/hotkey/repeat_filter.rs` (compiled, 4 tests pass)
+
+```rust
+//! Filter for X11 key auto-repeat.
+//!
+//! On X11 a held key arrives as Release/Press pairs a few milliseconds
+//! apart. The `global-hotkey` crate forwards both, so hold-to-talk would
+//! stop after the keyboard repeat delay. This filter holds each Release
+//! back for a short window and drops it, together with the Press that
+//! follows, when they form a repeat pair.
+//!
+//! Call `on_press` / `on_release` from the hotkey callback, and
+//! `poll(now_ms)` from a timer (10 ms) or on the next event. All three
+//! return the events to forward.
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Key {
+    Down { at_ms: u64 },
+    Up { at_ms: u64 },
+}
+
+pub struct RepeatFilter {
+    window_ms: u64,
+    pending_up: Option<u64>,
+    down: bool,
+}
+
+impl RepeatFilter {
+    /// 30 ms is far above the gap inside a repeat pair and far below a
+    /// deliberate double-tap.
+    pub fn new(window_ms: u64) -> Self {
+        Self { window_ms, pending_up: None, down: false }
+    }
+
+    pub fn on_press(&mut self, now_ms: u64) -> Vec<Key> {
+        let mut out = self.poll(now_ms);
+        if self.pending_up.take().is_some() {
+            // Release then Press inside the window: auto-repeat. Drop both.
+            return out;
+        }
+        if !self.down {
+            self.down = true;
+            out.push(Key::Down { at_ms: now_ms });
+        }
+        out
+    }
+
+    pub fn on_release(&mut self, now_ms: u64) -> Vec<Key> {
+        let out = self.poll(now_ms);
+        if self.down {
+            self.pending_up = Some(now_ms);
+        }
+        out
+    }
+
+    pub fn poll(&mut self, now_ms: u64) -> Vec<Key> {
+        match self.pending_up {
+            Some(at) if now_ms.saturating_sub(at) >= self.window_ms => {
+                self.pending_up = None;
+                self.down = false;
+                vec![Key::Up { at_ms: at }]
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    /// Milliseconds until `poll` should run again, if a release is held.
+    pub fn next_deadline(&self) -> Option<u64> {
+        self.pending_up.map(|at| at + self.window_ms)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn real_press_and_release_pass_through() {
+        let mut f = RepeatFilter::new(30);
+        assert_eq!(f.on_press(0), vec![Key::Down { at_ms: 0 }]);
+        assert!(f.on_release(500).is_empty());
+        assert!(f.poll(520).is_empty());
+        // The Up keeps its true time, so tap-length maths stays right.
+        assert_eq!(f.poll(530), vec![Key::Up { at_ms: 500 }]);
+    }
+
+    #[test]
+    fn auto_repeat_pairs_are_swallowed() {
+        let mut f = RepeatFilter::new(30);
+        assert_eq!(f.on_press(0), vec![Key::Down { at_ms: 0 }]);
+        for t in [500u64, 533, 566, 600] {
+            assert!(f.on_release(t).is_empty());
+            assert!(f.on_press(t + 1).is_empty());
+        }
+        assert!(f.on_release(700).is_empty());
+        assert_eq!(f.poll(731), vec![Key::Up { at_ms: 700 }]);
+    }
+
+    #[test]
+    fn double_tap_survives() {
+        let mut f = RepeatFilter::new(30);
+        assert_eq!(f.on_press(0), vec![Key::Down { at_ms: 0 }]);
+        assert!(f.on_release(100).is_empty());
+        // The second press arrives 150 ms later: flush the Up, then Down.
+        assert_eq!(
+            f.on_press(250),
+            vec![Key::Up { at_ms: 100 }, Key::Down { at_ms: 250 }]
+        );
+    }
+
+    #[test]
+    fn stray_release_is_ignored() {
+        let mut f = RepeatFilter::new(30);
+        assert!(f.on_release(0).is_empty());
+        assert!(f.poll(100).is_empty());
+        assert_eq!(f.next_deadline(), None);
+    }
+}
+```
+
+## Appendix D: segmenter and engine (sketches, not compiled)
+
+API names are from section 3. Adjust syntax as the compiler requires. Keep the logic.
+
+### D.1 Segmenter loop
+
+```rust
+// One per recording, on its own thread. `rx` is the ring-buffer consumer.
+pub fn run_segmenter(
+    id: SessionId,
+    native_rate: u32,
+    mut rx: impl ringbuf::traits::Consumer<Item = f32>,
+    stop: Arc<AtomicBool>,          // set by StopCapture
+    discard: Arc<AtomicBool>,       // set by DiscardCapture
+    vad_model: &Path,
+    stt: SttQueue,                  // sends (id, index, Vec<f32>) to the STT worker
+    events: Sender<Event>,
+    levels: impl Fn(f32),
+) -> Result<(), String> {
+    const RATE: u64 = 16_000;
+    const PRE: u64 = RATE / 5;          // 200 ms
+    const POST: u64 = RATE * 15 / 100;  // 150 ms
+    const WINDOW: usize = 512;
+
+    let resampler = if native_rate == 16_000 {
+        None
+    } else {
+        Some(LinearResampler::create(native_rate as i32, 16_000).ok_or("resampler")?)
+    };
+    let vad = VoiceActivityDetector::create(&vad_config(vad_model), 30.0).ok_or("vad")?;
+
+    let mut rolling = RollingBuffer::new();
+    let mut pending: Vec<f32> = Vec::new();   // 16 kHz samples not yet given to the VAD
+    let mut native = vec![0.0f32; 4096];
+    let mut fed: u64 = 0;                     // samples given to the VAD so far
+    let mut prev_end: u64 = 0;                // end of the previous segment
+    let mut index = 0usize;
+    let mut total_16k: u64 = 0;
+
+    loop {
+        if discard.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        let stopping = stop.load(Ordering::Relaxed);
+        let n = rx.pop_slice(&mut native);
+        if n == 0 && !stopping {
+            std::thread::sleep(Duration::from_millis(5));
+            continue;
+        }
+
+        let chunk: Vec<f32> = match &resampler {
+            Some(r) => r.resample(&native[..n], stopping && n == 0),
+            None => native[..n].to_vec(),
+        };
+        levels(rms(&chunk));
+        total_16k += chunk.len() as u64;
+        rolling.push(&chunk);
+        pending.extend_from_slice(&chunk);
+
+        while pending.len() >= WINDOW {
+            vad.accept_waveform(&pending[..WINDOW]);
+            pending.drain(..WINDOW);
+            fed += WINDOW as u64;
+            emit_ready(&vad, &rolling, &mut prev_end, &mut index, id, &stt, &events, PRE, POST);
+        }
+        // Keep only what a future segment's pre-roll could need.
+        rolling.drop_before(prev_end.max(fed.saturating_sub(RATE * 20)));
+
+        if stopping && n == 0 {
+            if !pending.is_empty() {
+                pending.resize(WINDOW, 0.0);
+                vad.accept_waveform(&pending);
+            }
+            vad.flush();
+            emit_ready(&vad, &rolling, &mut prev_end, &mut index, id, &stt, &events, PRE, POST);
+            // P1.7: safety net when the VAD found nothing in audible audio.
+            if index == 0 && total_16k > RATE * 4 / 10 && rolling_rms(&rolling) > 0.01 {
+                let all = rolling.slice_padded(rolling.end() - rolling.len() as u64,
+                                               rolling.len() as u64, 0, 0, 0);
+                stt.push(id, 0, all);
+                let _ = events.send(Event::SegmentQueued { id, index: 0 });
+                index = 1;
+            }
+            let _ = events.send(Event::CaptureEnded {
+                id, segments: index, audio_ms: total_16k * 1000 / RATE,
+            });
+            return Ok(());
+        }
+    }
+}
+
+fn emit_ready(vad: &VoiceActivityDetector, rolling: &RollingBuffer, prev_end: &mut u64,
+              index: &mut usize, id: SessionId, stt: &SttQueue, events: &Sender<Event>,
+              pre: u64, post: u64) {
+    while !vad.is_empty() {
+        if let Some(seg) = vad.front() {
+            let start = seg.start().max(0) as u64;
+            let len = seg.samples().len() as u64;
+            let audio = rolling.slice_padded(start, len, pre, post, *prev_end);
+            // If the rolling buffer no longer holds it, fall back to the VAD's copy.
+            let audio = if audio.is_empty() { seg.samples().to_vec() } else { audio };
+            *prev_end = start + len;
+            stt.push(id, *index, audio);
+            let _ = events.send(Event::SegmentQueued { id, index: *index });
+            *index += 1;
+        }
+        vad.pop();
+    }
+}
+```
+
+Note the ring buffer carries native-rate samples, so `SegmentQueued` is always sent before the STT worker can answer with `SegmentText` for the same index. Send `SegmentQueued` before `stt.push` if your queue can run the decode synchronously.
+
+`vad_config`: `silero_vad { model, threshold: 0.4, min_silence_duration: 0.35, min_speech_duration: 0.15, max_speech_duration: 15.0, window_size: 512 }`, `sample_rate: 16000`, `num_threads: 1`, `provider: "cpu"`.
+
+### D.2 Engine config per family
+
+```rust
+pub enum Family { NemoCtc, NemoTransducer, Moonshine }
+
+pub fn recognizer_config(family: Family, dir: &Path, threads: i32) -> OfflineRecognizerConfig {
+    let p = |name: &str| Some(dir.join(name).to_string_lossy().into_owned());
+    let mut cfg = OfflineRecognizerConfig::default();
+    cfg.model_config.num_threads = threads;
+    cfg.model_config.provider = Some("cpu".into());
+    cfg.model_config.tokens = p("tokens.txt");
+    cfg.decoding_method = Some("greedy_search".into());
+    match family {
+        Family::NemoCtc => {
+            // File name comes from the manifest: model.int8.onnx or model.onnx.
+            cfg.model_config.nemo_ctc.model = p("model.int8.onnx");
+        }
+        Family::NemoTransducer => {
+            cfg.model_config.transducer.encoder = p("encoder.int8.onnx");
+            cfg.model_config.transducer.decoder = p("decoder.int8.onnx");
+            cfg.model_config.transducer.joiner = p("joiner.int8.onnx");
+            cfg.model_config.model_type = Some("nemo_transducer".into());
+        }
+        Family::Moonshine => {
+            // Take the exact file names from the manifest. v1 uses preprocessor,
+            // encoder, uncached_decoder, cached_decoder. v2 uses encoder and merged_decoder.
+            cfg.model_config.moonshine.preprocessor = p("preprocess.onnx");
+            cfg.model_config.moonshine.encoder = p("encode.int8.onnx");
+            cfg.model_config.moonshine.uncached_decoder = p("uncached_decode.int8.onnx");
+            cfg.model_config.moonshine.cached_decoder = p("cached_decode.int8.onnx");
+        }
+    }
+    cfg
+}
+
+pub fn transcribe(rec: &OfflineRecognizer, samples: &[f32]) -> Result<String, String> {
+    if samples.len() < 1_600 {            // under 0.1 s
+        return Ok(String::new());
+    }
+    let stream = rec.create_stream();
+    stream.accept_waveform(16_000, samples);
+    rec.decode(&stream);
+    Ok(stream.get_result().ok_or("no result")?.text.trim().to_string())
+}
+```
+
+Store file names in the manifest and read them from there. Do not hard-code them as above in the final code.
+
+## Appendix E: injection sequences (sketch, not compiled)
+
+Common sequence, run on a blocking thread:
+
+1. Wait until Ctrl, Alt, Shift and the OS key are all up, polling every 10 ms for at most 400 ms. Windows: `GetAsyncKeyState` for `VK_CONTROL`, `VK_MENU`, `VK_SHIFT`, `VK_LWIN`, `VK_RWIN`. macOS: `CGEventSourceFlagsState(kCGEventSourceStateHIDSystemState)`. X11: skip the wait if no cheap query is available and sleep 60 ms instead.
+2. If `restore_clipboard`: save `get_text()`, and if that fails `get().image()`. Keep whichever succeeds.
+3. Set the text, excluded from history:
+
+```rust
+#[cfg(windows)] use arboard::SetExtWindows;
+#[cfg(target_os = "macos")] use arboard::SetExtApple;
+#[cfg(target_os = "linux")] use arboard::SetExtLinux;
+
+clipboard.set().exclude_from_history().text(text)?;
+```
+
+4. Sleep 20 ms, then send paste:
+
+```rust
+use enigo::{Direction::{Click, Press, Release}, Enigo, Key, Keyboard, Settings};
+let mut enigo = Enigo::new(&Settings::default())?;
+
+#[cfg(windows)] {
+    enigo.key(Key::Control, Press)?;
+    enigo.key(Key::Other(0x56), Click)?;      // VK_V, layout independent
+    enigo.key(Key::Control, Release)?;
+}
+#[cfg(target_os = "macos")] {
+    enigo.key(Key::Meta, Press)?;
+    enigo.raw(9, Click)?;                     // kVK_ANSI_V
+    enigo.key(Key::Meta, Release)?;
+}
+#[cfg(target_os = "linux")] {
+    // Never call enigo.raw() here: it panics with the xdo back end.
+    enigo.key(Key::Control, Press)?;
+    enigo.key(Key::Unicode('v'), Click)?;
+    enigo.key(Key::Control, Release)?;
+}
+```
+
+   Always release the modifier in a guard so an error between press and release cannot leave Ctrl stuck down. For `ctrl_shift_v` add Shift around the V. For `shift_insert` send Shift plus `Key::Insert`. For `type` call `enigo.text(text)` and skip the clipboard. For `clipboard_only` stop after step 3 and skip step 6.
+
+5. Return `Ok` to the controller now.
+6. On a detached thread: sleep `clipboard_restore_delay_ms`, then put the saved content back, but only if the clipboard still holds the dictated text (the user may have copied something else meanwhile).
+
+Wayland: clipboard through arboard with `wayland-data-control`. Keys: try enigo's `wayland` feature, then spawn `wtype -M ctrl v -m ctrl`, then `ydotool key 29:1 47:1 47:0 29:0`. If all fail, fall back to `clipboard_only` and tell the user in the overlay.
+
+## Appendix F: overlay window (sketch, not compiled)
+
+```rust
+let overlay = tauri::WebviewWindowBuilder::new(app, "overlay", WebviewUrl::App("overlay.html".into()))
+    .decorations(false)
+    .transparent(true)
+    .shadow(false)
+    .resizable(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .visible_on_all_workspaces(true)
+    .focusable(false)
+    .focused(false)
+    .visible(false)
+    .inner_size(340.0, 96.0)
+    .build()?;
+overlay.set_ignore_cursor_events(true)?;
+```
+
+Remove the `overlay` entry from `tauri.conf.json` and build it in code as above.
+
+Show without activating. Never call `overlay.show()` on Windows:
+
+```rust
+#[cfg(windows)]
+fn show_no_activate(w: &tauri::WebviewWindow) -> tauri::Result<()> {
+    use windows::Win32::UI::WindowsAndMessaging::*;
+    let hwnd = w.hwnd()?;
+    unsafe {
+        let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+        let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    }
+    Ok(())
+}
+```
+
+Position before showing: take the monitor under the cursor (`app.cursor_position()` then `monitor_from_point`, or the primary monitor if that fails), compute the pill rectangle in logical pixels from its work area and scale factor, and call `set_position` with a `LogicalPosition`.
+
+macOS: register `tauri_nspanel::init()` and build the overlay as a panel with `can_become_key_window: false` and `is_floating_panel: true`. Read the crate README for the builder calls that set the non-activating style mask, the level, and the collection behaviour (all spaces, full-screen auxiliary). Show it with the panel's own show method, not with `makeKeyAndOrderFront`.
+
+Page protocol: the page listens for `overlay-view` (the serialised `View`) and `overlay-level` (`f32`). It sends nothing back except `overlay-copy` and `overlay-dismiss` clicks, through `invoke`.
+
+## Appendix G: model manifest script (sketch, not run)
+
+```python
+#!/usr/bin/env python3
+"""Write src-tauri/models.json with pinned URLs, sizes and SHA-256 values."""
+import json, sys, urllib.request
+
+CANDIDATES = {
+    "parakeet-110m": {
+        "family": "nemo_ctc",
+        # Try the int8 repository first, then the fp32 one the app uses today.
+        "repos": ["csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8",
+                  "csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000"],
+        "want": ["model.int8.onnx", "model.onnx", "tokens.txt"],
+    },
+    "parakeet-0.6b-v3": {
+        "family": "nemo_transducer",
+        "repos": ["csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"],
+        "want": ["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"],
+    },
+    "moonshine-tiny-en": {
+        "family": "moonshine",
+        "repos": ["csukuangfj/sherpa-onnx-moonshine-tiny-en-int8"],
+        "want": None,   # take every .onnx and tokens.txt
+    },
+}
+
+def get(url):
+    with urllib.request.urlopen(url, timeout=30) as r:
+        return json.load(r)
+
+out = {}
+for model_id, spec in CANDIDATES.items():
+    for repo in spec["repos"]:
+        try:
+            sha = get(f"https://huggingface.co/api/models/{repo}")["sha"]
+            tree = get(f"https://huggingface.co/api/models/{repo}/tree/{sha}")
+        except Exception as e:
+            print(f"skip {repo}: {e}", file=sys.stderr)
+            continue
+        files = []
+        for f in tree:
+            name = f["path"]
+            wanted = (name in spec["want"]) if spec["want"] else (
+                name.endswith(".onnx") or name == "tokens.txt")
+            if f.get("type") != "file" or not wanted:
+                continue
+            lfs = f.get("lfs")
+            files.append({
+                "name": name,
+                "url": f"https://huggingface.co/{repo}/resolve/{sha}/{name}",
+                "size": (lfs or f)["size"],
+                # LFS files report their SHA-256 as `oid`. Small files do not:
+                # download those and hash them here.
+                "sha256": lfs["oid"] if lfs else None,
+            })
+        if files:
+            out[model_id] = {"family": spec["family"], "repo": repo, "revision": sha, "files": files}
+            break
+
+for m in out.values():
+    for f in m["files"]:
+        if f["sha256"] is None:
+            import hashlib
+            with urllib.request.urlopen(f["url"], timeout=60) as r:
+                f["sha256"] = hashlib.sha256(r.read()).hexdigest()
+
+json.dump(out, open("src-tauri/models.json", "w"), indent=2)
+print(json.dumps({k: sum(f["size"] for f in v["files"]) for k, v in out.items()}, indent=2))
+```
+
+If a repository has both `model.int8.onnx` and `model.onnx`, keep only the int8 file in the manifest once the bench confirms it (section 9.1).
