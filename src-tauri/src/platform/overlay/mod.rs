@@ -118,6 +118,12 @@ pub trait OverlayBackend: Send + Sync {
     fn rect(&self) -> Option<OverlayRect> {
         None
     }
+    /// Destroy the window to free its WebView after a long idle period
+    /// (plan P6.3).
+    fn release(&self) {}
+    /// Recreate the window in the background if it was released. Never
+    /// blocks: a recording starts without waiting for it.
+    fn ensure(&self) {}
 }
 
 /// An overlay that draws nothing (overlay disabled, headless tests).

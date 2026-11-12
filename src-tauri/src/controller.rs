@@ -24,6 +24,9 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Everything the controller can be told.
+/// How long the overlay window stays alive after the last dictation.
+const OVERLAY_IDLE: Duration = Duration::from_secs(600);
+
 #[derive(Debug)]
 pub enum Msg {
     Session(Event),
@@ -36,6 +39,12 @@ pub enum Msg {
     EvictTimer {
         generation: u64,
     },
+    /// Ten minutes after the last dictation: release the overlay window.
+    OverlayTimer {
+        generation: u64,
+    },
+    /// Release the overlay window now (the timer, and the test channel).
+    ReleaseOverlay,
     PasteLast,
     /// The cancel hotkey fired. Forwarded only while it is registered,
     /// so back ends that cannot unbind it still follow the policy.
@@ -280,6 +289,7 @@ pub struct Controller {
     /// settings while registered, so unregister always matches.
     cancel_registered: Option<String>,
     evict_generation: u64,
+    overlay_generation: u64,
     rss_before_evict: Option<u64>,
     paused: Arc<AtomicBool>,
     last_injection: Arc<Mutex<Option<String>>>,
@@ -355,6 +365,7 @@ pub fn start(parts: ControllerParts) -> Result<Started, String> {
         target_app: ForegroundApp::default(),
         cancel_registered: None,
         evict_generation: 0,
+        overlay_generation: 0,
         rss_before_evict: None,
         paused: paused.clone(),
         last_injection: last_injection.clone(),
@@ -418,6 +429,16 @@ impl Controller {
                 if generation == self.evict_generation && self.session.is_idle() {
                     self.rss_before_evict = memory::resident_bytes();
                     self.worker.evict();
+                }
+            }
+            Msg::OverlayTimer { generation } => {
+                if generation == self.overlay_generation && self.session.is_idle() {
+                    self.overlay.release();
+                }
+            }
+            Msg::ReleaseOverlay => {
+                if self.session.is_idle() {
+                    self.overlay.release();
                 }
             }
             Msg::PasteLast => self.paste_last(),
@@ -521,6 +542,8 @@ impl Controller {
     fn feed(&mut self, ev: Event) {
         match &ev {
             Event::RecordDown { at_ms } if self.session.is_idle() => {
+                self.overlay_generation += 1;
+                self.overlay.ensure();
                 self.last_down_ms = *at_ms;
                 self.timing = Timing {
                     pressed: Some(Instant::now()),
@@ -754,6 +777,17 @@ impl Controller {
     }
 
     fn schedule_evict(&mut self) {
+        // The overlay window is released after a longer idle period
+        // (plan P6.3); one timer per finished dictation, none while idle.
+        self.overlay_generation += 1;
+        let overlay_generation = self.overlay_generation;
+        let overlay_handle = self.handle.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(OVERLAY_IDLE).await;
+            overlay_handle.send(Msg::OverlayTimer {
+                generation: overlay_generation,
+            });
+        });
         self.evict_generation += 1;
         let secs = self.settings.idle_unload_seconds;
         if secs == 0 {

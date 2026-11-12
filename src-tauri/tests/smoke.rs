@@ -875,6 +875,40 @@ fn settings_window_not_created_at_start() {
     }
 }
 
+/// P6.3: after the overlay is released the app keeps running with no
+/// window at all, and the next press recreates the overlay and shows it.
+#[test]
+fn overlay_released_and_recreated() {
+    let (wav, _) = fixture("clip01_16k");
+    let mut app = App::launch(&wav);
+    app.cmd("destroy_overlay");
+    let start = Instant::now();
+    while window_labels(&mut app).iter().any(|l| l == "overlay") {
+        assert!(start.elapsed() < WAIT, "overlay was not released");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    std::thread::sleep(Duration::from_millis(500));
+    assert!(
+        app.state()["ok"].as_bool().unwrap_or(false),
+        "app stopped without a window"
+    );
+    app.cmd("down");
+    let start = Instant::now();
+    loop {
+        let has = window_labels(&mut app).iter().any(|l| l == "overlay");
+        let shown = !app.state()["state"]["overlay_rect"].is_null();
+        if has && shown {
+            break;
+        }
+        assert!(
+            start.elapsed() < WAIT,
+            "overlay not recreated and shown (window {has}, shown {shown})"
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    app.cmd("cancel");
+}
+
 #[test]
 fn second_instance_exits() {
     let (wav, _) = fixture("clip01_16k");

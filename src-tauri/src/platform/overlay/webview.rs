@@ -343,6 +343,38 @@ impl OverlayBackend for WebviewOverlay {
         self.hide_window();
     }
 
+    fn release(&self) {
+        self.generation.fetch_add(1, Ordering::AcqRel);
+        self.visible.store(false, Ordering::Release);
+        let app = self.app.clone();
+        let _ = self.app.run_on_main_thread(move || {
+            if let Some(w) = app.get_webview_window(LABEL) {
+                if let Err(e) = w.destroy() {
+                    log::warn!("overlay: could not release the window: {e}");
+                } else {
+                    log::info!("overlay: window released after idle");
+                }
+            }
+        });
+    }
+
+    fn ensure(&self) {
+        if self.app.get_webview_window(LABEL).is_some() {
+            return;
+        }
+        // Queued on the main thread ahead of any show, which then finds
+        // the window; the page asks for the current view once loaded.
+        let app = self.app.clone();
+        let _ = self.app.run_on_main_thread(move || {
+            if app.get_webview_window(LABEL).is_none() {
+                match build(&app) {
+                    Ok(()) => log::info!("overlay: window recreated"),
+                    Err(e) => log::error!("overlay: could not recreate the window: {e}"),
+                }
+            }
+        });
+    }
+
     fn configure(&self, config: OverlayConfig) {
         if let Ok(mut c) = self.config.lock() {
             *c = config;

@@ -346,7 +346,21 @@ pub fn run() {
                 app_commands!()
             }
         })
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
+        .map(|app| {
+            app.run(|_app, event| {
+                // A tray app keeps running with no window open (the
+                // settings window is closed and the overlay may have been
+                // released after idle). Only an explicit exit (tray Quit)
+                // carries an exit code.
+                if let tauri::RunEvent::ExitRequested {
+                    code: None, api, ..
+                } = event
+                {
+                    api.prevent_exit();
+                }
+            })
+        })
     {
         log::error!("Error while running Tauri application: {e}");
     }

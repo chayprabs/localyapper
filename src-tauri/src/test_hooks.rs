@@ -100,10 +100,8 @@ fn handle_line(line: &str, app: &AppHandle, ctl: &ControllerHandle) -> serde_jso
             json!({"ok": true})
         }
         "destroy_overlay" => {
-            // For the P6.3 measurement: what the overlay WebView costs.
-            if let Some(w) = app.get_webview_window("overlay") {
-                let _ = w.destroy();
-            }
+            // What the overlay idle timer does (P6.3), without the wait.
+            ctl.send(Msg::ReleaseOverlay);
             json!({"ok": true})
         }
         "windows" => {

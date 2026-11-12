@@ -11,13 +11,34 @@ pub fn trim() {
     unsafe {
         libc::malloc_trim(0);
     }
+    #[cfg(target_os = "macos")]
+    {
+        extern "C" {
+            fn malloc_zone_pressure_relief(zone: *mut std::ffi::c_void, goal: usize) -> usize;
+        }
+        // SAFETY: a null zone asks every malloc zone to return as much
+        // free memory as it can (goal 0 = no limit); no pointers kept.
+        unsafe {
+            malloc_zone_pressure_relief(std::ptr::null_mut(), 0);
+        }
+    }
     #[cfg(windows)]
     {
+        use windows::Win32::System::Memory::{GetProcessHeaps, HeapCompact, HEAP_FLAGS};
         use windows::Win32::System::ProcessStatus::EmptyWorkingSet;
         use windows::Win32::System::Threading::GetCurrentProcess;
-        // SAFETY: GetCurrentProcess returns a pseudo handle that needs no
-        // closing; EmptyWorkingSet only trims this process's working set.
-        let _ = unsafe { EmptyWorkingSet(GetCurrentProcess()) };
+        // SAFETY: GetProcessHeaps fills our buffer with this process's
+        // heap handles; HeapCompact decommits free blocks in each.
+        // GetCurrentProcess returns a pseudo handle that needs no closing;
+        // EmptyWorkingSet only trims this process's working set.
+        unsafe {
+            let mut heaps = [windows::Win32::Foundation::HANDLE::default(); 64];
+            let n = GetProcessHeaps(&mut heaps) as usize;
+            for h in heaps.iter().take(n.min(heaps.len())) {
+                HeapCompact(*h, HEAP_FLAGS(0));
+            }
+            let _ = EmptyWorkingSet(GetCurrentProcess());
+        }
     }
 }
 

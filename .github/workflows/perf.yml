@@ -9,6 +9,8 @@ on:
     paths:
       - scripts/measure-memory.*
       - scripts/write-performance.py
+      - src-tauri/src/platform/memory.rs
+      - src-tauri/src/platform/overlay/**
       - .github/workflows/perf.yml
   workflow_call:
   workflow_dispatch:
