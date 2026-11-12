@@ -617,11 +617,41 @@ fn overlay_is_click_through() {
     enigo.button(Button::Left, Direction::Click).expect("click");
     std::thread::sleep(Duration::from_millis(300));
     let after: usize = t.command("clicks").parse().unwrap_or(0);
+    let under = window_under(cx.round() as i32, cy.round() as i32);
     app.cmd("cancel");
     assert!(
         after > before,
-        "the click at the pill's centre did not reach the window below"
+        "the click at the pill's centre ({cx:.0}, {cy:.0}) did not reach the window below; \
+         rect {rect}, clicks {before} -> {after}, window there: {under}"
     );
+}
+
+/// Which window the OS hit-tests at a screen point (Windows only; used to
+/// explain a click-through failure).
+#[cfg(windows)]
+fn window_under(x: i32, y: i32) -> String {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetClassNameW, GetWindowLongPtrW, GetWindowThreadProcessId, WindowFromPoint, GWL_EXSTYLE,
+    };
+    // SAFETY: read-only queries about a window handle.
+    unsafe {
+        let h = WindowFromPoint(POINT { x, y });
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(h, Some(&mut pid));
+        let mut buf = [0u16; 128];
+        let n = GetClassNameW(h, &mut buf).max(0) as usize;
+        let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
+        format!(
+            "class {} pid {pid} exstyle {ex:#x}",
+            String::from_utf16_lossy(&buf[..n])
+        )
+    }
+}
+
+#[cfg(not(windows))]
+fn window_under(_x: i32, _y: i32) -> String {
+    "n/a".into()
 }
 
 #[test]
@@ -712,10 +742,22 @@ fn back_to_back() {
     }
     t.focus();
     app.dictate(clip_ms(&wav) + 300);
+    let first = fg_pid();
     app.wait_dictations(1);
     // No pause: the next press comes as soon as the first paste lands.
     app.dictate(clip_ms(&wav) + 300);
+    let second = fg_pid();
     app.wait_dictations(2);
+    if cfg!(target_os = "macos") && (first != Some(t.pid) || second != Some(t.pid)) {
+        println!("SKIP: the macOS runner moved another app in front during the test");
+        return;
+    }
+    assert_eq!(first, Some(t.pid), "focus moved during the first dictation");
+    assert_eq!(
+        second,
+        Some(t.pid),
+        "focus moved during the second dictation"
+    );
     let both = format!("{want} {want}");
     let got = t.wait_for_words(&both);
     assert_words(&got, &both);

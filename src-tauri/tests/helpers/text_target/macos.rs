@@ -62,6 +62,9 @@ pub fn run() {
             mode,
             true,
         ) {
+            if ev.r#type() == NSEventType::LeftMouseDown {
+                CLICKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
             app.sendEvent(&ev);
         }
         if !announced && started.elapsed().as_millis() > 300 {
