@@ -2,9 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme tokens (plan P5.10). "system" follows the OS; the theme setting
+   sets data-theme on <html> to force light or dark. */
+:root {
+  --ink: 0 0 0;
+  --surface: 255 255 255;
+  --canvas: 249 249 249;
+  --sidebar: 238 238 238;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: 255 255 255;
+    --surface: 40 40 43;
+    --canvas: 24 24 26;
+    --sidebar: 30 30 32;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ink: 255 255 255;
+  --surface: 40 40 43;
+  --canvas: 24 24 26;
+  --sidebar: 30 30 32;
+  color-scheme: dark;
+}
+
 html,
 body {
-  background: transparent;
+  background: rgb(var(--sidebar));
+  color: rgb(var(--ink) / 0.85);
 }
 
 body {

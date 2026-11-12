@@ -97,14 +97,14 @@ export function ReadyStep({
         {hotkeyParts.map((part, i) => (
           <span
             key={i}
-            className="flex h-7 items-center rounded-[6px] border border-black/[0.06] bg-white px-2.5 font-mono text-[13px] font-medium text-black/85 shadow-sm"
+            className="flex h-7 items-center rounded-[6px] border border-black/[0.06] bg-surface px-2.5 font-mono text-[13px] font-medium text-black/85 shadow-sm"
           >
             {part}
           </span>
         ))}
       </div>
 
-      <div className="mb-6 w-full rounded-[10px] border border-black/[0.07] bg-white px-4 py-1 text-left">
+      <div className="mb-6 w-full rounded-[10px] border border-black/[0.07] bg-surface px-4 py-1 text-left">
         <SummaryRow
           icon="keyboard"
           label="Dictation hotkey"

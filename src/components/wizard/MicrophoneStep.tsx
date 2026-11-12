@@ -99,7 +99,7 @@ export function MicrophoneStep({
         <button
           type="button"
           onClick={openSettings}
-          className="mb-3 inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-black/[0.10] bg-white px-4 text-[13px] font-medium text-black/85 shadow-sm transition-colors hover:bg-black/[0.02]"
+          className="mb-3 inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-black/[0.10] bg-surface px-4 text-[13px] font-medium text-black/85 shadow-sm transition-colors hover:bg-black/[0.02]"
         >
           <Icon name="open_in_new" size={16} />
           Open microphone settings

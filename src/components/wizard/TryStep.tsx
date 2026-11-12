@@ -42,7 +42,7 @@ export function TryStep({ hotkey, onContinue }: { hotkey: string; onContinue: ()
         rows={4}
         aria-label="Try dictation here"
         placeholder="Your words appear here"
-        className="mb-4 w-full resize-none rounded-[10px] border border-black/[0.12] bg-white px-3 py-2 text-[14px] text-black/85 outline-none focus:border-[#0058bc]"
+        className="mb-4 w-full resize-none rounded-[10px] border border-black/[0.12] bg-surface px-3 py-2 text-[14px] text-black/85 outline-none focus:border-[#0058bc]"
       />
       {failedOnce && (
         <p className="mb-4 w-full rounded-lg border border-[#9a5a00]/20 bg-[#9a5a00]/[0.06] px-3 py-2 text-left text-[12px] text-[#7a4500]">

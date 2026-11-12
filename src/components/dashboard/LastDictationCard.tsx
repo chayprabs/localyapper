@@ -12,7 +12,7 @@ interface LastDictationCardProps {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center text-center">
-      <Icon name="mic" size={40} className="text-[rgba(0,0,0,0.15)] mb-4" />
+      <Icon name="mic" size={40} className="text-black/[0.15] mb-4" />
       <p className="text-[14px] font-medium text-black/85 mb-1">No dictations yet</p>
       <p className="text-[12px] text-black/[0.26]">
         Use your record hotkey to start your first dictation.
@@ -24,14 +24,14 @@ function EmptyState() {
 export function LastDictationCard({ entry, onDelete }: LastDictationCardProps) {
   if (!entry) {
     return (
-      <div className="bg-white p-6 rounded-xl border border-black/[0.07] shadow-sm min-h-[200px] flex items-center justify-center">
+      <div className="bg-surface p-6 rounded-xl border border-black/[0.07] shadow-sm min-h-[200px] flex items-center justify-center">
         <EmptyState />
       </div>
     );
   }
 
   return (
-    <div className="bg-white p-6 rounded-xl border border-black/[0.07] shadow-sm">
+    <div className="bg-surface p-6 rounded-xl border border-black/[0.07] shadow-sm">
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-baseline gap-4">
           <h3 className="text-[10px] font-bold text-black/[0.26] tracking-[0.06em] uppercase">
@@ -69,7 +69,7 @@ export function LastDictationCard({ entry, onDelete }: LastDictationCardProps) {
         </div>
         <button
           onClick={() => onDelete(entry.id)}
-          className="text-black/50 hover:bg-[#f9f9f9] p-1.5 rounded-md transition-colors"
+          className="text-black/50 hover:bg-canvas p-1.5 rounded-md transition-colors"
         >
           <Icon name="delete" size={18} />
         </button>

@@ -56,7 +56,7 @@ function eventToShortcut(e: KeyboardEvent): string | null {
 
 function KeyBadge({ label }: { label: string }) {
   return (
-    <span className="inline-flex h-7 max-w-full items-center rounded-[7px] border border-black/[0.06] bg-[rgba(0,0,0,0.04)] px-2.5 text-[12px] font-medium font-mono text-[#1C1C1E] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+    <span className="inline-flex h-7 max-w-full items-center rounded-[7px] border border-black/[0.06] bg-black/[0.04] px-2.5 text-[12px] font-medium font-mono text-black/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
       {label}
     </span>
   );
@@ -127,7 +127,7 @@ function KeySelector({
     <div
       ref={containerRef}
       onClick={readOnly ? undefined : onStartEdit}
-      className={`flex w-full max-w-[320px] min-h-[46px] items-center rounded-[10px] border bg-white px-3 py-2 shadow-sm transition-colors ${
+      className={`flex w-full max-w-[320px] min-h-[46px] items-center rounded-[10px] border bg-surface px-3 py-2 shadow-sm transition-colors ${
         readOnly
           ? "cursor-default border-black/[0.08] bg-black/[0.015]"
           : "cursor-pointer hover:border-black/20"
@@ -150,7 +150,7 @@ function KeySelector({
         </div>
       )}
       {!readOnly && (
-        <Icon name="expand_more" size={14} className="ml-3 shrink-0 text-[rgba(0,0,0,0.30)]" />
+        <Icon name="expand_more" size={14} className="ml-3 shrink-0 text-black/[0.30]" />
       )}
     </div>
   );
@@ -204,7 +204,7 @@ export function HotkeysSection() {
             </span>
             <button
               onClick={() => setShowResetConfirm(false)}
-              className="h-8 rounded-lg border border-black/[0.15] bg-white px-3 text-[13px] font-medium shadow-sm transition-colors hover:bg-black/[0.02]"
+              className="h-8 rounded-lg border border-black/[0.15] bg-surface px-3 text-[13px] font-medium shadow-sm transition-colors hover:bg-black/[0.02]"
             >
               Cancel
             </button>
@@ -221,14 +221,14 @@ export function HotkeysSection() {
         ) : (
           <button
             onClick={() => setShowResetConfirm(true)}
-            className="h-8 rounded-lg border border-black/[0.15] bg-white px-4 text-[13px] font-medium shadow-sm transition-colors hover:bg-black/[0.02] active:bg-black/[0.04]"
+            className="h-8 rounded-lg border border-black/[0.15] bg-surface px-4 text-[13px] font-medium shadow-sm transition-colors hover:bg-black/[0.02] active:bg-black/[0.04]"
           >
             Reset to Defaults
           </button>
         )}
       </div>
 
-      <div className="overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-sm">
+      <div className="overflow-hidden rounded-[10px] border border-black/[0.07] bg-surface shadow-sm">
         {entries.map((entry, index) => {
           const reservedMessage = reservedHotkeyMessage(entry.value);
           return (

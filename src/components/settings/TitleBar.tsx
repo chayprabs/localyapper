@@ -14,14 +14,14 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="flex items-center justify-between h-8 bg-[#eeeeee] shrink-0 select-none"
+      className="flex items-center justify-between h-8 bg-sidebar shrink-0 select-none"
     >
       <div
         data-tauri-drag-region
         className="pl-4 flex items-center gap-2"
       >
         <img src={logoImg} alt="LocalYapper" className="w-[14px] h-[14px]" draggable={false} />
-        <span data-tauri-drag-region className="text-[13px] font-semibold text-[#1C1C1E]">
+        <span data-tauri-drag-region className="text-[13px] font-semibold text-black/90">
           LocalYapper
         </span>
         {paused === true && (

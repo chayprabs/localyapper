@@ -31,10 +31,10 @@ function errorText(err: unknown): string {
 function EmptyState({ onOpenHotkeys }: { onOpenHotkeys: () => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center -mt-16">
-      <div className="w-[56px] h-[56px] rounded-full bg-[rgba(0,0,0,0.05)] flex items-center justify-center mb-4">
-        <Icon name="history" size={24} className="text-[rgba(0,0,0,0.20)]" />
+      <div className="w-[56px] h-[56px] rounded-full bg-black/[0.05] flex items-center justify-center mb-4">
+        <Icon name="history" size={24} className="text-black/[0.20]" />
       </div>
-      <p className="text-[14px] font-medium text-[#1C1C1E] mb-1">
+      <p className="text-[14px] font-medium text-black/90 mb-1">
         No dictations yet
       </p>
       <p className="text-[12px] text-black/[0.26] text-center mb-6">
@@ -95,7 +95,7 @@ export function HistoryPage() {
     <div className="flex flex-col h-full px-6 py-8 sm:px-12 sm:py-10">
       <header className="mb-10 flex justify-between items-start gap-4 shrink-0">
         <div>
-          <h1 className="text-[26px] font-semibold text-[#1C1C1E]">History</h1>
+          <h1 className="text-[26px] font-semibold text-black/90">History</h1>
           {exportNote && (
             <p className="mt-2 max-w-[520px] break-all text-[12px] text-black/50">{exportNote}</p>
           )}
@@ -110,7 +110,7 @@ export function HistoryPage() {
             <span className="text-[13px] text-black/50">Clear all history?</span>
             <button
               onClick={() => setShowClearConfirm(false)}
-              className="h-8 rounded-lg border border-black/[0.15] bg-white px-3 text-[13px] font-medium shadow-sm transition-colors hover:bg-black/[0.02]"
+              className="h-8 rounded-lg border border-black/[0.15] bg-surface px-3 text-[13px] font-medium shadow-sm transition-colors hover:bg-black/[0.02]"
             >
               Cancel
             </button>
@@ -156,7 +156,7 @@ export function HistoryPage() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search dictations"
           aria-label="Search dictations"
-          className="h-9 w-full max-w-[360px] rounded-lg border border-black/[0.12] bg-white px-3 text-[13px] text-black/85 outline-none focus:border-[#0058bc]"
+          className="h-9 w-full max-w-[360px] rounded-lg border border-black/[0.12] bg-surface px-3 text-[13px] text-black/85 outline-none focus:border-[#0058bc]"
         />
       </div>
 
@@ -185,7 +185,7 @@ export function HistoryPage() {
             <div className="flex justify-center mt-6 mb-10 shrink-0">
               <button
                 onClick={loadMore}
-                className="h-8 px-4 bg-white border border-[rgba(0,0,0,0.15)] rounded-lg text-[13px] text-black/85 font-medium hover:bg-gray-50 transition-colors"
+                className="h-8 px-4 bg-surface border border-black/[0.15] rounded-lg text-[13px] text-black/85 font-medium hover:bg-gray-50 transition-colors"
               >
                 Load More
               </button>

@@ -44,7 +44,7 @@ interface DashboardEmptyStateProps {
 
 function DashboardEmptyState({ recordHotkey }: DashboardEmptyStateProps) {
   return (
-    <section className="flex min-h-[260px] flex-col items-center justify-center rounded-xl border border-black/[0.07] bg-white p-10 text-center shadow-sm">
+    <section className="flex min-h-[260px] flex-col items-center justify-center rounded-xl border border-black/[0.07] bg-surface p-10 text-center shadow-sm">
       <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#0058bc]/[0.10]">
         <Icon name="mic" size={28} className="text-[#0058bc]" />
       </div>
@@ -53,7 +53,7 @@ function DashboardEmptyState({ recordHotkey }: DashboardEmptyStateProps) {
       </p>
       <p className="max-w-[360px] text-[13px] leading-relaxed text-black/[0.50]">
         Hold{" "}
-        <span className="rounded-[4px] border border-black/[0.10] bg-white px-1.5 py-0.5 font-mono text-[12px] font-semibold text-black/85 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
+        <span className="rounded-[4px] border border-black/[0.10] bg-surface px-1.5 py-0.5 font-mono text-[12px] font-semibold text-black/85 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
           {recordHotkey}
         </span>{" "}
         anywhere on this device to record. Your stats, recent dictations, and
@@ -88,7 +88,7 @@ export function DashboardPage() {
   return (
     <div className="px-8 py-6">
       <header className="mb-5">
-        <h1 className="text-[24px] font-bold text-[#1C1C1E]">Dashboard</h1>
+        <h1 className="text-[24px] font-bold text-black/90">Dashboard</h1>
         <p className="mt-1 text-[12px] text-black/[0.45]">
           All processing happens on this device. No audio leaves your machine.
         </p>

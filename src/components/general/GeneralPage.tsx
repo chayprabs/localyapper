@@ -71,7 +71,7 @@ function About() {
       <Row label="LocalYapper" hint={info ? `Version ${info.version}` : undefined} error={error}>
         <button
           onClick={copyDiagnostics}
-          className="h-8 rounded-lg border border-black/[0.15] bg-white px-3 text-[13px] font-medium text-black/85 hover:bg-black/[0.02]"
+          className="h-8 rounded-lg border border-black/[0.15] bg-surface px-3 text-[13px] font-medium text-black/85 hover:bg-black/[0.02]"
         >
           {copied ? "Copied" : "Copy diagnostics"}
         </button>
@@ -91,7 +91,7 @@ function About() {
           <span className="flex gap-2">
             <button
               onClick={() => setConfirmReset(false)}
-              className="h-8 rounded-lg border border-black/[0.15] bg-white px-3 text-[13px] font-medium text-black/85"
+              className="h-8 rounded-lg border border-black/[0.15] bg-surface px-3 text-[13px] font-medium text-black/85"
             >
               Cancel
             </button>
@@ -102,7 +102,7 @@ function About() {
         ) : (
           <button
             onClick={() => setConfirmReset(true)}
-            className="h-8 rounded-lg border border-black/[0.15] bg-white px-3 text-[13px] font-medium text-[#ba1a1a]"
+            className="h-8 rounded-lg border border-black/[0.15] bg-surface px-3 text-[13px] font-medium text-[#ba1a1a]"
           >
             Reset…
           </button>

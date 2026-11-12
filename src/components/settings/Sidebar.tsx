@@ -28,7 +28,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "bg-[#eeeeee] flex flex-col h-full shrink-0 transition-[width] duration-200 overflow-hidden",
+        "bg-sidebar flex flex-col h-full shrink-0 transition-[width] duration-200 overflow-hidden",
         isCollapsed ? "w-12" : "w-[220px]"
       )}
     >

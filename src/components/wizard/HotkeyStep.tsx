@@ -151,7 +151,7 @@ export function HotkeyStep({
       <div ref={containerRef} className="mb-6">
         <div
           onClick={() => setIsCapturing(true)}
-          className={`inline-flex items-center gap-2 px-5 h-12 bg-white border rounded-[10px] shadow-sm cursor-pointer transition-all ${
+          className={`inline-flex items-center gap-2 px-5 h-12 bg-surface border rounded-[10px] shadow-sm cursor-pointer transition-all ${
             isCapturing
               ? "border-[#0058bc] ring-2 ring-[#0058bc]/20"
               : "border-black/[0.10] hover:border-black/20"

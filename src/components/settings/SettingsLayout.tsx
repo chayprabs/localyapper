@@ -65,10 +65,10 @@ export function SettingsLayout() {
   };
 
   return (
-    <div className="flex h-full bg-[#eeeeee] relative">
+    <div className="flex h-full bg-sidebar relative">
       <Sidebar />
-      <main className="flex-1 bg-[#eeeeee] p-3">
-        <div className="bg-white rounded-2xl h-full overflow-y-auto overflow-x-hidden">
+      <main className="flex-1 bg-sidebar p-3">
+        <div className="bg-surface rounded-2xl h-full overflow-y-auto overflow-x-hidden">
           <Suspense fallback={<PageFallback />}>
             <PageComponent />
           </Suspense>

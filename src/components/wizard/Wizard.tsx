@@ -23,7 +23,7 @@ export function Wizard() {
 
   if (!wizard.hydrated) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[#F2F2F4]">
+      <div className="flex h-full w-full items-center justify-center bg-canvas">
         <Icon name="progress_activity" size={28} className="animate-spin text-black/[0.30]" />
       </div>
     );

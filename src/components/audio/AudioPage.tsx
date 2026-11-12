@@ -46,7 +46,7 @@ function DeviceSetting() {
     >
       <select
         aria-label="Microphone"
-        className="h-8 max-w-[260px] rounded-md border border-black/[0.12] bg-white px-2 text-[13px] text-black/85"
+        className="h-8 max-w-[260px] rounded-md border border-black/[0.12] bg-surface px-2 text-[13px] text-black/85"
         value={value ?? "default"}
         disabled={value === null}
         onChange={(e) => save(e.target.value)}

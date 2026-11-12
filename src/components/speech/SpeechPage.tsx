@@ -97,7 +97,7 @@ export function SpeechPage() {
           {error}
         </p>
       )}
-      <ul className="bg-white rounded-xl border border-black/[0.08] divide-y divide-black/[0.07]">
+      <ul className="bg-surface rounded-xl border border-black/[0.08] divide-y divide-black/[0.07]">
         {models.map((m) => {
           const downloading = busy === m.id && progress?.id === m.id;
           return (
@@ -168,7 +168,7 @@ export function SpeechPage() {
           );
         })}
       </ul>
-      <label className="mt-5 flex items-center justify-between gap-4 bg-white rounded-xl border border-black/[0.08] px-5 py-3">
+      <label className="mt-5 flex items-center justify-between gap-4 bg-surface rounded-xl border border-black/[0.08] px-5 py-3">
         <span className="text-[13px] font-semibold text-black/85">
           Free memory when idle
           <span className="block text-[12px] font-normal text-black/50">

@@ -54,7 +54,7 @@ export function Section({ title, children }: { title: string; children: ReactNod
   return (
     <section className="mb-8">
       <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-black/40">{title}</h2>
-      <div className="divide-y divide-black/[0.06] rounded-xl border border-black/[0.08] bg-white">
+      <div className="divide-y divide-black/[0.06] rounded-xl border border-black/[0.08] bg-surface">
         {children}
       </div>
     </section>
@@ -121,7 +121,7 @@ export function SelectSetting({
     <Row label={label} hint={hint} error={error}>
       <select
         aria-label={label}
-        className="h-8 rounded-md border border-black/[0.12] bg-white px-2 text-[13px] text-black/85"
+        className="h-8 rounded-md border border-black/[0.12] bg-surface px-2 text-[13px] text-black/85"
         value={value ?? ""}
         disabled={value === null}
         onChange={(e) => save(e.target.value)}
@@ -169,7 +169,7 @@ export function NumberSetting({
           type="number"
           min={min}
           max={max}
-          className="h-8 w-24 rounded-md border border-black/[0.12] bg-white px-2 text-right text-[13px] text-black/85"
+          className="h-8 w-24 rounded-md border border-black/[0.12] bg-surface px-2 text-right text-[13px] text-black/85"
           value={draft}
           disabled={value === null}
           onChange={(e) => setDraft(e.target.value)}

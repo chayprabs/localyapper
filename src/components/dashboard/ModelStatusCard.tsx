@@ -47,7 +47,7 @@ export function ModelStatusCard({ status, fileStatus }: ModelStatusCardProps) {
         : "Files not installed";
 
   return (
-    <div className="rounded-xl border border-black/[0.07] bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-black/[0.07] bg-surface p-4 shadow-sm">
       <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.06em] text-black/[0.26]">
         SPEECH STATUS
       </p>
