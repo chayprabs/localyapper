@@ -39,11 +39,11 @@ States:
 Acceptance criterion A7 asks for under 40 MB private memory in the main
 process when idle with the model evicted. Where the tables show more:
 
-- On Linux and macOS the main process is already 70 to 80 MB before any
-  model is loaded: that is the GTK/WebKitGTK or AppKit/WebKit UI side of
-  the process with the overlay WebView, before LocalYapper's own work.
-- After eviction the main process stays above its pre-load size on
-  every OS. The recogniser is dropped and the allocators are asked to
+- On Linux the main process is already about 75 MB before any model is
+  loaded: that is the GTK/WebKitGTK UI side of the process with the
+  overlay WebView, before LocalYapper's own work.
+- After eviction the main process stays above its pre-load size (on
+  Windows by about 44 MB). The recogniser is dropped and the allocators are asked to
   return free memory (mimalloc `mi_collect`, glibc `malloc_trim`, macOS
   `malloc_zone_pressure_relief`, Windows `HeapCompact`), but part of what
   ONNX Runtime and sherpa-onnx allocated during the session is not

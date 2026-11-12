@@ -15,8 +15,8 @@ CI run on GitHub's runners (`ubuntu-22.04`, `windows-latest`,
 | A4 | Focus never leaves the target app | Pass on Linux and Windows; skipped on macOS | Same foreground pid before, during and after | `smoke::overlay_does_not_take_focus`, `end_to_end_dictation`, `back_to_back` (back_to_back also passed on macOS) |
 | A5 | Clipboard unchanged after dictation | Pass on Linux (Xvfb) and Windows; skipped on macOS | Previous clipboard text restored | `smoke::inject_restores_clipboard` |
 | A6 | Every setting takes effect at once and survives restart | Pass | One hook test per key (28 keys), validators reject bad values; values are stored in SQLite and loaded into the cache at start | `settings::tests::hook_*` and `every_key_has_a_hook_test`; `db::schema` migration tests |
-| A7 | Idle, evicted, settings closed: main process under 40 MB private, no settings WebView | **Fail** (settings WebView part passes) | Main process after eviction: Windows 57.9 MB, Linux 117.3 MB, macOS see Measured performance; no settings WebView alive on any OS | Memory workflow (`.github/workflows/perf.yml`) → `docs/PERFORMANCE.md` |
-| A8 | Windows installer under 25 MB; models downloaded on first run and checksum-verified | See Measured performance for the size; download and verification pass | SHA-256 of every file checked, resume after interruption | `core::download` tests; `tests/fresh_install.rs` (pipeline job: an empty profile downloads Moonshine, verifies and dictates); release workflow size check |
+| A7 | Idle, evicted, settings closed: main process under 40 MB private, no settings WebView | **Pass on macOS, fail on Windows and Linux** | Main process after eviction: macOS 27.4 MB, Windows 57.9 MB, Linux 117.3 MB; no settings WebView alive on any OS. The gap is explained in `docs/PERFORMANCE.md` | Memory workflow (`.github/workflows/perf.yml`) → `docs/PERFORMANCE.md` |
+| A8 | Windows installer under 25 MB; models downloaded on first run and checksum-verified | Pass | Windows installer 8.4 MB; SHA-256 of every model file checked, resume after interruption | Release workflow size check (run 43243078632); `core::download` tests; `tests/fresh_install.rs` (pipeline job: an empty profile downloads Moonshine, verifies and dictates) |
 | A9 | A second launch focuses the running instance | Pass | Second process exits, first keeps running | `smoke::second_instance_exits` on all three OSes |
 | A10 | Works on Windows, macOS, Linux X11; Wayland with documented limits | Pass on all three runners (16/15/15 smoke tests); Wayland not exercised | CI run 43243078600 (`958b906`): every job green | CI workflow; Wayland limits documented in the README |
 
@@ -38,14 +38,25 @@ Private memory of the release build, main process (WebView helpers in
 |---|---|---|---|---|---|
 | Windows | 14.3 MB | 585.2 MB | 583.2 MB | 57.9 MB | 58.3 MB (+0 MB helpers, was 105 MB) |
 | Linux | 75.4 MB | 613.2 MB | 625.3 MB | 117.3 MB | 136.1 MB (+10 MB helpers, was 144 MB) |
-| macOS | MACOS_IDLE | MACOS_LOADED | MACOS_SETTINGS | MACOS_EVICTED | kept alive (see Decisions) |
+| macOS | 16.3 MB | 380.9 MB | 381.0 MB | 27.4 MB | kept alive (see Decisions); helpers 21 MB |
 
-Idle CPU with the model evicted: 0.5 % (Windows), 0.1 % (Linux), 0.1 %
-(macOS) over 10 s.
+Idle CPU with the model evicted: 0.5 % (Windows), 0.1 % (Linux), 0.2 %
+(macOS) over 10 s. macOS figures are the physical footprint (what
+Activity Monitor shows); Windows private bytes; Linux USS.
 
-Installers (release workflow on the branch, run RELEASE_RUN):
+Installers (release workflow on the branch, run 43243078632, commit
+`958b906`, all four builds green):
 
-INSTALLER_SIZES
+| Bundle | Size |
+|---|---|
+| Windows NSIS `LocalYapper_2.0.0_x64-setup.exe` | 8.4 MB (limit 25 MB) |
+| macOS DMG, Apple Silicon | 11.6 MB |
+| macOS DMG, Intel | 12.9 MB |
+| Linux deb | 17.5 MB |
+| Linux rpm | 17.5 MB |
+| Linux AppImage | 90.5 MB |
+
+Speech models are not bundled; they are downloaded on first run.
 
 Decode speed and accuracy per model: see Model choice.
 
@@ -156,4 +167,7 @@ repositories, so the default is fp32.
 - Smoke harness fixes on the way to green: test processes start with CREATE_NO_WINDOW on Windows; the Windows text target no longer un-maximizes when focused; the macOS text target got an Edit menu so Cmd+V pastes; the Linux GTK text target retries the X display briefly.
 - P6.3: measured on the runners, keeping the overlay alive costs 107 MB (Windows) and 116 MB (Linux), so the release after 10 idle minutes stays. On macOS the overlay is an NSPanel (tauri-nspanel 2.1) and destroying/rebuilding it aborted the app on the runner, so macOS keeps the overlay alive.
 - Tauri exited the app when its last window closed; exits without an explicit code are now prevented (found by the memory run, whose "overlay destroyed" state read 0 MB).
-- A7 is not met; docs/PERFORMANCE.md explains the gap (UI-process baseline on Linux/macOS, allocator/ONNX Runtime retention after eviction).
+- A7 is met on macOS but not on Windows or Linux; docs/PERFORMANCE.md explains the gap (the GTK/WebKitGTK baseline on Linux, allocator/ONNX Runtime retention after eviction on Windows and Linux).
+- macOS memory is reported as the physical footprint (`proc_pid_rusage`), the figure Activity Monitor shows. USS there also counted freed pages the allocator had marked reusable, which read 556 MB after eviction against a 27 MB footprint.
+- P7 gate: no tag may be pushed, so the installers were built by the release workflow on the branch (run 43243078632): NSIS, both DMGs, deb, rpm and AppImage all built.
+- Plan section 14 was run locally on the final tree: lint, `tsc`, `cargo fmt --check`, clippy with and without `test-hooks`, 131 unit tests and the two model-free pipeline tests pass; the model pipeline test (`--include-ignored pipeline`) cannot run in this container (no model host reachable) and runs in CI's pipeline job instead.
