@@ -51,6 +51,7 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
         ("setup_complete", "false"),
         ("setup_step", "welcome"),
         ("idle_unload_seconds", "60"),
+        ("max_recording_seconds", "600"),
     ];
 
     let tx = conn.unchecked_transaction()?;
@@ -70,7 +71,7 @@ fn migrate_removed_features(conn: &Connection) -> Result<(), LocalYapperError> {
     conn.execute("DROP TABLE IF EXISTS corrections", [])?;
     conn.execute("DROP TABLE IF EXISTS personal_dictionary", [])?;
     conn.execute(
-        "DELETE FROM settings WHERE key IN ('confidence_threshold', 'correction_decay_days', 'training_paragraph_index', 'auto_inject_delay_ms', 'sound_effects', 'mute_media', 'language', 'max_recording_seconds', 'hotkey_hands_free')",
+        "DELETE FROM settings WHERE key IN ('confidence_threshold', 'correction_decay_days', 'training_paragraph_index', 'auto_inject_delay_ms', 'sound_effects', 'mute_media', 'language', 'hotkey_hands_free')",
         [],
     )?;
     Ok(())
@@ -161,6 +162,7 @@ mod tests {
         // hotkey_hands_free is no longer a separate hotkey -- hands-free is a
         // double-tap of the record hotkey.
         assert!(queries::get_setting(&conn, "hotkey_hands_free").is_err());
+        assert_eq!(queries::get_setting(&conn, "max_recording_seconds")?, "600");
 
         let settings_count: i64 =
             conn.query_row("SELECT COUNT(*) FROM settings", [], |row| row.get(0))?;
