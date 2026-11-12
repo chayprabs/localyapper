@@ -15,10 +15,10 @@ CI run on GitHub's runners (`ubuntu-22.04`, `windows-latest`,
 | A4 | Focus never leaves the target app | Pass on Linux and Windows; skipped on macOS | Same foreground pid before, during and after | `smoke::overlay_does_not_take_focus`, `end_to_end_dictation`, `back_to_back` (back_to_back also passed on macOS) |
 | A5 | Clipboard unchanged after dictation | Pass on Linux (Xvfb) and Windows; skipped on macOS | Previous clipboard text restored | `smoke::inject_restores_clipboard` |
 | A6 | Every setting takes effect at once and survives restart | Pass | One hook test per key (28 keys), validators reject bad values; values are stored in SQLite and loaded into the cache at start | `settings::tests::hook_*` and `every_key_has_a_hook_test`; `db::schema` migration tests |
-| A7 | Idle, evicted, settings closed: main process under 40 MB private, no settings WebView | **Pass on macOS, fail on Windows and Linux** | Main process after eviction: macOS 27.4 MB, Windows 57.9 MB, Linux 117.3 MB; no settings WebView alive on any OS. The gap is explained in `docs/PERFORMANCE.md` | Memory workflow (`.github/workflows/perf.yml`) → `docs/PERFORMANCE.md` |
+| A7 | Idle, evicted, settings closed: main process under 40 MB private, no settings WebView | **Pass on macOS, fail on Windows and Linux** | Main process after eviction: macOS 27.0 MB, Windows 58.7 MB, Linux 116.4 MB; no settings WebView alive on any OS. The gap is explained in `docs/PERFORMANCE.md` | Memory workflow (`.github/workflows/perf.yml`) → `docs/PERFORMANCE.md` |
 | A8 | Windows installer under 25 MB; models downloaded on first run and checksum-verified | Pass | Windows installer 8.4 MB; SHA-256 of every model file checked, resume after interruption | Release workflow size check (run 43243078632); `core::download` tests; `tests/fresh_install.rs` (pipeline job: an empty profile downloads Moonshine, verifies and dictates) |
 | A9 | A second launch focuses the running instance | Pass | Second process exits, first keeps running | `smoke::second_instance_exits` on all three OSes |
-| A10 | Works on Windows, macOS, Linux X11; Wayland with documented limits | Pass on all three runners (16/15/15 smoke tests); Wayland not exercised | CI run 43243078600 (`958b906`): every job green | CI workflow; Wayland limits documented in the README |
+| A10 | Works on Windows, macOS, Linux X11; Wayland with documented limits | Pass on all three runners (16/15/15 smoke tests); Wayland not exercised | CI runs 43243078600 (`958b906`) and 43284990517 (`c314f29`): every job green | CI workflow; Wayland limits documented in the README |
 
 ## Measured performance
 
@@ -31,16 +31,16 @@ PERF lines of CI run 43243078600):
 | Windows | 31 | 29 | 183 | 1730 ms |
 | macOS | not measured: the runner keeps another app in front, so the timed tests skip | | | |
 
-Private memory of the release build, main process (WebView helpers in
-`docs/PERFORMANCE.md`):
+Private memory of the release build, main process (memory workflow run
+43284990625 on commit `c314f29`; WebView helpers in `docs/PERFORMANCE.md`):
 
 | OS | Idle, model never loaded | Model loaded | Settings open | Idle, model evicted | Overlay released (10 min idle) |
 |---|---|---|---|---|---|
-| Windows | 14.3 MB | 585.2 MB | 583.2 MB | 57.9 MB | 58.3 MB (+0 MB helpers, was 105 MB) |
-| Linux | 75.4 MB | 613.2 MB | 625.3 MB | 117.3 MB | 136.1 MB (+10 MB helpers, was 144 MB) |
-| macOS | 16.3 MB | 380.9 MB | 381.0 MB | 27.4 MB | kept alive (see Decisions); helpers 21 MB |
+| Windows | 13.8 MB | 546.9 MB | 543.6 MB | 58.7 MB | 58.8 MB (helpers 0 MB, were 104 MB) |
+| Linux | 75.6 MB | 597.4 MB | 605.6 MB | 116.4 MB | 134.8 MB (helpers 10 MB, were 145 MB) |
+| macOS | 16.2 MB | 297.3 MB | 297.7 MB | 27.0 MB | kept alive (see Decisions); helpers 21 MB |
 
-Idle CPU with the model evicted: 0.5 % (Windows), 0.1 % (Linux), 0.2 %
+Idle CPU with the model evicted: 0.6 % (Windows), 0.0 % (Linux), 0.1 %
 (macOS) over 10 s. macOS figures are the physical footprint (what
 Activity Monitor shows); Windows private bytes; Linux USS.
 
