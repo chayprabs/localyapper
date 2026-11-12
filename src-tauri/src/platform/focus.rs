@@ -127,14 +127,15 @@ fn os_foreground() -> (String, bool) {
     )
 }
 
-/// `_NET_ACTIVE_WINDOW` on the root window, then its `_NET_WM_PID`, then
-/// /proc/<pid>/comm. No external tools.
+/// Process id of the foreground window on X11: `_NET_ACTIVE_WINDOW` and
+/// its `_NET_WM_PID`, or, without a window manager, the input focus
+/// window and its nearest ancestor that has `_NET_WM_PID`.
 #[cfg(target_os = "linux")]
-fn x11_active_process() -> Option<String> {
+fn x11_focus_pid() -> Option<u32> {
     use x11_dl::xlib::{self, Xlib};
     let x = Xlib::open().ok()?;
     // SAFETY: Xlib calls on a display opened and closed here; returned
-    // property buffers are freed with XFree.
+    // buffers are freed with XFree.
     unsafe {
         let dpy = (x.XOpenDisplay)(std::ptr::null());
         if dpy.is_null() {
@@ -175,13 +176,81 @@ fn x11_active_process() -> Option<String> {
             v
         };
         let root = (x.XDefaultRootWindow)(dpy);
-        let pid = read_card(root, c"_NET_ACTIVE_WINDOW")
+        let mut pid = read_card(root, c"_NET_ACTIVE_WINDOW")
             .filter(|w| *w != 0)
             .and_then(|w| read_card(w, c"_NET_WM_PID"));
+        if pid.is_none() {
+            let mut focus: xlib::Window = 0;
+            let mut revert = 0;
+            (x.XGetInputFocus)(dpy, &mut focus, &mut revert);
+            let mut win = focus;
+            for _ in 0..16 {
+                if win <= 1 || win == root {
+                    break;
+                }
+                if let Some(p) = read_card(win, c"_NET_WM_PID") {
+                    pid = Some(p);
+                    break;
+                }
+                let mut r: xlib::Window = 0;
+                let mut parent: xlib::Window = 0;
+                let mut children: *mut xlib::Window = std::ptr::null_mut();
+                let mut count = 0u32;
+                if (x.XQueryTree)(dpy, win, &mut r, &mut parent, &mut children, &mut count) == 0 {
+                    break;
+                }
+                if !children.is_null() {
+                    (x.XFree)(children.cast());
+                }
+                win = parent;
+            }
+        }
         (x.XCloseDisplay)(dpy);
-        let comm = std::fs::read_to_string(format!("/proc/{}/comm", pid?)).ok()?;
-        let comm = comm.trim();
-        (!comm.is_empty()).then(|| comm.to_string())
+        pid.map(|p| p as u32)
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn x11_active_process() -> Option<String> {
+    let pid = x11_focus_pid()?;
+    let comm = std::fs::read_to_string(format!("/proc/{pid}/comm")).ok()?;
+    let comm = comm.trim();
+    (!comm.is_empty()).then(|| comm.to_string())
+}
+
+/// Process id owning the foreground window, where the OS exposes it.
+pub fn foreground_pid() -> Option<u32> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetForegroundWindow, GetWindowThreadProcessId,
+        };
+        // SAFETY: reads the foreground window and its owning process id.
+        unsafe {
+            let hwnd = GetForegroundWindow();
+            if hwnd.0.is_null() {
+                return None;
+            }
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(hwnd, Some(&mut pid));
+            (pid != 0).then_some(pid)
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use objc2_app_kit::NSWorkspace;
+        let pid = NSWorkspace::sharedWorkspace()
+            .frontmostApplication()?
+            .processIdentifier();
+        u32::try_from(pid).ok()
+    }
+    #[cfg(target_os = "linux")]
+    {
+        x11_focus_pid()
+    }
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+    {
+        None
     }
 }
 

@@ -1,6 +1,6 @@
 //! GTK 3 TextView.
 
-use crate::{ready, reply, spawn_stdin, Cmd};
+use crate::{clicks, ready, reply, spawn_stdin, Cmd, CLICKS};
 use gtk::prelude::*;
 
 pub fn run() {
@@ -16,6 +16,12 @@ pub fn run() {
     let view = gtk::TextView::new();
     scroll.add(&view);
     window.add(&scroll);
+    view.connect_button_press_event(|_, ev| {
+        if ev.button() == 1 {
+            CLICKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        gtk::glib::Propagation::Proceed
+    });
     window.connect_delete_event(|_, _| {
         gtk::main_quit();
         gtk::glib::Propagation::Stop
@@ -54,6 +60,17 @@ pub fn run() {
                     }
                     reply("");
                 }
+                Cmd::Cover => {
+                    let monitor = gtk::gdk::Display::default()
+                        .and_then(|d| d.primary_monitor().or_else(|| d.monitor(0)));
+                    if let Some(m) = monitor {
+                        let g = m.geometry();
+                        w.move_(g.x(), g.y());
+                        w.resize(g.width(), g.height());
+                    }
+                    reply("");
+                }
+                Cmd::Clicks => reply(&clicks()),
                 Cmd::Quit => {
                     gtk::main_quit();
                     return gtk::glib::ControlFlow::Break;

@@ -95,20 +95,6 @@ pub(crate) fn show_or_create_main_window(app: &tauri::AppHandle) {
     }
 }
 
-/// Send a system notification via tauri-plugin-notification.
-fn send_notification(handle: &tauri::AppHandle, title: &str, body: &str) {
-    use tauri_plugin_notification::NotificationExt;
-    if let Err(e) = handle
-        .notification()
-        .builder()
-        .title(title)
-        .body(body)
-        .show()
-    {
-        log::warn!("Failed to send notification: {e}");
-    }
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -132,7 +118,6 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .plugin(tauri_plugin_notification::init())
         .setup(move |app| -> Result<(), Box<dyn std::error::Error>> {
             let app_data_dir = app.path().app_data_dir().map_err(|e| {
                 log::error!("Failed to resolve app data directory: {e}");
@@ -183,14 +168,6 @@ pub fn run() {
                 download_cancel: Arc::new(AtomicBool::new(false)),
                 hotkeys: started.hotkeys,
             });
-
-            if !speech_model_installed {
-                send_notification(
-                    app.handle(),
-                    "LocalYapper",
-                    "Speech model not downloaded - open Settings to get started",
-                );
-            }
 
             if let Some(action) = cli_action {
                 app.state::<AppState>()

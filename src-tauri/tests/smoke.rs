@@ -10,60 +10,122 @@
 
 use localyapper_lib::platform::inject::{self, InjectOptions, PasteMethod};
 use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::mpsc;
+use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 const WAIT: Duration = Duration::from_secs(20);
 
-/// The native text field from tests/helpers/text_target.
+/// The native text field from tests/helpers/text_target, driven over a
+/// local TCP connection.
 struct TextTarget {
-    child: Child,
-    stdin: ChildStdin,
-    lines: mpsc::Receiver<String>,
+    child: Option<Child>,
+    pid: u32,
+    conn: BufReader<std::net::TcpStream>,
+}
+
+/// macOS only lets an app come to the front when LaunchServices starts it,
+/// so the helper is wrapped in a minimal .app bundle and opened with
+/// `open -n`.
+#[cfg(target_os = "macos")]
+fn launch_text_target(port: u16) -> Option<Child> {
+    let bundle =
+        std::env::temp_dir().join(format!("LocalYapperTextTarget-{}.app", std::process::id()));
+    let macos = bundle.join("Contents/MacOS");
+    std::fs::create_dir_all(&macos).expect("bundle dir");
+    std::fs::copy(env!("CARGO_BIN_EXE_text_target"), macos.join("text_target"))
+        .expect("copy helper");
+    std::fs::write(
+        bundle.join("Contents/Info.plist"),
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>text_target</string>
+<key>CFBundleIdentifier</key><string>com.localyapper.texttarget</string>
+<key>CFBundleName</key><string>TextTarget</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>NSPrincipalClass</key><string>NSApplication</string>
+</dict></plist>"#,
+    )
+    .expect("Info.plist");
+    let status = Command::new("open")
+        .arg("-n")
+        .arg(&bundle)
+        .arg("--args")
+        .arg("--port")
+        .arg(port.to_string())
+        .status()
+        .expect("open helper bundle");
+    assert!(status.success(), "open failed");
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
+fn launch_text_target(port: u16) -> Option<Child> {
+    Some(
+        Command::new(env!("CARGO_BIN_EXE_text_target"))
+            .arg("--port")
+            .arg(port.to_string())
+            .stdin(Stdio::null())
+            .spawn()
+            .expect("start text_target"),
+    )
 }
 
 impl TextTarget {
     fn spawn() -> Self {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_text_target"))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .expect("start text_target");
-        let stdin = child.stdin.take().expect("stdin");
-        let stdout: ChildStdout = child.stdout.take().expect("stdout");
-        let (tx, lines) = mpsc::channel();
-        std::thread::spawn(move || {
-            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-                if tx.send(line).is_err() {
-                    break;
-                }
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("listen");
+        let port = listener.local_addr().expect("addr").port();
+        listener.set_nonblocking(true).expect("nonblocking");
+        let child = launch_text_target(port);
+        let start = Instant::now();
+        let stream = loop {
+            match listener.accept() {
+                Ok((s, _)) => break s,
+                Err(_) if start.elapsed() < WAIT => std::thread::sleep(Duration::from_millis(50)),
+                Err(e) => panic!("text_target did not connect: {e}"),
             }
-        });
-        let t = Self {
-            child,
-            stdin,
-            lines,
         };
-        let first = t.lines.recv_timeout(WAIT).expect("text_target ready");
-        assert_eq!(first, "ready");
-        t
+        stream.set_nonblocking(false).expect("blocking");
+        stream.set_read_timeout(Some(WAIT)).expect("timeout");
+        let mut conn = BufReader::new(stream);
+        let mut line = String::new();
+        conn.read_line(&mut line).expect("text_target ready");
+        let pid = line
+            .trim()
+            .strip_prefix("ready ")
+            .and_then(|p| p.parse().ok())
+            .expect("ready <pid>");
+        Self { child, pid, conn }
     }
 
     fn command(&mut self, cmd: &str) -> String {
-        writeln!(self.stdin, "{cmd}").expect("write command");
-        self.stdin.flush().expect("flush");
-        let line = self.lines.recv_timeout(WAIT).expect("text_target reply");
-        serde_json::from_str(&line).expect("json reply")
+        let s = self.conn.get_mut();
+        writeln!(s, "{cmd}").expect("write command");
+        s.flush().expect("flush");
+        let mut line = String::new();
+        self.conn.read_line(&mut line).expect("text_target reply");
+        serde_json::from_str(line.trim()).expect("json reply")
     }
 
     fn text(&mut self) -> String {
         self.command("get")
     }
 
+    /// Bring the target to the front and check that it is there.
     fn focus(&mut self) {
         self.command("focus");
-        std::thread::sleep(Duration::from_millis(300));
+        let start = Instant::now();
+        while localyapper_lib::platform::focus::foreground_pid() != Some(self.pid)
+            && start.elapsed() < Duration::from_secs(5)
+        {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        std::thread::sleep(Duration::from_millis(200));
+        assert_eq!(
+            localyapper_lib::platform::focus::foreground_pid(),
+            Some(self.pid),
+            "the text target could not be brought to the front"
+        );
     }
 
     /// Poll until the field holds `want` or 20 s pass; return the last text.
@@ -81,16 +143,19 @@ impl TextTarget {
 
 impl Drop for TextTarget {
     fn drop(&mut self) {
-        let _ = writeln!(self.stdin, "quit");
-        let _ = self.stdin.flush();
-        let start = Instant::now();
-        while start.elapsed() < Duration::from_secs(3) {
-            if let Ok(Some(_)) = self.child.try_wait() {
-                return;
+        let s = self.conn.get_mut();
+        let _ = writeln!(s, "quit");
+        let _ = s.flush();
+        if let Some(child) = self.child.as_mut() {
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_secs(3) {
+                if let Ok(Some(_)) = child.try_wait() {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(50));
             }
-            std::thread::sleep(Duration::from_millis(50));
+            let _ = child.kill();
         }
-        let _ = self.child.kill();
     }
 }
 

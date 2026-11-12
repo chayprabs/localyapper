@@ -1,12 +1,12 @@
 //! NSWindow with an NSTextView, driven by a manual event loop so stdin
 //! commands can be handled on the main thread.
 
-use crate::{ready, reply, spawn_stdin, Cmd};
+use crate::{clicks, ready, reply, spawn_stdin, Cmd, CLICKS};
 use objc2::rc::Retained;
 use objc2::MainThreadMarker;
 use objc2_app_kit::{
-    NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSEventMask, NSTextView,
-    NSWindow, NSWindowStyleMask,
+    NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSEventMask, NSEventType,
+    NSScreen, NSTextView, NSWindow, NSWindowStyleMask,
 };
 use objc2_foundation::{NSDate, NSDefaultRunLoopMode, NSPoint, NSRect, NSSize, NSString};
 
@@ -80,6 +80,13 @@ pub fn run() {
                     view.setString(&NSString::from_str(""));
                     reply("");
                 }
+                Cmd::Cover => {
+                    if let Some(screen) = NSScreen::mainScreen(mtm) {
+                        window.setFrame_display(screen.frame(), true);
+                    }
+                    reply("");
+                }
+                Cmd::Clicks => reply(&clicks()),
                 Cmd::Quit => return,
             }
         }

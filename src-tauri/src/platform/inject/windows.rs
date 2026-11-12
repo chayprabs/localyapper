@@ -5,24 +5,33 @@ use super::{Chord, Held, PasteError};
 use enigo::{Enigo, Key, Keyboard, Settings};
 use std::time::{Duration, Instant};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+    GetAsyncKeyState, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
 };
 
 const VK_V: u32 = 0x56;
+/// Unassigned virtual key. Tapping it while Alt or Win is held stops the
+/// release of that key from opening the window menu or the Start menu
+/// (the "menu mask key" trick).
+const VK_MASK: u32 = 0xE8;
 
-fn any_modifier_down() -> bool {
-    [VK_CONTROL, VK_MENU, VK_SHIFT, VK_LWIN, VK_RWIN]
-        .iter()
-        .any(|vk| {
-            // SAFETY: GetAsyncKeyState only reads global key state.
-            let state = unsafe { GetAsyncKeyState(i32::from(vk.0)) };
-            state < 0
-        })
+fn down(vks: &[VIRTUAL_KEY]) -> bool {
+    vks.iter().any(|vk| {
+        // SAFETY: GetAsyncKeyState only reads global key state.
+        let state = unsafe { GetAsyncKeyState(i32::from(vk.0)) };
+        state < 0
+    })
 }
 
 pub fn wait_modifiers_up(timeout: Duration) {
     let start = Instant::now();
-    while any_modifier_down() && start.elapsed() < timeout {
+    let mut masked = false;
+    while down(&[VK_CONTROL, VK_MENU, VK_SHIFT, VK_LWIN, VK_RWIN]) && start.elapsed() < timeout {
+        if !masked && down(&[VK_MENU, VK_LWIN, VK_RWIN]) {
+            masked = true;
+            if let Ok(mut e) = Enigo::new(&Settings::default()) {
+                let _ = e.key(Key::Other(VK_MASK), enigo::Direction::Click);
+            }
+        }
         std::thread::sleep(Duration::from_millis(10));
     }
 }

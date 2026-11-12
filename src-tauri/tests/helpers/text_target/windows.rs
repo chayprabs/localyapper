@@ -1,6 +1,6 @@
 //! Win32 window with a multi-line EDIT control.
 
-use crate::{ready, reply, spawn_stdin, Cmd};
+use crate::{clicks, ready, reply, spawn_stdin, Cmd, CLICKS};
 use std::sync::atomic::{AtomicIsize, Ordering};
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
@@ -55,6 +55,11 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
                         let _ = SetWindowTextW(edit(), w!(""));
                         reply("");
                     }
+                    3 => {
+                        let _ = ShowWindow(hwnd, SW_MAXIMIZE);
+                        reply("");
+                    }
+                    4 => reply(&clicks()),
                     _ => PostQuitMessage(0),
                 }
                 LRESULT(0)
@@ -127,7 +132,9 @@ pub fn run() {
                 Cmd::Get => 0,
                 Cmd::Focus => 1,
                 Cmd::Clear => 2,
-                Cmd::Quit => 3,
+                Cmd::Cover => 3,
+                Cmd::Clicks => 4,
+                Cmd::Quit => 5,
             };
             let main = HWND(MAIN.load(Ordering::Acquire) as *mut _);
             // Posting to our own window from the stdin thread (inside the
@@ -137,6 +144,9 @@ pub fn run() {
         ready();
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+            if msg.message == WM_LBUTTONDOWN {
+                CLICKS.fetch_add(1, Ordering::Relaxed);
+            }
             let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }

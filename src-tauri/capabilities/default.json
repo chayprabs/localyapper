@@ -2,7 +2,10 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for LocalYapper",
-  "windows": ["main", "overlay"],
+  "windows": [
+    "main",
+    "overlay"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-show",
@@ -17,7 +20,6 @@
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
     "autostart:allow-enable",
-    "autostart:allow-disable",
-    "notification:default"
+    "autostart:allow-disable"
   ]
 }

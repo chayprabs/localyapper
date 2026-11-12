@@ -153,7 +153,7 @@ jobs:
       - name: Smoke tests (Xvfb)
         if: runner.os == 'Linux'
         run: >
-          xvfb-run -a -s "-screen 0 1280x800x24"
+          dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24"
           cargo test --manifest-path src-tauri/Cargo.toml --features test-hooks --test smoke
           -- --test-threads=1 --nocapture
 

@@ -227,7 +227,7 @@ mod tests {
 
         assert_eq!(
             queries::get_setting(&conn, "hotkey_record").expect("hotkey_record"),
-            "F8"
+            RECORD_DEFAULT
         );
     }
 }
