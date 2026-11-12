@@ -4,9 +4,16 @@ use crate::{clicks, ready, reply, spawn_stdin, Cmd, CLICKS};
 use gtk::prelude::*;
 
 pub fn run() {
-    if gtk::init().is_err() {
-        eprintln!("text_target: no display");
-        std::process::exit(2);
+    // The X server can refuse a connection for a moment while the
+    // previous test's processes are still closing theirs; retry briefly.
+    let mut tries = 0;
+    while let Err(e) = gtk::init() {
+        tries += 1;
+        if tries >= 20 {
+            eprintln!("text_target: no display: {e}");
+            std::process::exit(2);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
     }
     let window = gtk::Window::new(gtk::WindowType::Toplevel);
     window.set_title("LocalYapper text target");

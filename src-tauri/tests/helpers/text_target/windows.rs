@@ -27,7 +27,13 @@ fn bring_to_front(hwnd: HWND) {
         let me = GetCurrentThreadId();
         let attached =
             fg_thread != 0 && fg_thread != me && AttachThreadInput(me, fg_thread, true).as_bool();
-        let _ = ShowWindow(hwnd, SW_RESTORE);
+        // SW_RESTORE would also un-maximize a window that "cover" just
+        // maximized; restore only from minimized.
+        if IsIconic(hwnd).as_bool() {
+            let _ = ShowWindow(hwnd, SW_RESTORE);
+        } else {
+            let _ = ShowWindow(hwnd, SW_SHOW);
+        }
         let _ = BringWindowToTop(hwnd);
         let _ = SetForegroundWindow(hwnd);
         let _ = SetFocus(edit());
