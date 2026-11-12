@@ -33,6 +33,7 @@
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "LocalYapper",
         "width": 900,
         "height": 650,

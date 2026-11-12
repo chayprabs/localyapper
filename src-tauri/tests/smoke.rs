@@ -395,6 +395,10 @@ impl App {
     }
 
     fn launch_with(audio: &Path, extra_settings: &str) -> Self {
+        Self::launch_args(audio, extra_settings, &[])
+    }
+
+    fn launch_args(audio: &Path, extra_settings: &str, args: &[&str]) -> Self {
         let port = free_port();
         let log = data_dir().join(format!("app-{port}.log"));
         let log_file = std::fs::File::create(&log).expect("log file");
@@ -404,6 +408,7 @@ impl App {
              overlay_preview=true;activation_mode=hold;{extra_settings}"
         );
         let child = Command::new(env!("CARGO_BIN_EXE_localyapper"))
+            .args(args)
             .env("LOCALYAPPER_DATA_DIR", data_dir())
             .env("LOCALYAPPER_TEST_PORT", port.to_string())
             .env("LOCALYAPPER_FAKE_AUDIO", audio)
@@ -800,6 +805,59 @@ fn test_dictation_reports_without_pasting() {
     );
     std::thread::sleep(Duration::from_millis(500));
     assert_eq!(t.text(), "", "a test dictation was pasted");
+}
+
+fn window_labels(app: &mut App) -> Vec<String> {
+    app.cmd("windows")["windows"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// P6.1, P6.2: after setup, and always at login, only the overlay exists.
+#[test]
+fn settings_window_not_created_at_start() {
+    let (wav, _) = fixture("clip01_16k");
+    {
+        let mut app = App::launch(&wav);
+        let labels = window_labels(&mut app);
+        assert!(
+            labels.iter().any(|l| l == "overlay"),
+            "no overlay: {labels:?}"
+        );
+        assert!(
+            !labels.iter().any(|l| l == "main"),
+            "settings window created: {labels:?}"
+        );
+    }
+    {
+        let mut app = App::launch_args(
+            &wav,
+            "setup_complete=false;setup_step=welcome",
+            &["--autostart"],
+        );
+        let labels = window_labels(&mut app);
+        assert!(
+            !labels.iter().any(|l| l == "main"),
+            "settings window created at login: {labels:?}"
+        );
+    }
+    {
+        // A first run opened by the user builds it for the wizard.
+        let mut app = App::launch_with(&wav, "setup_complete=false;setup_step=welcome");
+        let start = Instant::now();
+        while !window_labels(&mut app).iter().any(|l| l == "main") {
+            assert!(
+                start.elapsed() < WAIT,
+                "wizard window not created on first run"
+            );
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
 }
 
 #[test]

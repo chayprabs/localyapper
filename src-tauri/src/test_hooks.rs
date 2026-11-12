@@ -89,6 +89,10 @@ fn handle_line(line: &str, app: &AppHandle, ctl: &ControllerHandle) -> serde_jso
             ctl.send(Msg::Session(Event::Cancel));
             json!({"ok": true})
         }
+        "windows" => {
+            let labels: Vec<String> = app.webview_windows().into_keys().collect();
+            json!({"ok": true, "windows": labels})
+        }
         "test_on" => {
             ctl.send(Msg::TestDictation(true));
             json!({"ok": true})

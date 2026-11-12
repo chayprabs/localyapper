@@ -70,6 +70,9 @@ fn vad_model_path(app: &tauri::AppHandle) -> Option<PathBuf> {
 /// exist. The main window is destroyed on user close to free its WebView
 /// process; this helper recreates it on demand from the tray and the
 /// open-app hotkey.
+/// The argument the OS passes when it starts the app at login.
+const AUTOSTART_ARG: &str = "--autostart";
+
 pub(crate) fn show_or_create_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -147,7 +150,10 @@ macro_rules! app_commands {
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    let cli_action = controller::CliAction::from_args(&std::env::args().collect::<Vec<_>>());
+    let args: Vec<String> = std::env::args().collect();
+    let cli_action = controller::CliAction::from_args(&args);
+    // Launched at login (P6.2): never build the settings window.
+    let at_login = args.iter().any(|a| a == AUTOSTART_ARG);
 
     // Registered first: a second launch hands its arguments to this
     // instance and exits.
@@ -173,7 +179,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
+            Some(vec![AUTOSTART_ARG]),
         ))
         .setup(move |app| -> Result<(), Box<dyn std::error::Error>> {
             let app_data_dir = data_dir(app.handle()).map_err(|e| {
@@ -262,6 +268,18 @@ pub fn run() {
 
             if let Err(e) = tray::setup_tray(app) {
                 log::error!("Failed to setup system tray: {e}");
+            }
+
+            // The settings window is not created at start (P6.1): only the
+            // first-run wizard needs it, and never at login (P6.2). The
+            // tray, the open-app hotkey or a second launch build it.
+            let setup_complete = app
+                .state::<AppState>()
+                .settings
+                .get_or_default("setup_complete")
+                == "true";
+            if !setup_complete && !at_login && cli_action.is_none() {
+                show_or_create_main_window(app.handle());
             }
 
             {
