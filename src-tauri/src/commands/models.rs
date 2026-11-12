@@ -205,28 +205,6 @@ pub async fn download_speech_model(
         );
     }
 
-    let vad_path = models_dir.join(crate::stt::paths::SILERO_VAD_FILENAME);
-    if !vad_path.exists() {
-        log::info!("Downloading Silero VAD model...");
-        let client = reqwest::Client::new();
-        let resp = client
-            .get(crate::stt::paths::SILERO_VAD_URL)
-            .send()
-            .await
-            .map_err(|e| format!("Silero VAD download failed: {e}"))?;
-        if !resp.status().is_success() {
-            log::warn!("Silero VAD download failed with status: {}", resp.status());
-        } else {
-            let bytes = resp
-                .bytes()
-                .await
-                .map_err(|e| format!("Silero VAD read failed: {e}"))?;
-            std::fs::write(&vad_path, &bytes)
-                .map_err(|e| format!("Failed to write Silero VAD: {e}"))?;
-            log::info!("Silero VAD downloaded to {}", vad_path.display());
-        }
-    }
-
     let _ = app_handle.emit(
         "speech_model_download_progress",
         DownloadProgress {

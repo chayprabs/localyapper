@@ -47,10 +47,23 @@ pub(crate) fn resolve_model_spec(
     stt::paths::resolve_spec(&models_dir(app)?, &setting)
 }
 
-/// Silero VAD model, if present.
+/// The Silero VAD model bundled in the app's resources. When it is
+/// missing the segmenter falls back to the energy detector.
 fn vad_model_path(app: &tauri::AppHandle) -> Option<PathBuf> {
-    let p = models_dir(app).ok()?.join(stt::paths::SILERO_VAD_FILENAME);
-    p.is_file().then_some(p)
+    use tauri::path::BaseDirectory;
+    let p = app
+        .path()
+        .resolve(
+            format!("resources/{}", stt::paths::SILERO_VAD_FILENAME),
+            BaseDirectory::Resource,
+        )
+        .ok()?;
+    if p.is_file() {
+        Some(p)
+    } else {
+        log::warn!("vad: bundled model missing at {}", p.display());
+        None
+    }
 }
 
 /// Show the main settings window, building a new WebView when it does not

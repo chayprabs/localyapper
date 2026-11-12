@@ -6,7 +6,10 @@ repository, pins every file URL to that commit, and records size and
 SHA-256. Run on a machine that can reach huggingface.co (CI does this in
 .github/workflows/manifest.yml).
 
-Usage: gen-model-manifest.py [out_path]
+Also downloads the Silero VAD model that ships inside the app bundle,
+records its size and SHA-256 under "vad", and writes it to vad_out.
+
+Usage: gen-model-manifest.py [out_path] [vad_out]
 """
 import hashlib
 import json
@@ -15,6 +18,9 @@ import time
 import urllib.request
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "src-tauri/models.json"
+VAD_OUT = sys.argv[2] if len(sys.argv) > 2 else "src-tauri/resources/silero_vad.onnx"
+# sherpa-onnx's own export of Silero VAD (MIT), from its release assets.
+VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
 
 CANDIDATES = {
     "parakeet-110m": {
@@ -156,8 +162,15 @@ for m in models.values():
         if f["sha256"] is None:
             f["sha256"] = sha256_url(f["url"])
 
+with urllib.request.urlopen(VAD_URL, timeout=120) as r:
+    vad_bytes = r.read()
+with open(VAD_OUT, "wb") as fh:
+    fh.write(vad_bytes)
+vad = {"name": "silero_vad.onnx", "url": VAD_URL, "size": len(vad_bytes),
+       "sha256": hashlib.sha256(vad_bytes).hexdigest(), "license": "MIT"}
+
 with open(OUT, "w", encoding="utf-8") as fh:
-    json.dump({"schema": 1, "models": models}, fh, indent=2)
+    json.dump({"schema": 1, "vad": vad, "models": models}, fh, indent=2)
     fh.write("\n")
 print(json.dumps({k: {"repo": v["repo"], "mb": round(sum(f["size"] for f in v["files"]) / 1e6, 1)}
                   for k, v in models.items()}, indent=2))

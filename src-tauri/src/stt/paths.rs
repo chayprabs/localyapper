@@ -81,10 +81,8 @@ pub fn is_valid_stt_model_dir(model_dir: &Path) -> bool {
         && valid_stt_model_file_size(model_dir, "tokens.txt").is_some()
 }
 
-/// Silero VAD model download URL.
+/// File name of the bundled Silero VAD model.
 pub const SILERO_VAD_FILENAME: &str = "silero_vad.onnx";
-pub const SILERO_VAD_URL: &str =
-    "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx";
 
 /// Resolve a `speech_model` setting to an installed model in
 /// `models_dir`.
