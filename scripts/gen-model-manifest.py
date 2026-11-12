@@ -77,14 +77,21 @@ def sha256_url(url):
     return h.hexdigest()
 
 
+# Only sherpa-onnx's own exports are trusted. Third-party re-uploads are
+# ignored even when the name matches.
+TRUSTED_AUTHORS = ("csukuangfj", "k2-fsa")
+
+
 def search_int8(query):
-    """Repositories found by the Hub search whose name says int8."""
-    try:
-        found = get(f"https://huggingface.co/api/models?search={query}&limit=50")
-    except Exception as e:  # noqa: BLE001
-        print(f"search {query} failed: {e}", file=sys.stderr)
-        return []
-    return sorted(m["id"] for m in found if "int8" in m["id"].lower())
+    """Trusted repositories found by the Hub search whose name says int8."""
+    found = []
+    for author in TRUSTED_AUTHORS:
+        try:
+            found += get(f"https://huggingface.co/api/models?author={author}&search={query}&limit=50")
+        except Exception as e:  # noqa: BLE001
+            print(f"search {author}/{query} failed: {e}", file=sys.stderr)
+    return sorted({m["id"] for m in found
+                   if "int8" in m["id"].lower() and m["id"].split("/")[0] in TRUSTED_AUTHORS})
 
 
 # The int8 build of Parakeet 110M has no confirmed repository name, so ask
