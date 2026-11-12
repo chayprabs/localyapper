@@ -103,7 +103,7 @@ pub(crate) fn dispatch(ctl: &ControllerHandle, id: HotkeyId, pressed: bool, at_m
 /// when the portal is missing, which then works only for XWayland apps).
 pub fn create_backend(app: &tauri::AppHandle, ctl: &ControllerHandle) -> Arc<dyn HotkeyBackend> {
     #[cfg(target_os = "linux")]
-    if std::env::var_os("WAYLAND_DISPLAY").is_some() {
+    if crate::platform::inject::is_wayland_session() {
         match portal::PortalBackend::start(ctl.clone()) {
             Ok(b) => return Arc::new(b),
             Err(e) => {

@@ -1,9 +1,6 @@
 // IPC command handlers -- system utilities and permission checks
 use std::sync::atomic::Ordering;
 
-use crate::context::detector;
-#[cfg(target_os = "linux")]
-use crate::injection::platform::{self, Platform};
 use crate::models::PermissionsStatus;
 use crate::state::AppState;
 use cpal::traits::HostTrait;
@@ -16,7 +13,7 @@ use std::process::Command;
 /// Returns the name of the currently focused application.
 #[tauri::command]
 pub async fn get_focused_app() -> Result<String, String> {
-    Ok(detector::get_focused_window_name())
+    Ok(crate::platform::focus::foreground_app().name)
 }
 
 /// Returns system permissions status (mic + accessibility).
@@ -59,33 +56,7 @@ fn microphone_available() -> bool {
 }
 
 fn accessibility_available() -> bool {
-    #[cfg(target_os = "macos")]
-    {
-        macos_accessibility_trusted()
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        true
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        match platform::detect() {
-            Platform::LinuxWayland => {
-                command_available("wl-copy")
-                    && command_available("wl-paste")
-                    && command_available("wtype")
-            }
-            Platform::LinuxX11 => command_available("xclip") && command_available("xdotool"),
-            Platform::Windows | Platform::MacOS => true,
-        }
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-    {
-        false
-    }
+    crate::platform::permissions::accessibility_trusted(false)
 }
 
 fn open_accessibility_settings_panel() -> Result<(), String> {
@@ -192,16 +163,4 @@ fn command_available(program: &str) -> bool {
 #[cfg(target_os = "linux")]
 fn executable_candidate(dir: &Path, program: &str) -> std::path::PathBuf {
     dir.join(program)
-}
-
-#[cfg(target_os = "macos")]
-fn macos_accessibility_trusted() -> bool {
-    #[link(name = "ApplicationServices", kind = "framework")]
-    extern "C" {
-        fn AXIsProcessTrusted() -> std::os::raw::c_uchar;
-    }
-
-    // SAFETY: AXIsProcessTrusted reads the current process TCC trust state and
-    // does not require pointers or owned resources.
-    unsafe { AXIsProcessTrusted() != 0 }
 }

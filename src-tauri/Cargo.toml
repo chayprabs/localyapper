@@ -63,14 +63,27 @@ windows = { version = "0.58", features = [
     "Win32_System_Threading",
     "Win32_System_ProcessStatus",
     "Win32_System_SystemInformation",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Security",
 ] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+# Wayland: clipboard through the data-control protocol, keys through the
+# virtual keyboard protocol. X11 keeps enigo's default xdo back end.
+arboard = { version = "3", features = ["wayland-data-control"] }
+enigo = { version = "0.2", features = ["wayland"] }
+# Modifier state and the active window on X11 without external tools.
+x11-dl = "2"
 # Wayland global shortcuts through the xdg-desktop-portal.
 ashpd = { version = "0.13", default-features = false, features = ["global_shortcuts", "tokio"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+block2 = "0.6"
 
 # Release profile tuned for a small, fast binary. Panics are aborts because
 # the app does not unwind across the sherpa-onnx FFI boundary; aborting is

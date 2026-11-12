@@ -9,7 +9,9 @@ use crate::core::audio::segmenter::{self, EnergyDetector, Flags, SileroDetector,
 use crate::core::session::{self, Cue, Effect, Event, Session, SessionId, TimerKind};
 use crate::core::stt::manager::{LoadOutcome, ModelManager, ModelSpec, SttWorker, WorkerEvent};
 use crate::platform::audio_in::{AudioThread, Capture};
+use crate::platform::focus::{self, ForegroundApp};
 use crate::platform::hotkey::{HotkeyBackend, HotkeyId};
+use crate::platform::inject::{self, InjectOptions, Outcome, PasteMethod};
 use crate::platform::memory;
 use crate::platform::overlay::OverlayBackend;
 use serde::Serialize;
@@ -132,6 +134,9 @@ pub struct ControllerSettings {
     pub hotkey_cancel: String,
     pub sound_cues: bool,
     pub overlay_enabled: bool,
+    pub paste_method: PasteMethod,
+    pub restore_clipboard: bool,
+    pub clipboard_restore_delay_ms: u64,
 }
 
 impl Default for ControllerSettings {
@@ -144,6 +149,9 @@ impl Default for ControllerSettings {
             hotkey_cancel: "Escape".into(),
             sound_cues: false,
             overlay_enabled: true,
+            paste_method: PasteMethod::Auto,
+            restore_clipboard: true,
+            clipboard_restore_delay_ms: 250,
         }
     }
 }
@@ -180,6 +188,14 @@ impl ControllerSettings {
         }
         s.sound_cues = flag("sound_cues", false);
         s.overlay_enabled = flag("overlay_enabled", true);
+        s.paste_method = get("paste_method")
+            .and_then(PasteMethod::parse)
+            .unwrap_or(PasteMethod::Auto);
+        s.restore_clipboard = flag("restore_clipboard", true);
+        s.clipboard_restore_delay_ms = get("clipboard_restore_delay_ms")
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|v| (100..=2000).contains(v))
+            .unwrap_or(250);
         s
     }
 }
@@ -230,7 +246,7 @@ pub struct Controller {
     captures: HashMap<SessionId, CaptureFlags>,
     current_id: Option<SessionId>,
     timing: Timing,
-    target_app: String,
+    target_app: ForegroundApp,
     /// The cancel combo registered now, if any. Never re-read from
     /// settings while registered, so unregister always matches.
     cancel_registered: Option<String>,
@@ -296,7 +312,7 @@ pub fn start(parts: ControllerParts) -> Result<Started, String> {
         captures: HashMap::new(),
         current_id: None,
         timing: Timing::default(),
-        target_app: String::new(),
+        target_app: ForegroundApp::default(),
         cancel_registered: None,
         evict_generation: 0,
         rss_before_evict: None,
@@ -358,7 +374,6 @@ impl Controller {
             }
             Msg::OpenApp => crate::show_or_create_main_window(&self.app),
             Msg::Cli(action) => self.cli(action),
-
             Msg::SetPaused(p) => {
                 self.paused.store(p, Ordering::SeqCst);
                 self.feed(Event::SetPaused(p));
@@ -492,7 +507,7 @@ impl Controller {
 
     fn start_capture(&mut self, id: SessionId) {
         // The target app is read before any overlay call.
-        self.target_app = crate::context::detector::get_focused_window_name();
+        self.target_app = focus::foreground_app();
         self.current_id = Some(id);
         let flags = CaptureFlags {
             stopped: Arc::new(AtomicBool::new(false)),
@@ -642,6 +657,15 @@ impl Controller {
         }
     }
 
+    fn inject_options(&self) -> InjectOptions {
+        InjectOptions {
+            method: self.settings.paste_method,
+            restore_clipboard: self.settings.restore_clipboard,
+            restore_delay_ms: self.settings.clipboard_restore_delay_ms,
+            target_process: self.target_app.process.clone(),
+        }
+    }
+
     fn inject(&mut self, id: SessionId, text: String) {
         self.timing.inject_started = Some(Instant::now());
         if let Ok(mut last) = self.last_injection.lock() {
@@ -652,9 +676,26 @@ impl Controller {
         } else {
             text
         };
+        let opts = self.inject_options();
+        let blocked = self.target_app.blocked_by_elevation;
         let handle = self.handle.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            let result = crate::injection::injector::inject(&payload, false);
+            let result = if blocked {
+                // UIPI drops our key events into an elevated window.
+                let _ = inject::set_clipboard_text(&payload);
+                Err(
+                    "Cannot type into an administrator window. The text is on the clipboard."
+                        .to_string(),
+                )
+            } else {
+                match inject::inject(&payload, &opts) {
+                    Ok(Outcome::CopiedOnly {
+                        reason: Some(reason),
+                    }) => Err(reason),
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(e),
+                }
+            };
             handle.send(Msg::Session(Event::InjectDone { id, result }));
         });
     }
@@ -664,8 +705,10 @@ impl Controller {
         let Some(text) = text.filter(|t| !t.is_empty()) else {
             return;
         };
+        let mut opts = self.inject_options();
+        opts.target_process = focus::foreground_app().process;
         tauri::async_runtime::spawn_blocking(move || {
-            if let Err(e) = crate::injection::injector::inject(&text, false) {
+            if let Err(e) = inject::inject(&text, &opts) {
                 log::warn!("paste last: {e}");
             }
         });
@@ -676,7 +719,7 @@ impl Controller {
             id: uuid::Uuid::new_v4().to_string(),
             raw_text: text.to_string(),
             final_text: text.to_string(),
-            app_name: Some(self.target_app.clone()),
+            app_name: Some(self.target_app.name.clone()),
             duration_ms: Some(audio_ms as i64),
             word_count: Some(text.split_whitespace().count() as i64),
             created_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),

@@ -4,7 +4,6 @@ pub mod controller;
 pub mod core;
 mod db;
 mod error;
-mod injection;
 mod models;
 pub mod platform;
 mod state;
