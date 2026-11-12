@@ -146,6 +146,11 @@ impl Drop for TextTarget {
         let s = self.conn.get_mut();
         let _ = writeln!(s, "quit");
         let _ = s.flush();
+        if self.child.is_none() {
+            // Started through LaunchServices: make sure it is gone.
+            std::thread::sleep(Duration::from_millis(300));
+            let _ = Command::new("kill").arg(self.pid.to_string()).status();
+        }
         if let Some(child) = self.child.as_mut() {
             let start = Instant::now();
             while start.elapsed() < Duration::from_secs(3) {
@@ -164,7 +169,7 @@ fn keys_allowed() -> bool {
     if localyapper_lib::platform::permissions::accessibility_trusted(false) {
         return true;
     }
-    println!("SKIP: no Accessibility grant on runner");
+    println!("SKIP: no Accessibility grant on runner (synthetic key events are not allowed)");
     false
 }
 

@@ -73,7 +73,28 @@ mod mac {
         static kCFTypeDictionaryValueCallBacks: c_void;
     }
 
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGPreflightPostEventAccess() -> bool;
+        fn CGRequestPostEventAccess() -> bool;
+    }
+
+    /// Accessibility, plus the separate grant to post synthetic events,
+    /// which macOS checks when keys are sent.
     pub fn ax_trusted(prompt: bool) -> bool {
+        let ax = ax_trusted_only(prompt);
+        // SAFETY: plain permission queries without arguments.
+        let post = unsafe {
+            if prompt {
+                CGRequestPostEventAccess()
+            } else {
+                CGPreflightPostEventAccess()
+            }
+        };
+        ax && post
+    }
+
+    fn ax_trusted_only(prompt: bool) -> bool {
         // SAFETY: builds a one-entry CFDictionary from static CF constants,
         // passes it to AXIsProcessTrustedWithOptions and releases it.
         unsafe {

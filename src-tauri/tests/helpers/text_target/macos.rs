@@ -87,7 +87,7 @@ pub fn run() {
                     reply("");
                 }
                 Cmd::Clicks => reply(&clicks()),
-                Cmd::Quit => return,
+                Cmd::Quit => std::process::exit(0),
             }
         }
     }
