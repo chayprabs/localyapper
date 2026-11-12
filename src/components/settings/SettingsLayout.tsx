@@ -20,7 +20,7 @@ const HotkeysPage = lazy(() =>
   import("@/components/hotkeys/HotkeysPage").then((m) => ({ default: m.HotkeysPage })),
 );
 const ModelsPage = lazy(() =>
-  import("@/components/models/ModelsPage").then((m) => ({ default: m.ModelsPage })),
+  import("@/components/speech/SpeechPage").then((m) => ({ default: m.SpeechPage })),
 );
 
 /** Page ID → React component lookup table for content area rendering. */
