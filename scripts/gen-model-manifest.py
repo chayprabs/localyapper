@@ -77,6 +77,23 @@ def sha256_url(url):
     return h.hexdigest()
 
 
+def search_int8(query):
+    """Repositories found by the Hub search whose name says int8."""
+    try:
+        found = get(f"https://huggingface.co/api/models?search={query}&limit=50")
+    except Exception as e:  # noqa: BLE001
+        print(f"search {query} failed: {e}", file=sys.stderr)
+        return []
+    return sorted(m["id"] for m in found if "int8" in m["id"].lower())
+
+
+# The int8 build of Parakeet 110M has no confirmed repository name, so ask
+# the Hub search before falling back to the fp32 repository.
+extra = [r for r in search_int8("parakeet_tdt_ctc_110m") + search_int8("parakeet-tdt-ctc-110m")
+         if r not in CANDIDATES["parakeet-110m"]["repos"]]
+CANDIDATES["parakeet-110m"]["repos"] = (
+    CANDIDATES["parakeet-110m"]["repos"][:1] + extra + CANDIDATES["parakeet-110m"]["repos"][1:])
+
 models = {}
 for model_id, spec in CANDIDATES.items():
     for repo in spec["repos"]:
@@ -120,6 +137,12 @@ for model_id, spec in CANDIDATES.items():
         break
     else:
         print(f"WARNING: no repository found for {model_id}", file=sys.stderr)
+
+# Without an int8 build the default already is the fp32 build: no
+# separate legacy entry is needed.
+if models.get("parakeet-110m", {}).get("repo") == models.get("parakeet-110m-fp32", {}).get("repo"):
+    models.pop("parakeet-110m-fp32", None)
+    print("no int8 build of parakeet-110m found; keeping fp32", file=sys.stderr)
 
 for m in models.values():
     for f in m["files"]:
