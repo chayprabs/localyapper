@@ -165,11 +165,39 @@ impl Drop for TextTarget {
 }
 
 /// macOS drops synthetic key events without the Accessibility grant.
-fn keys_allowed() -> bool {
-    if localyapper_lib::platform::permissions::accessibility_trusted(false) {
+/// Whether synthetic key events reach the focused target on this runner.
+/// Elsewhere this is the OS grant. On macOS the runner can report the
+/// grant and still drop events, so a probe string is typed straight
+/// through enigo (not through LocalYapper's paste path); if even that
+/// never arrives the test is skipped with the reason printed.
+fn keys_reach(t: &mut TextTarget) -> bool {
+    if !localyapper_lib::platform::permissions::accessibility_trusted(false) {
+        println!("SKIP: no Accessibility grant on runner (synthetic key events are not allowed)");
+        return false;
+    }
+    if !cfg!(target_os = "macos") {
+        t.focus();
         return true;
     }
-    println!("SKIP: no Accessibility grant on runner (synthetic key events are not allowed)");
+    use enigo::{Enigo, Keyboard, Settings};
+    t.command("focus");
+    std::thread::sleep(Duration::from_millis(500));
+    if localyapper_lib::platform::focus::foreground_pid() != Some(t.pid) {
+        println!("SKIP: no Accessibility grant on runner (the runner keeps another app in front)");
+        return false;
+    }
+    if let Ok(mut e) = Enigo::new(&Settings::default()) {
+        let _ = e.text("probe");
+    }
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(3) {
+        if t.text() == "probe" {
+            t.command("clear");
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    println!("SKIP: no Accessibility grant on runner (synthetic key events are dropped)");
     false
 }
 
@@ -195,22 +223,20 @@ fn wait_clipboard(want: &str) -> Option<String> {
 
 #[test]
 fn inject_types_into_target() {
-    if !keys_allowed() {
+    let mut t = TextTarget::spawn();
+    if !keys_reach(&mut t) {
         return;
     }
-    let mut t = TextTarget::spawn();
-    t.focus();
     inject::inject("Hello, world.", &opts(250)).expect("inject");
     assert_eq!(t.wait_for("Hello, world."), "Hello, world.");
 }
 
 #[test]
 fn inject_restores_clipboard() {
-    if !keys_allowed() {
+    let mut t = TextTarget::spawn();
+    if !keys_reach(&mut t) {
         return;
     }
-    let mut t = TextTarget::spawn();
-    t.focus();
 
     // Text on the clipboard comes back after the restore delay.
     inject::set_clipboard_text("user clipboard").expect("set clipboard");
@@ -249,12 +275,11 @@ fn inject_restores_clipboard() {
 
 #[test]
 fn inject_with_modifier_down() {
-    if !keys_allowed() {
-        return;
-    }
     use enigo::{Direction, Enigo, Key, Keyboard, Settings};
     let mut t = TextTarget::spawn();
-    t.focus();
+    if !keys_reach(&mut t) {
+        return;
+    }
     let mut enigo = Enigo::new(&Settings::default()).expect("enigo");
     enigo.key(Key::Alt, Direction::Press).expect("alt down");
     let release = std::thread::spawn(|| {
