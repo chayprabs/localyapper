@@ -11,11 +11,6 @@ use std::path::Path;
 use std::process::Command;
 
 /// Returns the name of the currently focused application.
-#[tauri::command]
-pub async fn get_focused_app() -> Result<String, String> {
-    Ok(crate::platform::focus::foreground_app().name)
-}
-
 /// Returns system permissions status (mic + accessibility).
 /// Input device names, the system default first.
 #[tauri::command]

@@ -11,13 +11,6 @@ export interface HistoryEntry {
 
 // Pipeline & model types
 
-export interface PipelineResult {
-  raw_text: string;
-  final_text: string;
-  duration_ms: number;
-  word_count: number;
-}
-
 export interface DownloadProgress {
   percent: number;
   downloaded_mb: number;

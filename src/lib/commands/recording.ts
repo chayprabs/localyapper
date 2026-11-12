@@ -1,32 +1,12 @@
-// IPC wrappers -- recording control and text injection
+// IPC wrappers -- dictation actions handled by the backend controller
 import { invoke } from "@tauri-apps/api/core";
-import type { PipelineResult } from "@/types/commands";
 
-export async function startRecording(): Promise<void> {
-  return invoke<void>("start_recording");
-}
-
-export async function stopRecording(): Promise<PipelineResult> {
-  return invoke<PipelineResult>("stop_recording");
-}
-
-export async function runPipeline(audio: number[]): Promise<PipelineResult> {
-  return invoke<PipelineResult>("run_pipeline", { audio });
-}
-
-// Text injection
-
-export async function injectText(
-  text: string,
-  holdShift: boolean,
-): Promise<void> {
-  return invoke<void>("inject_text", { text, holdShift });
-}
-
+/** Paste the last dictated text again. */
 export async function pasteLast(): Promise<void> {
   return invoke<void>("paste_last");
 }
 
+/** Cancel the recording in progress. */
 export async function cancelRecording(): Promise<void> {
   return invoke<void>("cancel_recording");
 }

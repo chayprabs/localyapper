@@ -2,10 +2,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { PermissionsStatus } from "@/types/commands";
 
-export async function getFocusedApp(): Promise<string> {
-  return invoke<string>("get_focused_app");
-}
-
 export async function checkPermissions(): Promise<PermissionsStatus> {
   return invoke<PermissionsStatus>("check_permissions");
 }
