@@ -7,6 +7,7 @@ mod error;
 mod hotkey;
 mod injection;
 mod models;
+pub mod platform;
 mod state;
 mod stt;
 mod tray;
