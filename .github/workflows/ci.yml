@@ -101,3 +101,40 @@ jobs:
         run: >
           cargo test --manifest-path src-tauri/Cargo.toml --test pipeline
           -- --include-ignored pipeline --nocapture
+
+  smoke:
+    name: Smoke ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-15]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: smoke
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev xvfb xdotool
+
+      - name: Smoke tests (Xvfb)
+        if: runner.os == 'Linux'
+        run: >
+          xvfb-run -a -s "-screen 0 1280x800x24"
+          cargo test --manifest-path src-tauri/Cargo.toml --features test-hooks --test smoke
+          -- --test-threads=1 --nocapture
+
+      - name: Smoke tests
+        if: runner.os != 'Linux'
+        run: >
+          cargo test --manifest-path src-tauri/Cargo.toml --features test-hooks --test smoke
+          -- --test-threads=1 --nocapture

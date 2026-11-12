@@ -180,7 +180,10 @@ mod tests {
             conn.query_row("SELECT COUNT(*) FROM settings", [], |row| row.get(0))?;
         assert_eq!(settings_count, 14);
         assert_eq!(queries::get_setting(&conn, "cancel_key_enabled")?, "true");
-        assert_eq!(queries::get_setting(&conn, "cancel_key_in_hands_free")?, "false");
+        assert_eq!(
+            queries::get_setting(&conn, "cancel_key_in_hands_free")?,
+            "false"
+        );
         assert_eq!(queries::get_setting(&conn, "idle_unload_seconds")?, "60");
 
         Ok(())

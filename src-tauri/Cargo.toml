@@ -5,6 +5,7 @@ description = "Local-first voice dictation desktop app"
 authors = ["Chaitanya"]
 license = "MIT"
 edition = "2021"
+default-run = "localyapper"
 
 [lib]
 name = "localyapper_lib"
@@ -22,6 +23,12 @@ sherpa-shared = ["sherpa-onnx/shared"]
 # Test-only hooks: fake audio source and the controller test channel.
 # Never enabled in release builds.
 test-hooks = []
+
+# Smoke-test helper: a native window with one text field (plan 8A).
+[[bin]]
+name = "text_target"
+path = "tests/helpers/text_target/main.rs"
+required-features = ["test-hooks"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -65,6 +72,8 @@ windows = { version = "0.58", features = [
     "Win32_System_SystemInformation",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_Security",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
 ] }
 
 [target.'cfg(unix)'.dependencies]
@@ -77,6 +86,8 @@ arboard = { version = "3", features = ["wayland-data-control"] }
 enigo = { version = "0.2", features = ["wayland"] }
 # Modifier state and the active window on X11 without external tools.
 x11-dl = "2"
+# GTK text view for the smoke-test text target (already built by tao).
+gtk = "0.18"
 # Wayland global shortcuts through the xdg-desktop-portal.
 ashpd = { version = "0.13", default-features = false, features = ["global_shortcuts", "tokio"] }
 
@@ -84,6 +95,7 @@ ashpd = { version = "0.13", default-features = false, features = ["global_shortc
 objc2 = "0.6"
 objc2-app-kit = "0.3"
 block2 = "0.6"
+objc2-foundation = "0.3"
 
 # Release profile tuned for a small, fast binary. Panics are aborts because
 # the app does not unwind across the sherpa-onnx FFI boundary; aborting is
