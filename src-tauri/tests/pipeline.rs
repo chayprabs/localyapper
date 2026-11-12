@@ -167,3 +167,45 @@ fn pipeline_energy_fallback_finds_speech_in_fixtures() {
         );
     }
 }
+
+/// The bundled Silero VAD loads and splits the fixture with a 3 s pause.
+#[test]
+fn pipeline_silero_vad_segments_fixtures() {
+    for (path, _) in fixtures() {
+        let data = wav::read_file(&path).expect("read fixture");
+        let sink = Collect::default();
+        let stop = AtomicBool::new(true);
+        let discard = AtomicBool::new(false);
+        let mut vad = SileroDetector::new(&vad_model()).expect("bundled Silero VAD loads");
+        let summary = run_segmenter(
+            1,
+            data.sample_rate,
+            &mut VecSource::new(data.to_mono()),
+            Flags {
+                stop: &stop,
+                discard: &discard,
+            },
+            &mut vad,
+            &sink,
+            &|_| {},
+            &mut |_| {},
+        )
+        .expect("segmenter");
+        let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("?");
+        assert!(summary.segments >= 1, "{name}: no segment");
+        assert!(!summary.safety_net, "{name}: VAD found nothing");
+        if name.contains("pause") {
+            assert!(summary.segments >= 2, "{name}: pause not split");
+        }
+        // Silero's 15 s max_speech_duration is soft: past it the threshold
+        // rises until the next pause, so a long unbroken sentence can run a
+        // little over. Nothing may run away, though.
+        for (_, s) in sink.0.into_inner().unwrap_or_default() {
+            assert!(
+                s.len() <= 16_000 * 20,
+                "{name}: segment of {} samples",
+                s.len()
+            );
+        }
+    }
+}
