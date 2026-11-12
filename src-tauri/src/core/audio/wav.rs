@@ -96,26 +96,36 @@ pub fn parse(b: &[u8]) -> Result<WavData, String> {
             .map(|&v| (f32::from(v) - 128.0) / 128.0)
             .collect(),
         (1, 16) => data
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|s| f32::from(i16::from_le_bytes([s[0], s[1]])) / 32768.0)
             .collect(),
         (1, 24) => data
-            .chunks_exact(3)
+            .as_chunks::<3>()
+            .0
+            .iter()
             .map(|s| {
                 let v = i32::from_le_bytes([0, s[0], s[1], s[2]]) >> 8;
                 v as f32 / 8_388_608.0
             })
             .collect(),
         (1, 32) => data
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|s| i32::from_le_bytes([s[0], s[1], s[2], s[3]]) as f32 / 2_147_483_648.0)
             .collect(),
         (3, 32) => data
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|s| f32::from_le_bytes([s[0], s[1], s[2], s[3]]))
             .collect(),
         (3, 64) => data
-            .chunks_exact(8)
+            .as_chunks::<8>()
+            .0
+            .iter()
             .map(|s| f64::from_le_bytes([s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]]) as f32)
             .collect(),
         _ => return Err(format!("unsupported WAV format {format} with {bits} bits")),
