@@ -66,3 +66,38 @@ jobs:
 
       - name: Test
         run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  pipeline:
+    name: Pipeline (model)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: pipeline
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev
+
+      - name: Cache models
+        uses: actions/cache@v4
+        with:
+          path: ~/models
+          key: models-${{ hashFiles('src-tauri/models.json') }}-parakeet-110m
+
+      - name: Download default model
+        run: python3 scripts/fetch-models.py src-tauri/models.json ~/models parakeet-110m
+
+      - name: Headless pipeline test
+        env:
+          LOCALYAPPER_TEST_MODEL_DIR: /home/runner/models/parakeet-110m
+        run: >
+          cargo test --manifest-path src-tauri/Cargo.toml --test pipeline
+          -- --include-ignored pipeline --nocapture
