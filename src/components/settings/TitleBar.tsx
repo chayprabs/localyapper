@@ -20,7 +20,7 @@ export function TitleBar() {
         data-tauri-drag-region
         className="pl-4 flex items-center gap-2"
       >
-        <img src={logoImg} alt="LocalYapper" className="w-[14px] h-[14px]" draggable={false} />
+        <img src={logoImg} alt="LocalYapper" className="w-[14px] h-[14px] object-contain" draggable={false} />
         <span data-tauri-drag-region className="text-[13px] font-semibold text-black/90">
           LocalYapper
         </span>
