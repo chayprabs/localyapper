@@ -350,7 +350,11 @@ fn data_dir() -> &'static Path {
         let model_src = std::env::var_os("LOCALYAPPER_TEST_MODEL_DIR")
             .map(PathBuf::from)
             .expect("set LOCALYAPPER_TEST_MODEL_DIR to the parakeet-110m model folder");
-        let model_dst = dir.join("models").join("parakeet-tdt-ctc-110m");
+        let manifest = localyapper_lib::core::stt::catalog::manifest().expect("manifest");
+        let entry = &manifest.models[localyapper_lib::core::stt::catalog::DEFAULT_MODEL];
+        let model_dst = dir
+            .join("models")
+            .join(localyapper_lib::core::stt::catalog::DEFAULT_MODEL);
         std::fs::create_dir_all(&model_dst).expect("model dir");
         for entry in std::fs::read_dir(&model_src)
             .expect("read model dir")
@@ -361,6 +365,13 @@ fn data_dir() -> &'static Path {
                 std::fs::copy(entry.path(), &to).expect("copy model file");
             }
         }
+        // The files came from scripts/fetch-models.py, which checked every
+        // SHA-256, so the install marker can be written directly.
+        std::fs::write(
+            model_dst.join(localyapper_lib::core::stt::catalog::VERIFIED_MARKER),
+            localyapper_lib::core::stt::catalog::marker_text(entry),
+        )
+        .expect("marker");
         dir
     })
 }
@@ -389,6 +400,7 @@ impl App {
         let log_file = std::fs::File::create(&log).expect("log file");
         let settings = format!(
             "setup_complete=true;setup_step=done;auto_start=false;idle_unload_seconds=0;\
+             speech_model=parakeet-110m;\
              overlay_preview=true;activation_mode=hold;{extra_settings}"
         );
         let child = Command::new(env!("CARGO_BIN_EXE_localyapper"))

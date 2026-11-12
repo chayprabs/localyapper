@@ -45,7 +45,7 @@ fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
         ("hotkey_cancel", "Escape"),
         ("hotkey_paste_last", "Ctrl+Alt+J"),
         ("hotkey_open_app", "Ctrl+Alt+O"),
-        ("speech_model", "parakeet-110m"),
+        ("speech_model", "auto"),
         ("auto_start", "true"),
         ("overlay_x", "100"),
         ("overlay_y", "100"),
@@ -167,10 +167,7 @@ mod tests {
             crate::platform::hotkey::default_combo(crate::platform::hotkey::HotkeyId::Record)
         );
         assert_eq!(queries::get_setting(&conn, "hotkey_cancel")?, "Escape");
-        assert_eq!(
-            queries::get_setting(&conn, "speech_model")?,
-            "parakeet-110m"
-        );
+        assert_eq!(queries::get_setting(&conn, "speech_model")?, "auto");
         // hotkey_hands_free is no longer a separate hotkey -- hands-free is a
         // double-tap of the record hotkey.
         assert!(queries::get_setting(&conn, "hotkey_hands_free").is_err());

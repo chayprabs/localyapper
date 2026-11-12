@@ -7,7 +7,6 @@ mod error;
 mod models;
 pub mod platform;
 mod state;
-mod stt;
 #[cfg(feature = "test-hooks")]
 mod test_hooks;
 mod tray;
@@ -45,14 +44,9 @@ pub(crate) fn models_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 pub(crate) fn resolve_model_spec(
     app: &tauri::AppHandle,
 ) -> Result<core::stt::manager::ModelSpec, String> {
-    let setting = app
-        .state::<AppState>()
-        .db
-        .lock()
-        .ok()
-        .and_then(|c| db::queries::get_setting(&c, "speech_model").ok())
-        .unwrap_or_else(|| stt::paths::DEFAULT_STT_MODEL.to_string());
-    stt::paths::resolve_spec(&models_dir(app)?, &setting)
+    let state = app.state::<AppState>();
+    let id = commands::models::active_model_id(state.inner())?;
+    core::stt::catalog::spec(&models_dir(app)?, &id, commands::models::manifest()?)
 }
 
 /// The Silero VAD model bundled in the app's resources. When it is
@@ -61,10 +55,7 @@ fn vad_model_path(app: &tauri::AppHandle) -> Option<PathBuf> {
     use tauri::path::BaseDirectory;
     let p = app
         .path()
-        .resolve(
-            format!("resources/{}", stt::paths::SILERO_VAD_FILENAME),
-            BaseDirectory::Resource,
-        )
+        .resolve("resources/silero_vad.onnx", BaseDirectory::Resource)
         .ok()?;
     if p.is_file() {
         Some(p)
@@ -117,6 +108,10 @@ macro_rules! app_commands {
             commands::models::cancel_model_download,
             commands::models::reload_models,
             commands::models::check_models_status,
+            commands::models::list_models,
+            commands::models::download_model,
+            commands::models::use_model,
+            commands::models::delete_model,
             commands::models::get_model_state,
             commands::models::check_speech_model_file_exists,
             commands::models::delete_speech_model,
@@ -191,16 +186,7 @@ pub fn run() {
                 .get("auto_start")
                 .map(|v| v.eq_ignore_ascii_case("true"))
                 .unwrap_or(true);
-            let speech_model_installed = stt::paths::resolve_spec(
-                &models_dir(app.handle())?,
-                settings_map
-                    .get("speech_model")
-                    .map_or(stt::paths::DEFAULT_STT_MODEL, String::as_str),
-            )
-            .is_ok();
-            if !speech_model_installed {
-                log::warn!("Speech model files not found at startup");
-            }
+            commands::models::migrate_legacy_install(&models_dir(app.handle())?);
 
             let controller_settings = controller::ControllerSettings::from_map(&settings_map);
             // The overlay window is created here, hidden, so a key press
