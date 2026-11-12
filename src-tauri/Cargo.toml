@@ -52,9 +52,20 @@ futures-util = "0.3"
 # to freed ONNX scratch space, which would defeat the idle-unload work.
 ringbuf = "0.4"
 mimalloc = { version = "0.1", default-features = false }
+# mi_collect() after model eviction (plan P1.13).
+libmimalloc-sys = { version = "0.1", features = ["extended"] }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Threading"] }
+windows = { version = "0.58", features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_System_ProcessStatus",
+    "Win32_System_SystemInformation",
+] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 # Release profile tuned for a small, fast binary. Panics are aborts because
 # the app does not unwind across the sherpa-onnx FFI boundary; aborting is
