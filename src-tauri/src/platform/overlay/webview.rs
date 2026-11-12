@@ -344,6 +344,12 @@ impl OverlayBackend for WebviewOverlay {
     }
 
     fn release(&self) {
+        // On macOS the overlay is an NSPanel (tauri-nspanel), which aborts
+        // the process when its window is destroyed and rebuilt, so there
+        // the overlay stays alive.
+        if cfg!(target_os = "macos") {
+            return;
+        }
         self.generation.fetch_add(1, Ordering::AcqRel);
         self.visible.store(false, Ordering::Release);
         let app = self.app.clone();

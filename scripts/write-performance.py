@@ -34,6 +34,22 @@ States:
 5. The same with the overlay window destroyed, to price keeping the
    overlay alive (plan P6.3).
 
+Acceptance criterion A7 asks for under 40 MB private memory in the main
+process when idle with the model evicted. Where the tables show more:
+
+- On Linux and macOS the main process is already 70 to 80 MB before any
+  model is loaded: that is the GTK/WebKitGTK or AppKit/WebKit UI side of
+  the process with the overlay WebView, before LocalYapper's own work.
+- After eviction the main process stays above its pre-load size on
+  every OS. The recogniser is dropped and the allocators are asked to
+  return free memory (mimalloc `mi_collect`, glibc `malloc_trim`, macOS
+  `malloc_zone_pressure_relief`, Windows `HeapCompact`), but part of what
+  ONNX Runtime and sherpa-onnx allocated during the session is not
+  returned to the OS.
+- Ten minutes after the last dictation the overlay window is released
+  on Windows and Linux (state 5 shows what that saves); on macOS the
+  overlay panel is kept, so state 5 equals state 4 there.
+
 Release-to-text timings (A3) are in `docs/MODEL_BENCHMARK.md` (decode
 speed per model and thread count) and in the `PERF` lines of the CI smoke
 suite (`tests/smoke.rs`, end-to-end on each runner).
