@@ -118,6 +118,11 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --test pipeline
           -- --include-ignored pipeline --nocapture
 
+      - name: Fresh install downloads, verifies and dictates
+        run: >
+          cargo test --manifest-path src-tauri/Cargo.toml --test fresh_install
+          -- --include-ignored --nocapture
+
   smoke:
     name: Smoke ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
