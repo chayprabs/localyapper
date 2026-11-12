@@ -1,0 +1,120 @@
+name: Bench
+
+# Runs the speech model bench harness on the Linux runner and commits
+# docs/MODEL_BENCHMARK.md back to the branch. Also called by manifest.yml
+# and fixtures.yml after they commit, because pushes made with
+# GITHUB_TOKEN do not start new workflow runs.
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - src-tauri/models.json
+      - src-tauri/examples/bench.rs
+      - src-tauri/src/core/stt/**
+      - src-tauri/tests/fixtures/**
+      - scripts/write-benchmark.py
+      - .github/workflows/bench.yml
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    name: Bench models
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Check inputs
+        id: inputs
+        run: |
+          if [ -f src-tauri/models.json ] && ls src-tauri/tests/fixtures/*.wav >/dev/null 2>&1; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::models.json or fixtures not committed yet; bench not run"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node
+        if: steps.inputs.outputs.ready == 'true'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Rust
+        if: steps.inputs.outputs.ready == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        if: steps.inputs.outputs.ready == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: bench
+
+      - name: Install Linux dependencies
+        if: steps.inputs.outputs.ready == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev
+
+      - name: Cache models
+        if: steps.inputs.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/models
+          key: models-${{ hashFiles('src-tauri/models.json') }}
+
+      - name: Download models
+        if: steps.inputs.outputs.ready == 'true'
+        run: python3 scripts/fetch-models.py src-tauri/models.json ~/models
+
+      - name: Build bench
+        if: steps.inputs.outputs.ready == 'true'
+        env:
+          CARGO_PROFILE_RELEASE_LTO: "false"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+        run: |
+          npm ci
+          npm run build
+          cargo build --release --example bench --manifest-path src-tauri/Cargo.toml
+
+      - name: Run bench
+        if: steps.inputs.outputs.ready == 'true'
+        run: |
+          mkdir -p bench-results
+          for id in $(python3 -c "import json; print(' '.join(json.load(open('src-tauri/models.json'))['models']))"); do
+            family=$(python3 -c "import json,sys; print(json.load(open('src-tauri/models.json'))['models'][sys.argv[1]]['family'])" "$id")
+            for t in 1 2 4; do
+              src-tauri/target/release/examples/bench --model-id "$id" --family "$family" \
+                --model-dir ~/models/"$id" --fixtures src-tauri/tests/fixtures --threads "$t" \
+                | tee "bench-results/${id}-t${t}.txt"
+            done
+          done
+          python3 scripts/write-benchmark.py bench-results docs/MODEL_BENCHMARK.md
+
+      - name: Commit results
+        if: steps.inputs.outputs.ready == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/MODEL_BENCHMARK.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "P0.3: update docs/MODEL_BENCHMARK.md from CI bench [skip ci]"
+          for i in 1 2 3 4; do
+            git pull --rebase origin "${{ github.ref_name }}" && git push origin HEAD:"${{ github.ref_name }}" && exit 0
+            sleep $((i * 10))
+          done
+          exit 1

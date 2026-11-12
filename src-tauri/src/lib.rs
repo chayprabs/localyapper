@@ -1,6 +1,7 @@
 mod audio;
 mod commands;
 mod context;
+pub mod core;
 mod db;
 mod error;
 mod hotkey;
