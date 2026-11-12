@@ -156,9 +156,37 @@ fn install_crash_reporting() {
     }
 }
 
+/// GTK exits with `_exit(1)` and no message when its X connection fails.
+/// Under test, replace the X I/O error handler with one that says which
+/// thread hit it, with a backtrace, and then exits the same way.
+#[cfg(target_os = "linux")]
+fn install_x_io_reporting() {
+    unsafe extern "C" fn on_io_error(_dpy: *mut x11_dl::xlib::Display) -> std::os::raw::c_int {
+        let err = std::io::Error::last_os_error();
+        let thread = std::thread::current();
+        let bt = std::backtrace::Backtrace::force_capture();
+        eprintln!(
+            "test hooks: X I/O error ({err}) on thread {:?}\n{bt}",
+            thread.name()
+        );
+        // SAFETY: terminate as GDK's own handler would.
+        unsafe { libc::_exit(1) }
+    }
+    let Ok(xlib) = x11_dl::xlib::Xlib::open() else {
+        return;
+    };
+    // SAFETY: installs a process-wide Xlib callback. libX11 stays loaded
+    // for the life of the process (GTK links it).
+    unsafe {
+        (xlib.XSetIOErrorHandler)(Some(on_io_error));
+    }
+}
+
 pub fn start(app: AppHandle, ctl: ControllerHandle) {
     #[cfg(unix)]
     install_crash_reporting();
+    #[cfg(target_os = "linux")]
+    install_x_io_reporting();
     let Some(port) = std::env::var("LOCALYAPPER_TEST_PORT")
         .ok()
         .and_then(|p| p.parse::<u16>().ok())
