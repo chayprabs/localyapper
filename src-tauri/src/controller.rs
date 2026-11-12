@@ -668,7 +668,7 @@ impl Controller {
 
     fn cue(&self, cue: Cue) {
         if self.settings.sound_cues {
-            log::debug!("controller: cue {cue:?}");
+            crate::platform::cues::play(cue);
         }
     }
 
