@@ -507,6 +507,8 @@ impl Drop for App {
         if std::thread::panicking() {
             let log = self.log_text();
             let tail: Vec<&str> = log.lines().rev().take(60).collect();
+            std::thread::sleep(Duration::from_millis(200));
+            eprintln!("---- app exit status: {:?} ----", self.child.try_wait());
             eprintln!("---- app log (last 60 lines) ----");
             for line in tail.iter().rev() {
                 eprintln!("{line}");

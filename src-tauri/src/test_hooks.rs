@@ -119,7 +119,46 @@ fn handle_line(line: &str, app: &AppHandle, ctl: &ControllerHandle) -> serde_jso
 }
 
 /// Start the control channel if LOCALYAPPER_TEST_PORT is set.
+/// Under test, report how the process ends: a crash signal prints its
+/// number and a backtrace, and `exit()` says so, so a smoke test that
+/// loses the app can tell which it was.
+#[cfg(unix)]
+fn install_crash_reporting() {
+    extern "C" fn on_signal(sig: libc::c_int) {
+        let bt = std::backtrace::Backtrace::force_capture();
+        eprintln!("test hooks: fatal signal {sig}\n{bt}");
+        // SAFETY: restore the default action and re-raise so the process
+        // still dies with the original signal.
+        unsafe {
+            libc::signal(sig, libc::SIG_DFL);
+            libc::raise(sig);
+        }
+    }
+    extern "C" fn on_exit() {
+        eprintln!("test hooks: process exiting through exit()");
+    }
+    // SAFETY: installing process-wide handlers once at startup.
+    unsafe {
+        for sig in [
+            libc::SIGSEGV,
+            libc::SIGBUS,
+            libc::SIGABRT,
+            libc::SIGILL,
+            libc::SIGFPE,
+            libc::SIGTERM,
+        ] {
+            libc::signal(sig, on_signal as *const () as libc::sighandler_t);
+        }
+        libc::atexit(on_exit);
+        // Rust ignores SIGPIPE; say if a library has put it back.
+        let old = libc::signal(libc::SIGPIPE, libc::SIG_IGN);
+        log::info!("test hooks: SIGPIPE disposition at start {old}");
+    }
+}
+
 pub fn start(app: AppHandle, ctl: ControllerHandle) {
+    #[cfg(unix)]
+    install_crash_reporting();
     let Some(port) = std::env::var("LOCALYAPPER_TEST_PORT")
         .ok()
         .and_then(|p| p.parse::<u16>().ok())
