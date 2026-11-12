@@ -85,10 +85,41 @@ def prepare_data_dir(model_dir):
     return data
 
 
+def mac_footprint(pid):
+    """phys_footprint from proc_pid_rusage: the private memory figure
+    Activity Monitor shows. USS also counts freed pages the allocator has
+    marked reusable until the system reclaims them."""
+    import ctypes
+
+    class RusageInfoV2(ctypes.Structure):
+        _fields_ = [("uuid", ctypes.c_uint8 * 16)] + [
+            (n, ctypes.c_uint64)
+            for n in (
+                "user_time", "system_time", "pkg_idle_wkups", "interrupt_wkups",
+                "pageins", "wired_size", "resident_size", "phys_footprint",
+                "proc_start_abstime", "proc_exit_abstime", "child_user_time",
+                "child_system_time", "child_pkg_idle_wkups", "child_interrupt_wkups",
+                "child_pageins", "child_elapsed_abstime", "diskio_bytesread",
+                "diskio_byteswritten",
+            )
+        ]
+
+    libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+    info = RusageInfoV2()
+    if libc.proc_pid_rusage(int(pid), 2, ctypes.byref(info)) != 0:
+        raise OSError("proc_pid_rusage failed")
+    return info.phys_footprint
+
+
 def private_bytes(p):
     try:
         if os.name == "nt":
             return p.memory_info().private
+        if platform.system() == "Darwin":
+            try:
+                return mac_footprint(p.pid)
+            except OSError:
+                pass
         return p.memory_full_info().uss
     except (psutil.AccessDenied, psutil.NoSuchProcess, AttributeError):
         try:

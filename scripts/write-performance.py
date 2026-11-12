@@ -19,7 +19,9 @@ P6.6). Do not edit by hand: the workflow rewrites this file.
 The app under test is the release build with the `test-hooks` feature,
 which only adds a local control channel used to drive the states below.
 Audio comes from a fixture file instead of a microphone. Private memory
-is USS on Linux and macOS and private bytes on Windows; WebView helpers
+is USS on Linux, private bytes on Windows and the physical footprint on
+macOS (what Activity Monitor shows; falls back to USS where it cannot be
+read); WebView helpers
 are the app's child processes (on macOS, the WebKit processes started
 with the app).
 
