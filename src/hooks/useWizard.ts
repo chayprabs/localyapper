@@ -1,4 +1,4 @@
-import { DEFAULT_RECORD_HOTKEY } from "@/lib/hotkeyDefaults";
+import { DEFAULT_RECORD_HOTKEY, isMacPlatform } from "@/lib/hotkeyDefaults";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DownloadProgress, PermissionsStatus } from "@/types/commands";
 import { getAllSettings, setSetting } from "@/lib/commands/settings";
@@ -12,21 +12,28 @@ import { updateHotkey } from "@/lib/commands/hotkeys";
 import {
   checkPermissions,
   openMicSettings,
+  requestMicrophonePermission,
 } from "@/lib/commands/system";
 
 /**
  * Onboarding step identifiers, in display order. The last entry, `done`,
  * is the summary screen the user sees just before the wizard closes.
  */
-export const WIZARD_STEPS = [
+const ALL_WIZARD_STEPS = [
   "welcome",
   "microphone",
+  "accessibility",
   "hotkey",
   "files",
   "done",
 ] as const;
 
-export type WizardStep = (typeof WIZARD_STEPS)[number];
+export type WizardStep = (typeof ALL_WIZARD_STEPS)[number];
+
+// The Accessibility grant only exists on macOS.
+export const WIZARD_STEPS: readonly WizardStep[] = isMacPlatform
+  ? ALL_WIZARD_STEPS
+  : ALL_WIZARD_STEPS.filter((s) => s !== "accessibility");
 
 const DEFAULT_HOTKEY = DEFAULT_RECORD_HOTKEY;
 
@@ -148,6 +155,17 @@ export function useWizard(onComplete: () => void) {
       setPermissionsLoading(false);
     }
   }, []);
+
+  // Entering the microphone step asks the OS for access (macOS prompts
+  // once through AVFoundation), then reads the result.
+  useEffect(() => {
+    if (step !== "microphone") return;
+    void requestMicrophonePermission()
+      .catch((error: unknown) => {
+        console.error("Failed to request microphone access:", error);
+      })
+      .then(() => refreshPermissions());
+  }, [step, refreshPermissions]);
 
   const requestOpenMicSettings = useCallback(async () => {
     try {

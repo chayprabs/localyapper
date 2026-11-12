@@ -262,6 +262,8 @@ pub fn run() {
             commands::system::get_focused_app,
             commands::system::check_permissions,
             commands::system::list_input_devices,
+            commands::system::request_microphone_permission,
+            commands::system::request_accessibility_permission,
             commands::system::get_paused_state,
             commands::system::open_accessibility_settings,
             commands::system::open_mic_settings,

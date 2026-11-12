@@ -52,7 +52,23 @@ pub async fn open_mic_settings() -> Result<(), String> {
 }
 
 fn microphone_available() -> bool {
-    cpal::default_host().default_input_device().is_some()
+    use crate::platform::permissions::{microphone_permission, MicPermission};
+    microphone_permission() != MicPermission::Denied
+        && cpal::default_host().default_input_device().is_some()
+}
+
+/// Ask the OS for microphone access (macOS shows its prompt once).
+#[tauri::command]
+pub async fn request_microphone_permission() -> Result<(), String> {
+    crate::platform::permissions::request_microphone();
+    Ok(())
+}
+
+/// Check Accessibility and show the macOS prompt when it is off.
+/// Returns whether access is granted now.
+#[tauri::command]
+pub async fn request_accessibility_permission() -> Result<bool, String> {
+    Ok(crate::platform::permissions::accessibility_trusted(true))
 }
 
 fn accessibility_available() -> bool {

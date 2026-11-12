@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { useSetAtom } from "jotai";
 import { setupCompleteAtom } from "@/stores/wizardStore";
 import { useWizard } from "@/hooks/useWizard";
+import { AccessibilityStep } from "./AccessibilityStep";
 import { HotkeyStep } from "./HotkeyStep";
 import { MicrophoneStep } from "./MicrophoneStep";
 import { ReadyStep } from "./ReadyStep";
@@ -51,6 +52,8 @@ export function Wizard() {
             onContinue={wizard.goNext}
           />
         );
+      case "accessibility":
+        return <AccessibilityStep onContinue={wizard.goNext} />;
       case "hotkey":
         return (
           <HotkeyStep

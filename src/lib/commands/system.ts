@@ -23,3 +23,13 @@ export async function openAccessibilitySettings(): Promise<void> {
 export async function openMicSettings(): Promise<void> {
   return invoke<void>("open_mic_settings");
 }
+
+/** macOS: show the microphone prompt once. No-op elsewhere. */
+export async function requestMicrophonePermission(): Promise<void> {
+  return invoke<void>("request_microphone_permission");
+}
+
+/** macOS: show the Accessibility prompt when off. Returns whether granted. */
+export async function requestAccessibilityPermission(): Promise<boolean> {
+  return invoke<boolean>("request_accessibility_permission");
+}

@@ -17,7 +17,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["resources/*"]
+    "resources": [
+      "resources/*"
+    ],
+    "macOS": {
+      "entitlements": "entitlements.plist",
+      "minimumSystemVersion": "12.0",
+      "hardenedRuntime": true
+    }
   },
   "app": {
     "security": {
