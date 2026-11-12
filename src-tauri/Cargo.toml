@@ -10,6 +10,16 @@ edition = "2021"
 name = "localyapper_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = ["sherpa-static"]
+# Static sherpa-onnx (release builds, CI). Downloads the prebuilt archive
+# from the sherpa-onnx GitHub release, or reads SHERPA_ONNX_ARCHIVE_DIR.
+sherpa-static = ["sherpa-onnx/static"]
+# Shared sherpa-onnx, for hosts that cannot fetch the static archive.
+# Point SHERPA_ONNX_LIB_DIR at a folder with libsherpa-onnx-c-api and
+# libonnxruntime (for example from the sherpa-onnx-core wheel).
+sherpa-shared = ["sherpa-onnx/shared"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -30,7 +40,7 @@ log = "0.4"
 env_logger = "0.11"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "http2"] }
 cpal = "0.15"
-sherpa-onnx = "1.12"
+sherpa-onnx = { version = "2.0", default-features = false }
 arboard = "3"
 enigo = "0.2"
 futures-util = "0.3"
