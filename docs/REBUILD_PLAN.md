@@ -1,4 +1,4 @@
-# LocalYapper Rebuild Plan (v2)
+# LocalYapper Rebuild Plan (v3)
 
 **Audience:** the implementing agent. Read sections 0 to 4 fully before touching code. The appendices are reference material to use when you reach the matching task.
 **Written against:** commit `2115b4b` (version 1.0.0).
@@ -13,8 +13,10 @@
 3. Run section 14 after every task.
 4. The owner has granted full freedom over architecture, dependencies, models and UI. Where this plan conflicts with `CLAUDE.md` or `AGENTS.md`, this plan wins. Task `P7.9` rewrites those files.
 5. Decisions in this plan are final unless a gate fails. Do not reopen them, and do not add features that are not listed.
-6. **You cannot run Windows or macOS code from a Linux container.** Compile-check it through CI, keep it behind the traits defined here, and list every piece you wrote without running in `docs/MANUAL_QA.md`. Never report unrun platform code as working.
-7. Items marked **OWNER** need a secret or a decision from the repository owner. Build around them and list them in your final report.
+6. **This runs unattended, start to finish.** Never stop to ask a question or wait for a person. When something is unclear, take the option this plan implies, note it in `docs/BUILD_REPORT.md`, and continue.
+7. **All verification is automated.** Your container is Linux, so Windows and macOS code is exercised by the CI smoke suite on GitHub's Windows and macOS runners (section 8A). Push, read the CI result with the GitHub tools, fix, repeat. A phase gate passes only when CI is green on all three OSes. There is no manual testing step anywhere in this plan.
+8. If CI cannot exercise something (a physical microphone, or macOS key events when the runner lacks the Accessibility grant), the test must skip with a printed reason, and `docs/BUILD_REPORT.md` must list it under "Not exercised by CI". Never describe such code as verified.
+9. Nothing in this plan needs a secret, a certificate or a paid account. Code signing and the auto-updater are out of scope (section 15).
 
 ### Rules that stay
 
@@ -41,17 +43,17 @@
 | # | Criterion | Measured by |
 |---|---|---|
 | A1 | Hotkey press starts audio capture within 150 ms and shows the overlay within 150 ms | Stage timings in the log (`P1.11`) |
-| A2 | The overlay waveform follows the real microphone level | Manual QA, level-meter unit test |
+| A2 | The overlay waveform follows the real microphone level | Level-meter unit test, and a smoke test that the overlay receives changing `overlay-level` values during a fake-audio recording |
 | A3 | After release, text is in the target app in under 2 s at the median, and under 5 s in the worst supported case (cold model, 60 s of speech, 4-core laptop) | Stage timings, bench harness (`P0.3`) |
-| A4 | Focus never leaves the target app | Manual QA per OS |
+| A4 | Focus never leaves the target app | CI smoke test per OS: foreground window is the same before, during and after a dictation |
 | A5 | The clipboard holds the same content after dictation as before | Automated under Xvfb, manual elsewhere |
 | A6 | Every setting in the UI changes backend behaviour at once and survives restart | One test per key (`P5.2`) |
 | A7 | Idle, settings closed, model evicted: main process under 40 MB private memory and no settings WebView alive | `scripts/measure-memory` (`P6.6`) |
 | A8 | Windows installer under 25 MB. Models download on first run and are checksum-verified | CI size check (`P7.6`) |
-| A9 | A second launch focuses the running instance | Manual QA |
-| A10 | Works on Windows 10+, macOS 12+, Linux X11. Wayland works with the documented limits | Manual QA matrix |
+| A9 | A second launch focuses the running instance | CI smoke test: second process exits, first stays |
+| A10 | Works on Windows, macOS and Linux X11. Wayland works with the documented limits | CI smoke suite green on `windows-latest`, `macos-15`, `ubuntu-22.04` (Xvfb) |
 
-A3 depends on the CPU. These are the numbers the design is built to. Report measured values, whatever they are.
+A3 and A7 depend on the machine. Measure them on the CI runners, write the numbers to `docs/PERFORMANCE.md`, and report them as measured, whatever they are.
 
 ### Where the time goes (10 s utterance, 4-core laptop, cold model)
 
@@ -256,11 +258,11 @@ The segmenter sends `SegmentQueued { id, index }` when it hands a segment to the
 
 - **P0.1 Baseline.** Run section 14 on a clean checkout and record the results in the first commit message.
 - **P0.2 Upgrade sherpa-onnx** from 1.12.34 to 2.0.x with the default `static` feature. The offline ASR and VAD APIs have the same shape. If the Windows static-CRT link fails in CI, pin back to 1.12.34 (it already has the CTC, transducer and Moonshine v1 configs) and continue.
-- **P0.3 Bench harness.** `src-tauri/examples/bench.rs`. Input: a model id, a model directory, a folder of `*.wav` with matching `*.txt`. Output per run: load ms, warm-up ms, real-time factor per clip, peak resident memory, word error rate. Run with 1, 2 and 4 threads. Write results to `docs/MODEL_BENCHMARK.md`. Add a manually triggered CI job that runs it.
-- **P0.4 Model manifest script.** `scripts/gen-model-manifest.py` (Appendix G). It asks the Hugging Face API for the pinned commit, file sizes and SHA-256 of each candidate repository and writes `src-tauri/models.json`. Commit the output. If your environment cannot reach huggingface.co, commit the script, add the manual CI job that runs it and uploads the result, and tell the owner to run it. Until the file exists, the app keeps the current fp32 110m entry so nothing is blocked.
+- **P0.3 Bench harness.** `src-tauri/examples/bench.rs`. Input: a model id, a model directory, a folder of `*.wav` with matching `*.txt`. Output per run: load ms, warm-up ms, real-time factor per clip, peak resident memory, word error rate. Run with 1, 2 and 4 threads. Add a CI workflow (`bench.yml`, runs on push to the working branch when `models.json` or the harness changes) that downloads the models, runs the harness on the Linux runner, and commits `docs/MODEL_BENCHMARK.md` back to the branch.
+- **P0.4 Model manifest script.** `scripts/gen-model-manifest.py` (Appendix G). It asks the Hugging Face API for the pinned commit, file sizes and SHA-256 of each candidate repository and writes `src-tauri/models.json`. If your container can reach huggingface.co, run it and commit the output. If not, add a CI workflow (`manifest.yml`) that runs the script on a GitHub runner and commits `src-tauri/models.json` back to the branch, then pull. Until the file exists, the app keeps the current fp32 110m entry so nothing is blocked.
 - **P0.5 CI split.** `ci.yml`: lint, typecheck, fmt, clippy, tests on Linux, Windows and macOS with `Swatinem/rust-cache`. `release.yml`: tag builds only.
 
-**Gate:** CI green on three OSes.
+**Gate:** CI green on three OSes, `models.json` and `docs/MODEL_BENCHMARK.md` committed.
 
 ---
 
@@ -311,7 +313,7 @@ Copy Appendix A, B and C into place first. They compile and their tests pass as 
 **Gate:**
 
 - Under Xvfb, a test opens a GTK or xterm text target, runs the injector, and asserts the target text and that the clipboard was restored.
-- `docs/MANUAL_QA.md` has Windows and macOS checklists: focus kept, modifiers held at release, non-Latin layout, terminal paste, elevated window, clipboard holding an image.
+- The injection smoke tests in section 8A pass on all three runners.
 
 ---
 
@@ -328,7 +330,45 @@ Copy Appendix A, B and C into place first. They compile and their tests pass as 
 - **P3.9 Cues.** `sound_cues` (default off). Two short embedded PCM clips played through a `cpal` output stream.
 - **P3.10 Off switch.** `overlay_enabled` (default true).
 
-**Gate:** manual QA per OS: the overlay shows over a full-screen app, the caret stays in the target app, clicks pass through the pill, the bars follow the voice.
+**Gate:** the overlay and end-to-end smoke tests in section 8A pass on all three runners.
+
+---
+
+## 8A. CI smoke suite (replaces all manual testing)
+
+GitHub's hosted runners are real Windows and macOS machines with a desktop session. Use them. Add `src-tauri/tests/smoke.rs` and a `smoke` job in `ci.yml` that runs on `windows-latest`, `macos-15` and `ubuntu-22.04` (under `xvfb-run`). Build this suite during P2 and P3 and keep extending it. Every later phase must keep it green.
+
+To make the app testable without a person:
+
+- **Fake audio source.** `LOCALYAPPER_FAKE_AUDIO=/path/to.wav` makes the audio thread play that file into the ring buffer at real-time speed instead of opening a device. Runners have no microphone.
+- **Test control channel.** A debug-only command (compiled with `--features test-hooks`, never in release) lets a test send `RecordDown`, `RecordUp` and `Cancel` to the controller and read back the last stage timings and the overlay's last view. This stands in for pressing the hotkey.
+- **Text target.** A tiny helper binary (`src-tauri/tests/helpers/text_target`) opens a native window with one focused multi-line text field and prints its content on request. Use a plain Win32 `EDIT` control on Windows, an `NSTextView` on macOS, a GTK `TextView` on Linux. Do not depend on Notepad or TextEdit.
+
+Tests, each run on all three OSes unless noted:
+
+| Test | Asserts |
+|---|---|
+| `inject_types_into_target` | After `inject("Hello, world.")` the target holds exactly that text |
+| `inject_restores_clipboard` | Clipboard text set before the call is back after the restore delay. Repeat with an image on the clipboard |
+| `inject_with_modifier_down` | With Alt held by a synthetic key-down, the paste still lands as plain text once the wait in Appendix E completes (send the key-up from a second thread after 150 ms) |
+| `overlay_does_not_take_focus` | The foreground window is the text target before `show`, 300 ms after `show`, and after `hide` |
+| `overlay_is_click_through` | A synthetic click at the pill's centre reaches the window underneath |
+| `overlay_receives_levels` | During a fake-audio recording the overlay page reports at least 10 distinct `overlay-level` values |
+| `end_to_end_dictation` | Fake audio of a known sentence, `RecordDown`, wait for the clip length, `RecordUp`. The target holds the expected words (word error rate under 15 %), focus never moved, and `release_to_text_ms` is under 5000 |
+| `end_to_end_cold_and_warm` | Same, once right after start (cold model) and once again 2 s later (warm). Record both timings to `docs/PERFORMANCE.md` |
+| `cancel_discards` | `RecordDown`, `Cancel`: target stays empty, state returns to idle |
+| `back_to_back` | Two dictations with no pause between them both land (proves there is no post-paste lockout) |
+| `second_instance_exits` | A second process exits within 3 s and the first keeps running |
+| `settings_window_not_created_at_start` | With `setup_complete = true`, no window labelled `main` exists after start |
+| `x11_repeat_hold` (Linux) | With xdotool holding the record key for 2 s under Xvfb, exactly one `RecordDown` and one `RecordUp` reach the controller |
+| `hotkey_registers` | Each default hotkey registers without error on that OS |
+
+Rules for this suite:
+
+- macOS runners may not grant Accessibility to the test process, in which case synthetic key events are dropped by the OS. Check `AXIsProcessTrusted()` at the start of each test that sends keys. If it is false, print `SKIP: no Accessibility grant on runner`, exit 0, and list the test in `docs/BUILD_REPORT.md`. Do not try to edit the TCC database.
+- Cache the model between CI runs with `actions/cache`, keyed on the `models.json` hash.
+- A test that needs a display must fail loudly, not hang: give every wait a timeout of 20 s or less.
+- Flaky tests are bugs. Fix the cause. Do not add retries, and do not skip or disable a test to get green.
 
 ---
 
@@ -367,7 +407,6 @@ Do not add Whisper, and do not add `parakeet-0.6b-v2`: v3 covers English too. A 
 |---|---|---|---|---|
 | General | `auto_start` | bool | false, asked in the wizard | autostart plugin with `--autostart` |
 | General | `theme` | `system`, `light`, `dark` | `system` | both windows |
-| General | `update_check` | `off`, `on_start` | `off` | `P7.4` |
 | Dictation | `activation_mode` | `hold`, `toggle`, `hybrid` | `hybrid` | `Event::ConfigChanged` |
 | Dictation | `hotkey_record`, `hotkey_cancel`, `hotkey_paste_last`, `hotkey_open_app` | combo | per OS | re-register with rollback |
 | Dictation | `cancel_key_enabled`, `cancel_key_in_hands_free` | bool | true, false | `Event::ConfigChanged` |
@@ -394,7 +433,7 @@ Do not add Whisper, and do not add `parakeet-0.6b-v2`: v3 covers English too. A 
 - **P5.9 Stats.** Pass local day and week boundaries from Rust (`chrono::Local`) into the queries.
 - **P5.10 Dark theme** with CSS variables.
 
-**Gate:** every table row has a hook test and a line in `docs/MANUAL_QA.md`. No control exists without a backend effect.
+**Gate:** every table row has a hook test. No control exists without a backend effect.
 
 ---
 
@@ -402,10 +441,9 @@ Do not add Whisper, and do not add `parakeet-0.6b-v2`: v3 covers English too. A 
 
 - **P6.1** Set `"create": false` on the `main` window in `tauri.conf.json` and build it only for the wizard or when the user opens it. Keep destroy-on-close.
 - **P6.2** With `--autostart`, never create the settings window.
-- **P6.3** Create the overlay at start. Destroy it after 10 minutes without a dictation and recreate it in the background on the next press. Recording never waits for it. Measure the saving on Windows: if it is under 30 MB, keep the overlay alive and delete this code.
+- **P6.3** Create the overlay at start. Destroy it after 10 minutes without a dictation and recreate it in the background on the next press. Recording never waits for it. Measure the saving with the `P6.6` script on the Windows CI runner: if it is under 30 MB, keep the overlay alive and delete this code.
 - **P6.4** No timers, polling or animation while idle. Idle CPU must read 0.0 %.
-- **P6.5 Native overlay (only after owner sign-off).** A second `OverlayBackend` without a WebView: a layered window drawn with `tiny-skia` on Windows, an `NSPanel` with Core Animation layers on macOS. Do not start it until the owner has confirmed the WebView overlay works on that platform.
-- **P6.6** `scripts/measure-memory.ps1` and `.sh` print private memory of the main process and each WebView helper in three states: idle and evicted, model loaded, settings open. Put the results in `docs/PERFORMANCE.md` and replace the unmeasured claims in the README.
+- **P6.6** `scripts/measure-memory.ps1` and `.sh` print private memory of the main process and each WebView helper in three states: idle and evicted, model loaded, settings open. Run them in CI on the Windows, macOS and Linux runners against the release build, and commit the results to `docs/PERFORMANCE.md`. Replace the unmeasured claims in the README with those numbers.
 - **P6.7** Run `cargo bloat --release --crates`. Remove `tauri-plugin-notification`, `futures-util`, `anyhow`, `env_logger` if unused. Trim `chrono` and `tokio` features. Keep `opt-level = 3`.
 - **P6.8** Replace the 50 KB logo PNG with an SVG or a smaller PNG.
 
@@ -418,12 +456,12 @@ Do not add Whisper, and do not add `parakeet-0.6b-v2`: v3 covers English too. A 
 - **P7.1 Single instance.** `tauri-plugin-single-instance` registered first. No arguments: open settings. With a CLI flag: forward to the controller.
 - **P7.2 Logging.** `tauri-plugin-log`, two files of 1 MB at most, `info`, or `debug` with `LOCALYAPPER_DEBUG=1`. Never log transcript or clipboard text.
 - **P7.3 Autostart.** Remove the forced enable in `lib.rs:198-215`. Follow the setting only.
-- **P7.4 Updates.** `tauri-plugin-updater` with signed artifacts from GitHub Releases. Off by default, with a manual "Check now". State in the UI that this is a network call. **OWNER:** generate the key pair and add `TAURI_SIGNING_PRIVATE_KEY`. Until then keep the UI hidden.
+- **P7.4 Updates.** No auto-updater (it needs a signing key). The About section shows the version and a "Releases" link that opens the GitHub releases page in the browser.
 - **P7.5 Bundles.** Windows: NSIS, `installMode: currentUser`, `compression: lzma`, WebView2 `downloadBootstrapper`. macOS: DMG per architecture, plist and entitlements, hardened runtime, minimum 12.0. Linux: deb with `depends` `libwebkit2gtk-4.1-0, libasound2, libxdo3` and `recommends` `wl-clipboard, wtype`, plus rpm and AppImage. All: bundle `silero_vad.onnx` and `THIRD_PARTY_NOTICES.md`.
 - **P7.6 CI.** Fail the release if the Windows installer is over 25 MB. Run tests on three OSes. Run the model integration test on Linux with a cached model. Use the tag's own release notes file.
-- **P7.7 Signing.** **OWNER:** Apple Developer ID and a Windows signing certificate. Wire the CI steps so they run when the secrets exist. Document unsigned install steps until then.
+- **P7.7 Unsigned builds.** Builds are unsigned. Put the install steps in the README: on macOS, `xattr -dr com.apple.quarantine /Applications/LocalYapper.app` and re-grant Accessibility after each update. On Windows, "More info", then "Run anyway" on the SmartScreen prompt.
 - **P7.8 Notices.** `THIRD_PARTY_NOTICES.md`: Parakeet (NVIDIA, CC-BY-4.0), Moonshine (MIT), Silero VAD (MIT), sherpa-onnx (Apache-2.0), ONNX Runtime (MIT), the test fixtures, and the generated Rust and npm licence lists.
-- **P7.9 Docs.** Delete `docs/FINAL_AUDIT.md`, `docs/PRODUCT_AUDIT.md`, `docs/PROJECT_COMPLETION.md`, `docs/RELEASE_NOTES_v0.1.0.md`. Rewrite `README.md`, `CLAUDE.md`, `AGENTS.md`, `docs/BUILD.md`, `docs/MANUAL_QA.md`. Add `docs/ARCHITECTURE.md`, `docs/PERFORMANCE.md`, `docs/MODEL_BENCHMARK.md`.
+- **P7.9 Docs.** Delete `docs/FINAL_AUDIT.md`, `docs/PRODUCT_AUDIT.md`, `docs/PROJECT_COMPLETION.md`, `docs/RELEASE_NOTES_v0.1.0.md`. Delete `docs/MANUAL_QA.md` too. Rewrite `README.md`, `CLAUDE.md`, `AGENTS.md`, `docs/BUILD.md`. Add `docs/ARCHITECTURE.md`, `docs/PERFORMANCE.md`, `docs/MODEL_BENCHMARK.md`, `docs/BUILD_REPORT.md`.
 - **P7.10 Version.** `2.0.0`.
 
 **Gate:** a tag build produces installers for every target.
@@ -435,7 +473,7 @@ Do not add Whisper, and do not add `parakeet-0.6b-v2`: v3 covers English too. A 
 | `sherpa-onnx` 1.12 to 2.0 | `P0.2` |
 | add `ringbuf = "0.4"` | `P1.3` |
 | add `sha2` | `P4.2` |
-| add `tauri-plugin-single-instance`, `tauri-plugin-log`, `tauri-plugin-updater`, `tauri-plugin-dialog` | `P7.1`, `P7.2`, `P7.4`, `P5.8` |
+| add `tauri-plugin-single-instance`, `tauri-plugin-log`, `tauri-plugin-dialog`, `tauri-plugin-opener` | `P7.1`, `P7.2`, `P5.8`, `P7.4` |
 | add `tauri-nspanel = "2.1"` and `objc2-app-kit` (macOS), `ashpd` (Linux) | `P3.3`, `P2.7`, `P2.1` |
 | `windows` features: add `Win32_UI_Input_KeyboardAndMouse`, `Win32_System_ProcessStatus`, `Win32_Security`, `Win32_System_SystemInformation` | `P2.5`, `P1.13`, `P2.7`, `P4.4` |
 | `arboard`: add feature `wayland-data-control` | `P2.5` |
@@ -452,15 +490,15 @@ Do not add `rubato`, `sysinfo` or `rdev`.
 |---|---|---|
 | P0 | Baseline, upgrade, bench, manifest script, CI | CI green |
 | P1 | Audio, segmenter, engine, controller | Headless pipeline test |
-| P2 | Hotkeys, injection, permissions | Xvfb injection test |
-| P3 | Overlay, tray, cues | Manual QA |
+| P2 | Hotkeys, injection, permissions | Injection smoke tests on three OSes |
+| P3 | Overlay, tray, cues, smoke suite | Smoke suite green on three OSes |
 | P4 | Catalog, downloader, models UI | Downloader tests |
 | P5 | Settings, pages, wizard, history | Hook test per key |
 | P6 | Window lifetimes, eviction, measurement, size | Measured numbers |
-| P7 | Packaging, logging, updater, docs | Installers built |
-| P8 | Section 1 on real hardware | Owner sign-off |
+| P7 | Packaging, logging, docs | Installers built in CI |
+| P8 | Final run of every acceptance test, `docs/BUILD_REPORT.md` | All CI green, report written |
 
-If you must stop early, stop after P3. At that point the core loop meets A1 to A5.
+Do all phases. Finish only when P8 is done.
 
 ---
 
@@ -499,15 +537,21 @@ Building the Rust crate needs network access to github.com release assets for th
 | GPU providers | CPU int8 meets the budget. GPU adds installer size and driver failures |
 | Streaming partial text into the target app | Needs a streaming model with worse accuracy, and editing text in a foreign app is fragile |
 | Bare modifier or Fn as the hotkey | Needs low-level keyboard hooks on each OS. Can be added later as another `HotkeyBackend` |
+| Code signing and notarisation | Need a paid certificate and secrets |
+| Auto-updater | Needs a signing key |
+| Native overlay with no WebView | Separate drawing code per OS, large risk for a modest saving |
 | Starting a new recording while the previous tail is decoding | The window is short. The state machine drops the press |
 
-## 16. Owner inputs
+## 16. Phase 8: final run and report
 
-1. Updater key pair (`P7.4`).
-2. Apple Developer ID and Windows signing certificate (`P7.7`).
-3. A real-hardware pass on Windows and macOS with `docs/MANUAL_QA.md`.
-4. Sign-off on the WebView overlay before the native overlay (`P6.5`) is considered.
-5. Running the manifest and bench CI jobs if the agent's environment cannot reach huggingface.co.
+1. Run section 14 locally and confirm every CI job is green on the final commit.
+2. Write `docs/BUILD_REPORT.md` with these sections, and nothing else:
+   - **Acceptance results.** One row per criterion A1 to A10: pass or fail, the measured number where there is one, and the CI job that proves it.
+   - **Measured performance.** Cold and warm `release_to_text_ms`, idle and loaded memory, installer sizes, per OS, copied from CI.
+   - **Model choice.** The catalog as shipped and the bench numbers behind it.
+   - **Not exercised by CI.** Every skipped test and every code path no automated test reached (for example a physical microphone, or macOS key events if the runner had no Accessibility grant), one line each.
+   - **Decisions taken.** Each place you chose between options the plan left open, one line each.
+3. Bump the version to `2.0.0`, commit, push. Do not create a tag, a release or a pull request unless told to.
 
 ---
 
