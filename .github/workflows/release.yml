@@ -1,85 +1,24 @@
 name: Release
 
+# Tag builds only. Branch and pull request checks live in ci.yml.
 on:
   push:
-    branches: [main]
     tags:
       - "v*"
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+  cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  verify:
-    name: Verify
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            curl \
-            file \
-            libasound2-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libssl-dev \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            patchelf \
-            wget
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Audit production dependencies
-        run: npm audit --omit=dev
-
-      - name: Lint frontend
-        run: npm run lint
-
-      - name: Typecheck frontend
-        run: npx tsc --noEmit
-
-      - name: Check Rust formatting
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-
-      - name: Lint Rust
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-
-      - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml
-
-      - name: Build frontend
-        run: npm run build
-
   build:
     name: Build ${{ matrix.name }}
-    needs: verify
     runs-on: ${{ matrix.platform }}
     strategy:
       fail-fast: false
