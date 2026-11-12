@@ -59,10 +59,25 @@ fn launch_text_target(port: u16) -> Option<Child> {
     None
 }
 
+/// Test builds are console programs. On the Windows runner each one
+/// would get a new terminal window in front of the test windows.
+#[cfg(windows)]
+fn quiet(mut cmd: Command) -> Command {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+#[cfg(not(windows))]
+fn quiet(cmd: Command) -> Command {
+    cmd
+}
+
 #[cfg(not(target_os = "macos"))]
 fn launch_text_target(port: u16) -> Option<Child> {
     Some(
-        Command::new(env!("CARGO_BIN_EXE_text_target"))
+        quiet(Command::new(env!("CARGO_BIN_EXE_text_target")))
             .arg("--port")
             .arg(port.to_string())
             .stdin(Stdio::null())
@@ -407,7 +422,7 @@ impl App {
              speech_model=parakeet-110m;\
              overlay_preview=true;activation_mode=hold;{extra_settings}"
         );
-        let child = Command::new(env!("CARGO_BIN_EXE_localyapper"))
+        let child = quiet(Command::new(env!("CARGO_BIN_EXE_localyapper")))
             .args(args)
             .env("LOCALYAPPER_DATA_DIR", data_dir())
             .env("LOCALYAPPER_TEST_PORT", port.to_string())
@@ -864,7 +879,7 @@ fn settings_window_not_created_at_start() {
 fn second_instance_exits() {
     let (wav, _) = fixture("clip01_16k");
     let mut first = App::launch(&wav);
-    let mut second = Command::new(env!("CARGO_BIN_EXE_localyapper"))
+    let mut second = quiet(Command::new(env!("CARGO_BIN_EXE_localyapper")))
         .env("LOCALYAPPER_DATA_DIR", data_dir())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
