@@ -1,194 +1,104 @@
-# LocalYapper Build Guide
+# Building LocalYapper
 
-This guide describes the build and release workflow for the current v0.1.0
-speech-only LocalYapper app.
+## Prerequisites
 
-Official Tauri references:
+- Rust stable and Node.js 20 or newer.
+- The Tauri 2 system packages for your OS:
+  https://v2.tauri.app/start/prerequisites/
+- Linux: `libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+  libssl-dev libasound2-dev libxdo-dev`.
+- Python 3 for the helper scripts in `scripts/`.
 
-- Prerequisites: https://v2.tauri.app/start/prerequisites/
-- Distribution: https://v2.tauri.app/distribute/
-
-## Repository Setup
-
-Install JavaScript dependencies:
+The `sherpa-onnx` crate downloads its prebuilt static library during the
+first build (from the k2-fsa GitHub releases). Where that host is not
+reachable, build with shared libraries instead:
 
 ```bash
-npm install
+export SHERPA_ONNX_LIB_DIR=/path/to/sherpa-onnx/lib
+cargo build --manifest-path src-tauri/Cargo.toml --no-default-features --features sherpa-shared
 ```
 
-Verify the toolchains:
+## Develop
 
 ```bash
-node -v
-npm -v
-rustc -V
-cargo -V
-```
-
-## Development
-
-Run the frontend only:
-
-```bash
-npm run dev
-```
-
-Run the full desktop app:
-
-```bash
+npm ci
 npm run tauri dev
 ```
 
-The Tauri dev server uses Vite on port `1420`.
+The app keeps its data in the platform data folder
+(`%APPDATA%\com.localyapper.desktop`, `~/Library/Application Support/com.localyapper.desktop`,
+`~/.local/share/com.localyapper.desktop`). Set `LOCALYAPPER_DEBUG=1` for
+debug logging.
 
-## Required Verification
+## Check
 
-Run these before tagging or publishing a release:
+These run in CI (`.github/workflows/ci.yml`) on every push:
 
 ```bash
 npm run lint
-npm audit --omit=dev
 npx tsc --noEmit
+npm run build
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+Tests that need a speech model are ignored by default. Fetch the models
+(checks every SHA-256 against `src-tauri/models.json`), then run them:
+
+```bash
+python3 scripts/fetch-models.py src-tauri/models.json ~/models parakeet-110m
+LOCALYAPPER_TEST_MODEL_DIR=~/models/parakeet-110m \
+  cargo test --manifest-path src-tauri/Cargo.toml --test pipeline -- --ignored
+```
+
+### Smoke suite
+
+`src-tauri/tests/smoke.rs` starts the real app with the `test-hooks`
+feature, feeds it a recording instead of the microphone, presses the
+hotkey through a local control channel and checks what lands in a test
+window (`tests/helpers/text_target`): text, focus, clipboard restore,
+overlay behaviour, single instance, window lifetimes.
+
+```bash
 npm run build
+LOCALYAPPER_TEST_MODEL_DIR=~/models/parakeet-110m \
+  cargo test --manifest-path src-tauri/Cargo.toml \
+  --features test-hooks,tauri/custom-protocol --test smoke -- --test-threads=1
+```
+
+On Linux run it under Xvfb and a D-Bus session:
+`dbus-run-session -- xvfb-run -a cargo test ...`.
+
+`test-hooks` is never enabled in release builds.
+
+### Measurements
+
+- `docs/MODEL_BENCHMARK.md`: `cargo run --release --example bench` per
+  model and thread count, written by `.github/workflows/bench.yml`.
+- `docs/PERFORMANCE.md`: `scripts/measure-memory.sh` /
+  `scripts/measure-memory.ps1`, written by `.github/workflows/perf.yml`.
+
+## Package
+
+```bash
+python3 scripts/gen-notices.py
 npm run tauri build
 ```
 
-After these automated checks pass, run `docs/MANUAL_QA.md` on the target
-desktop platform to validate real microphone capture, overlay behavior, and text
-injection into another focused app.
+Bundles (`src-tauri/tauri.conf.json`): NSIS per-user installer on
+Windows, app and DMG on macOS (one per architecture), deb, rpm and
+AppImage on Linux. All of them carry `resources/silero_vad.onnx` and
+`THIRD_PARTY_NOTICES.md`; speech models are downloaded on first run.
 
-## GitHub Actions Release Workflow
+## Release
 
-The repository includes `.github/workflows/release.yml`.
+`.github/workflows/release.yml`:
 
-On pushes and pull requests to `main`, the workflow:
+- On a branch, changing packaging inputs builds every installer as a
+  workflow artifact and fails if the Windows installer is over 25 MB.
+- A `v*` tag runs the full CI first, then builds the installers and
+  attaches them to a draft release whose notes are
+  `docs/RELEASE_NOTES_<tag>.md`.
 
-- installs the Linux system dependencies required by Tauri,
-- runs frontend lint and TypeScript checks,
-- runs Rust formatting, clippy, and tests,
-- builds the frontend,
-- builds Tauri artifacts on Windows, macOS Apple Silicon, macOS Intel, and Linux.
-
-On tags matching `v*`, the workflow also creates a draft GitHub Release through
-`tauri-apps/tauri-action` and uploads the built platform artifacts.
-
-Release tag format:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-## Windows Build
-
-Required:
-
-- Windows 10 or newer for the supported app target.
-- Microsoft C++ Build Tools with `Desktop development with C++`.
-- Microsoft Edge WebView2 Runtime. It is already included on most Windows 10
-  version 1803+ installations.
-- Rust stable MSVC toolchain.
-- Node.js LTS or newer.
-
-Recommended Rust setup:
-
-```powershell
-rustup default stable-msvc
-```
-
-Build:
-
-```powershell
-npm install
-npm run tauri build -- --bundles nsis
-```
-
-The repo sets static CRT linking for `x86_64-pc-windows-msvc` in
-`src-tauri/.cargo/config.toml` because `sherpa-onnx-sys` must use the same CRT
-as the rest of the app.
-
-If MSI packaging fails with a `light.exe` error, confirm the Windows VBSCRIPT
-optional feature is enabled.
-
-## macOS Build
-
-Required:
-
-- macOS 12 or newer for the supported app target.
-- Xcode Command Line Tools for desktop builds:
-
-```bash
-xcode-select --install
-```
-
-Build:
-
-```bash
-npm install
-npm run tauri build -- --bundles dmg
-```
-
-For public distribution outside the App Store, Apple code signing and
-notarization are required. Unsigned local builds are useful for internal QA but
-are not suitable for broad end-user distribution.
-
-## Linux Build
-
-Required:
-
-- Rust stable.
-- Node.js LTS or newer.
-- Tauri Linux system dependencies, including WebKitGTK, OpenSSL, appindicator,
-  librsvg, curl, wget, file, and build tools. Exact package names vary by
-  distribution; follow the official Tauri prerequisites page.
-
-Runtime text injection dependencies:
-
-- X11: `xclip` and `xdotool`
-- Wayland: `wl-clipboard` (`wl-copy`, `wl-paste`) and `wtype`
-
-Build:
-
-```bash
-npm install
-npm run tauri build -- --bundles deb,appimage
-```
-
-Linux packages may be distributed as AppImage, Debian, RPM, Snap, Flatpak, or
-distribution-specific package formats depending on the release target.
-
-## Model Files
-
-Speech model files are not committed to Git. The app downloads the selected
-Parakeet speech model and Silero VAD model into the Tauri app data directory on
-first launch or from Settings > Speech.
-
-The default speech model is `parakeet-110m`, currently estimated at about
-458 MB.
-
-## Build Artifacts
-
-Frontend build output:
-
-```text
-dist/
-```
-
-Tauri build output:
-
-```text
-src-tauri/target/
-```
-
-Both directories are ignored by Git.
-
-The GitHub Actions release workflow currently produces and uploads these
-workflow artifacts on `main`:
-
-- `localyapper-windows-x64` (NSIS installer)
-- `localyapper-macos-aarch64` (Apple Silicon DMG)
-- `localyapper-macos-x64` (Intel DMG)
-- `localyapper-linux-x64` (DEB and AppImage)
+Builds are unsigned; the README explains the first-launch steps.
