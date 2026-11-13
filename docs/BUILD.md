@@ -98,7 +98,7 @@ AppImage on Linux. All of them carry `resources/silero_vad.onnx` and
 - On a branch, changing packaging inputs builds every installer as a
   workflow artifact and fails if the Windows installer is over 25 MB.
 - A `v*` tag runs the full CI first, then builds the installers and
-  attaches them to a draft release whose notes are
+  attaches them to a published release whose notes are
   `docs/RELEASE_NOTES_<tag>.md`.
 
 Builds are unsigned; the README explains the first-launch steps.
