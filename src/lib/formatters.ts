@@ -5,6 +5,41 @@ export function formatNumber(n: number): string {
   return numberFormatter.format(n);
 }
 
+/**
+ * History rows store UTC: ISO-8601 with `Z` now, "YYYY-MM-DD HH:MM:SS"
+ * in databases written before version 2.
+ */
+export function parseStoredDate(stored: string): Date {
+  const iso = stored.includes("T") ? stored : stored.replace(" ", "T");
+  return new Date(/[zZ]|[+-]\d\d:\d\d$/.test(iso) ? iso : iso + "Z");
+}
+
+const dayFormatter = new Intl.DateTimeFormat(undefined, {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+});
+
+/** Local calendar day of a stored timestamp: "Today", "Yesterday" or a date. */
+export function formatLocalDay(stored: string, now: Date = new Date()): string {
+  const d = parseStoredDate(stored);
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(d)) / 86_400_000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return dayFormatter.format(d);
+}
+
+/** Local time of day of a stored timestamp. */
+export function formatLocalTime(stored: string): string {
+  return timeOfDayFormatter.format(parseStoredDate(stored));
+}
+
+const timeOfDayFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: "numeric",
+  minute: "2-digit",
+});
+
 /** Time unit constants in milliseconds for relative time formatting. */
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
@@ -12,7 +47,7 @@ const DAY = 86_400_000;
 const WEEK = 604_800_000;
 
 export function formatRelativeTime(isoDate: string): string {
-  const timestamp = new Date(isoDate.endsWith("Z") ? isoDate : isoDate + "Z");
+  const timestamp = parseStoredDate(isoDate);
   const now = Date.now();
   const diff = now - timestamp.getTime();
 
@@ -34,39 +69,3 @@ export function formatRelativeTime(isoDate: string): string {
   return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
 }
 
-const timeFormatter = new Intl.DateTimeFormat("en-US", {
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true,
-});
-
-const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true,
-});
-
-export function formatHistoryTimestamp(isoDate: string): string {
-  const timestamp = new Date(isoDate.endsWith("Z") ? isoDate : isoDate + "Z");
-  const now = new Date();
-
-  const isToday =
-    timestamp.getFullYear() === now.getFullYear() &&
-    timestamp.getMonth() === now.getMonth() &&
-    timestamp.getDate() === now.getDate();
-
-  if (isToday) return `Today, ${timeFormatter.format(timestamp)}`;
-
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const isYesterday =
-    timestamp.getFullYear() === yesterday.getFullYear() &&
-    timestamp.getMonth() === yesterday.getMonth() &&
-    timestamp.getDate() === yesterday.getDate();
-
-  if (isYesterday) return `Yesterday, ${timeFormatter.format(timestamp)}`;
-
-  return dateTimeFormatter.format(timestamp);
-}

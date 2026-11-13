@@ -1,0 +1,200 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  # The release workflow runs the full suite before building a tag.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+  rust:
+    name: Rust ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-15]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Drop an incomplete sherpa-onnx download from the cache
+        shell: bash
+        run: |
+          d=src-tauri/target/sherpa-onnx-prebuilt
+          if [ -d "$d" ] && [ -z "$(find "$d" -path '*/lib/*' -name '*sherpa-onnx-c-api*' -print -quit)" ]; then
+            echo "removing $d"; rm -rf "$d"
+          fi
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev
+
+      - name: Check formatting
+        if: runner.os == 'Linux'
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  pipeline:
+    name: Pipeline (model)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: pipeline
+
+      - name: Drop an incomplete sherpa-onnx download from the cache
+        shell: bash
+        run: |
+          d=src-tauri/target/sherpa-onnx-prebuilt
+          if [ -d "$d" ] && [ -z "$(find "$d" -path '*/lib/*' -name '*sherpa-onnx-c-api*' -print -quit)" ]; then
+            echo "removing $d"; rm -rf "$d"
+          fi
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev
+
+      - name: Cache models
+        uses: actions/cache@v4
+        with:
+          path: ~/models
+          key: models-${{ hashFiles('src-tauri/models.json') }}-parakeet-110m
+
+      - name: Download default model
+        run: python3 scripts/fetch-models.py src-tauri/models.json ~/models parakeet-110m
+
+      - name: Headless pipeline test
+        env:
+          LOCALYAPPER_TEST_MODEL_DIR: /home/runner/models/parakeet-110m
+        run: >
+          cargo test --manifest-path src-tauri/Cargo.toml --test pipeline
+          -- --include-ignored pipeline --nocapture
+
+      - name: Fresh install downloads, verifies and dictates
+        run: >
+          cargo test --manifest-path src-tauri/Cargo.toml --test fresh_install
+          -- --include-ignored --nocapture
+
+  smoke:
+    name: Smoke ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-15]
+    env:
+      LOCALYAPPER_TEST_MODEL_DIR: ${{ github.workspace }}/../models/parakeet-110m
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: smoke
+
+      - name: Drop an incomplete sherpa-onnx download from the cache
+        shell: bash
+        run: |
+          d=src-tauri/target/sherpa-onnx-prebuilt
+          if [ -d "$d" ] && [ -z "$(find "$d" -path '*/lib/*' -name '*sherpa-onnx-c-api*' -print -quit)" ]; then
+            echo "removing $d"; rm -rf "$d"
+          fi
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev xvfb xdotool dbus
+
+      - name: Cache models
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/../models
+          key: models-${{ runner.os }}-${{ hashFiles('src-tauri/models.json') }}-parakeet-110m
+
+      - name: Download default model
+        shell: bash
+        run: python scripts/fetch-models.py src-tauri/models.json "${{ github.workspace }}/../models" parakeet-110m
+
+      - name: Build frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Smoke tests (Xvfb)
+        if: runner.os == 'Linux'
+        run: >
+          dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24"
+          cargo test --manifest-path src-tauri/Cargo.toml
+          --features test-hooks,tauri/custom-protocol --test smoke
+          -- --test-threads=1 --nocapture
+
+      - name: Smoke tests
+        if: runner.os != 'Linux'
+        run: >
+          cargo test --manifest-path src-tauri/Cargo.toml
+          --features test-hooks,tauri/custom-protocol --test smoke
+          -- --test-threads=1 --nocapture

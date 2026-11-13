@@ -30,6 +30,7 @@ import {
   MicOff,
   Pause,
   RefreshCw,
+  Settings,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
@@ -60,7 +61,8 @@ export type IconName =
   | "graphic_eq"
   | "dashboard"
   | "sync"
-  | "help";
+  | "help"
+  | "settings";
 
 const REGISTRY: Record<IconName, LucideIcon> = {
   mic: Mic,
@@ -89,6 +91,7 @@ const REGISTRY: Record<IconName, LucideIcon> = {
   dashboard: LayoutDashboard,
   sync: RefreshCw,
   help: HelpCircle,
+  settings: Settings,
 };
 
 interface IconProps {

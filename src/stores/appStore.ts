@@ -1,9 +1,8 @@
-// Global application state atoms -- page navigation and speech model cache
+// Global application state atoms -- page navigation and paused state
 import { atom } from "jotai";
-import type { SpeechModelFileStatus } from "@/types/commands";
 
 /** Main settings pages — order matches sidebar nav items. */
-export type PageId = "dashboard" | "history" | "hotkeys" | "models";
+export type PageId = "dashboard" | "history" | "dictation" | "audio" | "speech" | "general";
 
 /** Currently active page in the settings window sidebar. */
 export const activePageAtom = atom<PageId>("dashboard");
@@ -18,15 +17,3 @@ export const sidebarCollapsedAtom = atom<boolean>(false);
  * - true: dictation paused via the tray menu — global hotkeys are unregistered
  */
 export const pausedAtom = atom<boolean | null>(null);
-
-export interface ModelsSettingsCache {
-  speechModel: string;
-}
-
-export interface ModelStatusCache {
-  speechModelFileStatus: SpeechModelFileStatus;
-  speechModelLoaded: boolean;
-}
-
-export const modelsSettingsCacheAtom = atom<ModelsSettingsCache | null>(null);
-export const modelStatusCacheAtom = atom<ModelStatusCache | null>(null);

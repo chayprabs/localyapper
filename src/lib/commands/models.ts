@@ -35,3 +35,35 @@ export async function checkSpeechModelFileExists(): Promise<SpeechModelFileStatu
 export async function deleteSpeechModel(): Promise<void> {
   return invoke<void>("delete_speech_model");
 }
+
+/** One entry of the speech model catalog. */
+export interface ModelInfo {
+  id: string;
+  name: string;
+  languages: string[];
+  license: string;
+  size_bytes: number;
+  /** "installed" | "partial" | "missing" */
+  state: string;
+  active: boolean;
+  recommended: boolean;
+  loaded: boolean;
+}
+
+export async function listModels(): Promise<ModelInfo[]> {
+  return invoke<ModelInfo[]>("list_models");
+}
+
+/** Download and verify a model; progress arrives as `model-download-progress`. */
+export async function downloadModel(id: string): Promise<void> {
+  return invoke<void>("download_model", { id });
+}
+
+/** Make `id` (or "auto") the dictation model. */
+export async function selectModel(id: string): Promise<void> {
+  return invoke<void>("use_model", { id });
+}
+
+export async function deleteModel(id: string): Promise<void> {
+  return invoke<void>("delete_model", { id });
+}

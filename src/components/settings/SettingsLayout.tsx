@@ -16,19 +16,27 @@ const DashboardPage = lazy(() =>
 const HistoryPage = lazy(() =>
   import("@/components/history/HistoryPage").then((m) => ({ default: m.HistoryPage })),
 );
-const HotkeysPage = lazy(() =>
-  import("@/components/hotkeys/HotkeysPage").then((m) => ({ default: m.HotkeysPage })),
+const DictationPage = lazy(() =>
+  import("@/components/dictation/DictationPage").then((m) => ({ default: m.DictationPage })),
 );
-const ModelsPage = lazy(() =>
-  import("@/components/models/ModelsPage").then((m) => ({ default: m.ModelsPage })),
+const AudioPage = lazy(() =>
+  import("@/components/audio/AudioPage").then((m) => ({ default: m.AudioPage })),
+);
+const SpeechPage = lazy(() =>
+  import("@/components/speech/SpeechPage").then((m) => ({ default: m.SpeechPage })),
+);
+const GeneralPage = lazy(() =>
+  import("@/components/general/GeneralPage").then((m) => ({ default: m.GeneralPage })),
 );
 
 /** Page ID → React component lookup table for content area rendering. */
 const pages = {
   dashboard: DashboardPage,
   history: HistoryPage,
-  hotkeys: HotkeysPage,
-  models: ModelsPage,
+  dictation: DictationPage,
+  audio: AudioPage,
+  speech: SpeechPage,
+  general: GeneralPage,
 } as const;
 
 function PageFallback() {
@@ -57,10 +65,10 @@ export function SettingsLayout() {
   };
 
   return (
-    <div className="flex h-full bg-[#eeeeee] relative">
+    <div className="flex h-full bg-sidebar relative">
       <Sidebar />
-      <main className="flex-1 bg-[#eeeeee] p-3">
-        <div className="bg-white rounded-2xl h-full overflow-y-auto overflow-x-hidden">
+      <main className="flex-1 bg-sidebar p-3">
+        <div className="bg-surface rounded-2xl h-full overflow-y-auto overflow-x-hidden">
           <Suspense fallback={<PageFallback />}>
             <PageComponent />
           </Suspense>

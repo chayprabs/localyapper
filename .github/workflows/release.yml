@@ -1,86 +1,58 @@
 name: Release
 
+# Plan P7.6. Builds the installers for every target.
+# - A tag (v*) first runs the full CI (tests on three OSes and the model
+#   integration test on Linux), then builds and attaches the installers to
+#   a published release whose notes come from docs/RELEASE_NOTES_<tag>.md.
+# - Run by hand on main with a release_tag input (e.g. v2.0.0), it does
+#   the same as a tag push and creates that tag on the commit it built.
+# - On a branch (when packaging inputs change) or on demand without a tag
+#   it only builds the installers and uploads them as workflow artifacts,
+#   so packaging is checked without a release.
+# The Windows installer must stay under 25 MB (A8).
 on:
   push:
-    branches: [main]
     tags:
       - "v*"
-  pull_request:
-    branches: [main]
+    branches-ignore: [main]
+    paths:
+      - .github/workflows/release.yml
+      - src-tauri/tauri.conf.json
+      - src-tauri/Info.plist
+      - src-tauri/entitlements.plist
+      - scripts/gen-notices.py
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to create from main, e.g. v2.0.0 (empty: build only)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # The release this run publishes: the pushed tag, or the release_tag
+  # input of a manual run on main. Empty for build-only runs.
+  RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || (github.ref == 'refs/heads/main' && inputs.release_tag) || '' }}
 
 jobs:
-  verify:
-    name: Verify
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            curl \
-            file \
-            libasound2-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libssl-dev \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            patchelf \
-            wget
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Audit production dependencies
-        run: npm audit --omit=dev
-
-      - name: Lint frontend
-        run: npm run lint
-
-      - name: Typecheck frontend
-        run: npx tsc --noEmit
-
-      - name: Check Rust formatting
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-
-      - name: Lint Rust
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-
-      - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml
-
-      - name: Build frontend
-        run: npm run build
+  ci:
+    name: CI
+    if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && inputs.release_tag != '')
+    uses: ./.github/workflows/ci.yml
 
   build:
     name: Build ${{ matrix.name }}
-    needs: verify
+    needs: ci
+    if: ${{ always() && (needs.ci.result == 'success' || needs.ci.result == 'skipped') }}
     runs-on: ${{ matrix.platform }}
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -88,17 +60,17 @@ jobs:
           - name: macOS Apple Silicon
             platform: macos-15
             rust_targets: aarch64-apple-darwin
-            args: --target aarch64-apple-darwin --bundles dmg
+            args: --target aarch64-apple-darwin --bundles app,dmg
             artifact: macos-aarch64
           - name: macOS Intel
             platform: macos-15-intel
             rust_targets: x86_64-apple-darwin
-            args: --target x86_64-apple-darwin --bundles dmg
+            args: --target x86_64-apple-darwin --bundles app,dmg
             artifact: macos-x64
           - name: Linux
             platform: ubuntu-22.04
             rust_targets: ""
-            args: --bundles deb,appimage
+            args: --bundles deb,rpm,appimage
             artifact: linux-x64
           - name: Windows
             platform: windows-latest
@@ -109,6 +81,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Release notes for the tag
+        id: notes
+        if: env.RELEASE_TAG != ''
+        shell: bash
+        run: |
+          case "$RELEASE_TAG" in
+            v[0-9]*) ;;
+            *) echo "::error::release tag '$RELEASE_TAG' must look like v2.0.0"; exit 1 ;;
+          esac
+          f="docs/RELEASE_NOTES_${RELEASE_TAG}.md"
+          if [ ! -f "$f" ]; then
+            echo "::error::$f is missing; every release tag needs its own notes file"
+            exit 1
+          fi
+          { echo "body<<EOF"; cat "$f"; echo "EOF"; } >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
         uses: actions/setup-node@v5
@@ -131,21 +119,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            curl \
-            file \
-            libasound2-dev \
-            libayatana-appindicator3-dev \
-            libfuse2 \
-            librsvg2-dev \
-            libssl-dev \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            patchelf \
-            wget
+            build-essential curl file rpm \
+            libasound2-dev libayatana-appindicator3-dev libfuse2 \
+            librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev \
+            patchelf wget
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Third-party notices
+        shell: bash
+        run: python3 scripts/gen-notices.py
 
       - name: Build Tauri app
         id: build-tauri
@@ -154,14 +138,37 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.args }}
-          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
-          releaseName: ${{ startsWith(github.ref, 'refs/tags/v') && format('LocalYapper {0}', github.ref_name) || '' }}
-          releaseBody: |
-            LocalYapper release build.
-
-            See docs/RELEASE_NOTES_v1.0.0.md for release notes.
-          releaseDraft: true
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: ${{ env.RELEASE_TAG != '' && format('LocalYapper {0}', env.RELEASE_TAG) || '' }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: false
           prerelease: false
+
+      - name: Installer sizes
+        shell: bash
+        env:
+          ARTIFACT_PATHS: ${{ steps.build-tauri.outputs.artifactPaths }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const paths = JSON.parse(process.env.ARTIFACT_PATHS || '[]');
+          const limit = 25 * 1024 * 1024;
+          let failed = false;
+          for (const p of paths) {
+            if (!fs.existsSync(p) || fs.statSync(p).isDirectory()) continue;
+            const size = fs.statSync(p).size;
+            console.log(`${(size / 1048576).toFixed(1)} MB  ${p}`);
+            if (/\.exe$/i.test(p) && size > limit) {
+              console.log(`::error::Windows installer is ${(size / 1048576).toFixed(1)} MB, over the 25 MB limit`);
+              failed = true;
+            }
+          }
+          if (paths.length === 0) {
+            console.log('::error::the build produced no installers');
+            failed = true;
+          }
+          process.exit(failed ? 1 : 0);
+          NODE
 
       - name: Prepare artifact paths
         id: artifact-paths

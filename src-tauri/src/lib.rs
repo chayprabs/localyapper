@@ -1,13 +1,15 @@
-mod audio;
 mod commands;
 mod context;
+pub mod controller;
+pub mod core;
 mod db;
 mod error;
-mod hotkey;
-mod injection;
 mod models;
+pub mod platform;
+pub mod settings;
 mod state;
-mod stt;
+#[cfg(feature = "test-hooks")]
+mod test_hooks;
 mod tray;
 
 // Replace the system allocator with mimalloc. sherpa-onnx allocates and
@@ -17,71 +19,81 @@ mod tray;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-use audio::capture::AudioRecorder;
 use state::AppState;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
-use stt::whisper::WhisperEngine;
 use tauri::Manager;
 
-/// Candidate directories where the STT model might be found.
-///
-/// Checks for the selected model first, then falls back to the default Parakeet model.
-pub(crate) fn speech_model_candidates(app: &tauri::AppHandle, model_setting: &str) -> Vec<PathBuf> {
-    let models_dir = match app.path().app_data_dir() {
-        Ok(d) => d.join("models"),
-        Err(_) => return vec![],
-    };
-    let model_setting = stt::whisper::normalize_stt_model_name(model_setting);
-
-    let primary = models_dir.join(stt::whisper::stt_model_dir_name(model_setting));
-    let fallback = if model_setting != stt::whisper::DEFAULT_STT_MODEL {
-        Some(models_dir.join(stt::whisper::stt_model_dir_name(
-            stt::whisper::DEFAULT_STT_MODEL,
-        )))
-    } else {
-        None
-    };
-
-    let mut candidates = vec![primary];
-    if let Some(fallback) = fallback {
-        candidates.push(fallback);
+/// The app's data folder. Test builds can point it elsewhere with
+/// LOCALYAPPER_DATA_DIR so smoke tests never touch a real profile.
+pub(crate) fn data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    #[cfg(feature = "test-hooks")]
+    if let Some(dir) = std::env::var_os("LOCALYAPPER_DATA_DIR") {
+        return Ok(PathBuf::from(dir));
     }
-    candidates
+    app.path().app_data_dir().map_err(|e| e.to_string())
 }
 
-pub(crate) fn resolve_speech_model_dir(
-    app: &tauri::AppHandle,
-    model_setting: &str,
-) -> Option<PathBuf> {
-    speech_model_candidates(app, model_setting)
-        .into_iter()
-        .find(|candidate| stt::whisper::is_valid_stt_model_dir(candidate))
+/// Directory holding downloaded speech models.
+pub(crate) fn models_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    data_dir(app).map(|d| d.join("models"))
 }
 
-pub(crate) fn load_speech_model_from_setting(
+/// Resolve the `speech_model` setting to files on disk.
+pub(crate) fn resolve_model_spec(
     app: &tauri::AppHandle,
-    model_setting: &str,
-) -> Result<Arc<WhisperEngine>, String> {
-    let candidate = resolve_speech_model_dir(app, model_setting).ok_or_else(|| {
-        let model_setting = stt::whisper::normalize_stt_model_name(model_setting);
-        format!(
-            "Speech model files not found for {}. Open Settings > Speech to download them.",
-            stt::whisper::stt_model_dir_name(model_setting)
-        )
-    })?;
+) -> Result<core::stt::manager::ModelSpec, String> {
+    let state = app.state::<AppState>();
+    let id = commands::models::active_model_id(state.inner())?;
+    core::stt::catalog::spec(&models_dir(app)?, &id, commands::models::manifest()?)
+}
 
-    log::info!("STT: Loading engine from {}", candidate.display());
-    WhisperEngine::new(&candidate)
-        .map(Arc::new)
-        .map_err(|e| format!("Failed to load STT from {}: {e}", candidate.display()))
+/// The Silero VAD model bundled in the app's resources. When it is
+/// missing the segmenter falls back to the energy detector.
+fn vad_model_path(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::path::BaseDirectory;
+    let p = app
+        .path()
+        .resolve("resources/silero_vad.onnx", BaseDirectory::Resource)
+        .ok()?;
+    if p.is_file() {
+        Some(p)
+    } else {
+        log::warn!("vad: bundled model missing at {}", p.display());
+        None
+    }
 }
 
 /// Show the main settings window, building a new WebView when it does not
 /// exist. The main window is destroyed on user close to free its WebView
 /// process; this helper recreates it on demand from the tray and the
 /// open-app hotkey.
+/// Logging (plan P7.2): the log folder keeps the current file and one
+/// rotated file of at most 1 MB each, plus stderr. `info`, or `debug`
+/// with LOCALYAPPER_DEBUG=1. Transcripts and clipboard text are never
+/// logged.
+fn log_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
+    let debug = std::env::var("LOCALYAPPER_DEBUG").is_ok_and(|v| v == "1");
+    tauri_plugin_log::Builder::new()
+        .clear_targets()
+        .target(Target::new(TargetKind::LogDir { file_name: None }))
+        .target(Target::new(TargetKind::Stderr))
+        .max_file_size(1_000_000)
+        .rotation_strategy(RotationStrategy::KeepOne)
+        .level(if debug {
+            log::LevelFilter::Debug
+        } else {
+            log::LevelFilter::Info
+        })
+        .build()
+}
+
+/// The argument the OS passes when it starts the app at login.
+const AUTOSTART_ARG: &str = "--autostart";
+
 pub(crate) fn show_or_create_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -108,87 +120,170 @@ pub(crate) fn show_or_create_main_window(app: &tauri::AppHandle) {
     }
 }
 
-/// Send a system notification via tauri-plugin-notification.
-fn send_notification(handle: &tauri::AppHandle, title: &str, body: &str) {
-    use tauri_plugin_notification::NotificationExt;
-    if let Err(e) = handle
-        .notification()
-        .builder()
-        .title(title)
-        .body(body)
-        .show()
-    {
-        log::warn!("Failed to send notification: {e}");
-    }
+/// The IPC command list. Test builds add the overlay test hook.
+macro_rules! app_commands {
+    ($($extra:path),* $(,)?) => {
+        tauri::generate_handler![
+            commands::recording::paste_last,
+            commands::recording::cancel_recording,
+            commands::recording::overlay_copy,
+            commands::recording::overlay_dismiss,
+            commands::recording::overlay_current_view,
+            commands::models::download_speech_model,
+            commands::models::cancel_model_download,
+            commands::models::reload_models,
+            commands::models::check_models_status,
+            commands::models::list_models,
+            commands::models::download_model,
+            commands::models::use_model,
+            commands::models::delete_model,
+            commands::models::get_model_state,
+            commands::models::check_speech_model_file_exists,
+            commands::models::delete_speech_model,
+            commands::history::get_history,
+            commands::history::delete_history_entry,
+            commands::history::clear_history,
+            commands::history::get_stats,
+            commands::settings::get_setting,
+            commands::settings::set_setting,
+            commands::settings::get_all_settings,
+            commands::settings::reset_all_settings,
+            commands::history::export_history,
+            commands::recording::test_dictation,
+            commands::hotkeys::update_hotkey,
+            commands::hotkeys::reset_hotkeys,
+            commands::hotkeys::set_hotkey_probe,
+            commands::system::check_permissions,
+            commands::system::list_input_devices,
+            commands::system::about_info,
+            commands::system::diagnostics,
+            commands::system::open_releases,
+            commands::system::request_microphone_permission,
+            commands::system::request_accessibility_permission,
+            commands::system::get_paused_state,
+            commands::system::open_accessibility_settings,
+            commands::system::open_mic_settings,
+            $($extra,)*
+        ]
+    };
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    let args: Vec<String> = std::env::args().collect();
+    let cli_action = controller::CliAction::from_args(&args);
+    // Launched at login (P6.2): never build the settings window.
+    let at_login = args.iter().any(|a| a == AUTOSTART_ARG);
 
-    if let Err(e) = tauri::Builder::default()
+    // Registered first: a second launch hands its arguments to this
+    // instance and exits.
+    #[allow(unused_mut)]
+    let mut builder =
+        tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            match controller::CliAction::from_args(&args) {
+                Some(action) => app
+                    .state::<AppState>()
+                    .controller
+                    .send(controller::Msg::Cli(action)),
+                None => show_or_create_main_window(app),
+            }
+        }));
+    // The overlay becomes a non-activating NSPanel on macOS.
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_nspanel::init());
+    }
+
+    if let Err(e) = builder
+        .plugin(log_plugin())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
+            Some(vec![AUTOSTART_ARG]),
         ))
-        .plugin(tauri_plugin_notification::init())
-        .setup(|app| -> Result<(), Box<dyn std::error::Error>> {
-            let app_data_dir = app.path().app_data_dir().map_err(|e| {
+        .setup(move |app| -> Result<(), Box<dyn std::error::Error>> {
+            let app_data_dir = data_dir(app.handle()).map_err(|e| {
                 log::error!("Failed to resolve app data directory: {e}");
-                Box::new(e) as Box<dyn std::error::Error>
+                e
             })?;
 
-            let conn = db::open_database(&app_data_dir).map_err(|e| {
+            let (conn, migration) = db::open_database(&app_data_dir).map_err(|e| {
                 log::error!("Failed to initialize database: {e}");
                 Box::new(e) as Box<dyn std::error::Error>
             })?;
-            let speech_model_setting = db::queries::get_setting(&conn, "speech_model")
-                .unwrap_or_else(|_| stt::whisper::DEFAULT_STT_MODEL.to_string());
-            let auto_start_enabled = db::queries::get_setting(&conn, "auto_start")
-                .map(|value| value.eq_ignore_ascii_case("true"))
-                .unwrap_or(true);
-            let speech_model_installed =
-                resolve_speech_model_dir(app.handle(), &speech_model_setting).is_some();
-
-            if speech_model_installed {
-                log::info!(
-                    "Speech model files found at startup; engine will load on first dictation"
-                );
-            } else {
-                log::warn!(
-                    "Speech model files not found at startup - STT unavailable until downloaded"
-                );
+            #[cfg(feature = "test-hooks")]
+            test_hooks::apply_test_settings(&conn);
+            if migration.from_version < 2 && !migration.fresh {
+                // Schema version 2 (P5.3): an upgraded install keeps
+                // whatever launch-at-login state the OS has now.
+                use tauri_plugin_autostart::ManagerExt;
+                let on = app.autolaunch().is_enabled().unwrap_or(false);
+                if let Err(e) = db::queries::set_setting(&conn, "auto_start", &on.to_string()) {
+                    log::warn!("settings: could not record launch-at-login state: {e}");
+                }
             }
+            let settings_map: HashMap<String, String> =
+                db::queries::get_all_settings(&conn).unwrap_or_default();
+            let settings_cache = Arc::new(settings::SettingsCache::new(settings_map.clone()));
+            let retention: i64 = settings_cache
+                .get_or_default("history_retention_days")
+                .parse()
+                .unwrap_or(0);
+            if retention > 0 {
+                if let Err(e) = db::queries::prune_history(&conn, retention) {
+                    log::warn!("history: could not prune at start: {e}");
+                }
+            }
+            let auto_start_enabled = settings_cache.get_or_default("auto_start") == "true";
+            commands::models::migrate_legacy_install(&models_dir(app.handle())?);
 
-            let hotkey_state = Arc::new(state::HotkeyState::new());
+            let controller_settings = controller::ControllerSettings::from_map(&settings_map);
+            // The overlay window is created here, hidden, so a key press
+            // never waits for a WebView to start.
+            if let Err(e) = platform::overlay::webview::build(app.handle()) {
+                log::error!("overlay: could not create the window: {e}");
+            }
+            let started = controller::start(controller::ControllerParts {
+                app: app.handle().clone(),
+                overlay: Arc::new(platform::overlay::webview::WebviewOverlay::new(
+                    app.handle().clone(),
+                    controller_settings.overlay,
+                )),
+                settings: controller_settings,
+                resolve_model: Box::new(resolve_model_spec),
+                vad_model: vad_model_path(app.handle()),
+                hotkeys: {
+                    let handle = app.handle().clone();
+                    Box::new(move |ctl| platform::hotkey::create_backend(&handle, ctl))
+                },
+            })?;
 
             app.manage(AppState {
                 db: Arc::new(Mutex::new(conn)),
-                recorder: Arc::new(AudioRecorder::new()),
-                // Lazy-loaded by ensure_speech_model_loaded on first use. Models are
-                // dropped after idle_unload_seconds by ModelLifecycle to keep idle
-                // RAM low; reloading from disk-cached weights costs ~1s.
-                whisper: Arc::new(Mutex::new(None)),
-                vad: Arc::new(Mutex::new(None)),
-                lifecycle: stt::lifecycle::ModelLifecycle::new(),
-                last_injection: Arc::new(Mutex::new(None)),
+                controller: started.handle,
+                models: started.manager,
+                paused: started.paused,
+                last_injection: started.last_injection,
                 download_cancel: Arc::new(AtomicBool::new(false)),
-                paused: Arc::new(AtomicBool::new(false)),
-                recording_target_app: Arc::new(Mutex::new(None)),
-                loaded_speech_model: Arc::new(Mutex::new(None)),
-                hotkey_state,
+                hotkeys: started.hotkeys,
+                settings: settings_cache,
             });
 
-            if !speech_model_installed {
-                send_notification(
-                    app.handle(),
-                    "LocalYapper",
-                    "Speech model not downloaded - open Settings to get started",
-                );
+            #[cfg(feature = "test-hooks")]
+            test_hooks::start(
+                app.handle().clone(),
+                app.state::<AppState>().controller.clone(),
+            );
+
+            if let Some(action) = cli_action {
+                app.state::<AppState>()
+                    .controller
+                    .send(controller::Msg::Cli(action));
             }
 
-            match hotkey::manager::register_hotkeys(app.handle()) {
+            match platform::hotkey::apply_settings(app.handle()) {
                 Ok(()) => log::info!("STARTUP: Hotkeys registered successfully"),
                 Err(e) => log::error!("STARTUP: FAILED to register hotkeys: {e}"),
             }
@@ -197,21 +292,33 @@ pub fn run() {
                 log::error!("Failed to setup system tray: {e}");
             }
 
+            // The settings window is not created at start (P6.1): only the
+            // first-run wizard needs it, and never at login (P6.2). The
+            // tray, the open-app hotkey or a second launch build it.
+            let setup_complete = app
+                .state::<AppState>()
+                .settings
+                .get_or_default("setup_complete")
+                == "true";
+            if !setup_complete && !at_login && cli_action.is_none() {
+                show_or_create_main_window(app.handle());
+            }
+
             {
                 use tauri_plugin_autostart::ManagerExt;
                 let manager = app.autolaunch();
                 let is_enabled = manager.is_enabled().unwrap_or(false);
                 if auto_start_enabled && !is_enabled {
                     if let Err(e) = manager.enable() {
-                        log::warn!("Failed to enable autostart: {e}");
+                        log::warn!("Failed to enable launch at login: {e}");
                     } else {
-                        log::info!("Autostart enabled by default");
+                        log::info!("Launch at login enabled, following the setting");
                     }
                 } else if !auto_start_enabled && is_enabled {
                     if let Err(e) = manager.disable() {
-                        log::warn!("Failed to disable autostart: {e}");
+                        log::warn!("Failed to disable launch at login: {e}");
                     } else {
-                        log::info!("Autostart disabled by setting");
+                        log::info!("Launch at login disabled, following the setting");
                     }
                 }
             }
@@ -229,36 +336,31 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::recording::start_recording,
-            commands::recording::stop_recording,
-            commands::recording::run_pipeline,
-            commands::recording::inject_text,
-            commands::recording::paste_last,
-            commands::recording::cancel_recording,
-            commands::models::download_speech_model,
-            commands::models::cancel_model_download,
-            commands::models::reload_models,
-            commands::models::check_models_status,
-            commands::models::get_model_state,
-            commands::models::check_speech_model_file_exists,
-            commands::models::delete_speech_model,
-            commands::history::get_history,
-            commands::history::delete_history_entry,
-            commands::history::clear_history,
-            commands::history::get_stats,
-            commands::settings::get_setting,
-            commands::settings::set_setting,
-            commands::settings::get_all_settings,
-            commands::hotkeys::update_hotkey,
-            commands::hotkeys::reset_hotkeys,
-            commands::system::get_focused_app,
-            commands::system::check_permissions,
-            commands::system::get_paused_state,
-            commands::system::open_accessibility_settings,
-            commands::system::open_mic_settings,
-        ])
-        .run(tauri::generate_context!())
+        .invoke_handler({
+            #[cfg(feature = "test-hooks")]
+            {
+                app_commands!(test_hooks::test_overlay_seen)
+            }
+            #[cfg(not(feature = "test-hooks"))]
+            {
+                app_commands!()
+            }
+        })
+        .build(tauri::generate_context!())
+        .map(|app| {
+            app.run(|_app, event| {
+                // A tray app keeps running with no window open (the
+                // settings window is closed and the overlay may have been
+                // released after idle). Only an explicit exit (tray Quit)
+                // carries an exit code.
+                if let tauri::RunEvent::ExitRequested {
+                    code: None, api, ..
+                } = event
+                {
+                    api.prevent_exit();
+                }
+            })
+        })
     {
         log::error!("Error while running Tauri application: {e}");
     }

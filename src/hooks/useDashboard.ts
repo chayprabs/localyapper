@@ -1,4 +1,5 @@
 // Dashboard hook -- stats, last dictation, model status with auto-refresh
+import { DEFAULT_RECORD_HOTKEY } from "@/lib/hotkeyDefaults";
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type {
@@ -7,7 +8,6 @@ import type {
   SpeechModelFileStatus,
   Stats,
 } from "@/types/commands";
-import type { PipelineEvent } from "@/types/overlay";
 import {
   deleteHistoryEntry,
   getHistory,
@@ -39,17 +39,13 @@ function toErrorMessage(error: unknown, fallback: string): string {
       : fallback;
 }
 
-function eventShouldRefreshDashboard(event: PipelineEvent): boolean {
-  return event.state === "injected" || (event.state === "error" && Boolean(event.text));
-}
-
 export function useDashboard(): DashboardData {
   const [stats, setStats] = useState<Stats | null>(null);
   const [lastDictation, setLastDictation] = useState<HistoryEntry | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelsStatus | null>(null);
   const [modelFileStatus, setModelFileStatus] =
     useState<SpeechModelFileStatus | null>(null);
-  const [recordHotkey, setRecordHotkey] = useState("F8");
+  const [recordHotkey, setRecordHotkey] = useState(DEFAULT_RECORD_HOTKEY);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,10 +102,8 @@ export function useDashboard(): DashboardData {
   }, [fetchAll]);
 
   useEffect(() => {
-    const unlisten = listen<PipelineEvent>("pipeline-state", (event) => {
-      if (eventShouldRefreshDashboard(event.payload)) {
-        void fetchAll();
-      }
+    const unlisten = listen("history-updated", () => {
+      void fetchAll();
     });
 
     return () => {

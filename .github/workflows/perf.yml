@@ -1,0 +1,139 @@
+name: Memory
+
+# Plan P6.6: measure private memory of the release build and its WebView
+# helpers on the three runners, then commit docs/PERFORMANCE.md. Runs when
+# the measurement changes, on demand, and from CI on the final commit.
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - scripts/measure-memory.*
+      - scripts/write-performance.py
+      - src-tauri/src/platform/memory.rs
+      - src-tauri/src/platform/overlay/**
+      - .github/workflows/perf.yml
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: perf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: Measure ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-15]
+    env:
+      MODELS: ${{ github.workspace }}/../models
+      CARGO_PROFILE_RELEASE_LTO: "false"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: perf
+
+      - name: Drop an incomplete sherpa-onnx download from the cache
+        shell: bash
+        run: |
+          d=src-tauri/target/sherpa-onnx-prebuilt
+          if [ -d "$d" ] && [ -z "$(find "$d" -path '*/lib/*' -name '*sherpa-onnx-c-api*' -print -quit)" ]; then
+            rm -rf "$d"
+          fi
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev xvfb dbus
+
+      - name: Cache models
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.MODELS }}
+          key: models-${{ runner.os }}-${{ hashFiles('src-tauri/models.json') }}-parakeet-110m
+
+      - name: Download default model
+        shell: bash
+        run: python scripts/fetch-models.py src-tauri/models.json "$MODELS" parakeet-110m
+
+      - name: Build release with the test channel
+        shell: bash
+        run: |
+          npm ci
+          npm run build
+          cargo build --release --manifest-path src-tauri/Cargo.toml \
+            --features test-hooks,tauri/custom-protocol
+
+      - name: Measure (Linux)
+        if: runner.os == 'Linux'
+        run: >
+          dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24"
+          scripts/measure-memory.sh src-tauri/target/release/localyapper
+          "$MODELS/parakeet-110m" perf-linux.md
+
+      - name: Measure (macOS)
+        if: runner.os == 'macOS'
+        run: scripts/measure-memory.sh src-tauri/target/release/localyapper "$MODELS/parakeet-110m" perf-macos.md
+
+      - name: Measure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: scripts/measure-memory.ps1 src-tauri/target/release/localyapper.exe "$env:MODELS/parakeet-110m" perf-windows.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: perf-${{ runner.os }}
+          path: perf-*.md
+
+  commit:
+    name: Commit docs/PERFORMANCE.md
+    needs: measure
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: perf
+          merge-multiple: true
+
+      - name: Write and commit
+        run: |
+          python3 scripts/write-performance.py perf docs/PERFORMANCE.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/PERFORMANCE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "P6.6: update docs/PERFORMANCE.md from CI memory run [skip ci]"
+          for i in 1 2 3 4; do
+            git pull --rebase origin "${{ github.ref_name }}" && git push origin HEAD:"${{ github.ref_name }}" && exit 0
+            sleep $((i * 10))
+          done
+          exit 1

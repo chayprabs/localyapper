@@ -18,7 +18,7 @@ export function WizardChrome({
   children,
 }: WizardChromeProps) {
   return (
-    <div className="relative h-full w-full overflow-hidden bg-gradient-to-b from-[#F2F2F4] to-[#E6E6EA]">
+    <div className="relative h-full w-full overflow-hidden bg-gradient-to-b from-canvas to-sidebar">
       <header className="absolute top-0 left-0 right-0 flex h-14 items-center justify-between px-6">
         {canGoBack ? (
           <button
@@ -35,7 +35,7 @@ export function WizardChrome({
         )}
 
         <span
-          className="rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/55 shadow-sm backdrop-blur"
+          className="rounded-full bg-surface/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/55 shadow-sm backdrop-blur"
           aria-label={`Step ${stepNumber} of ${totalSteps}`}
         >
           Step {stepNumber} of {totalSteps}
@@ -45,7 +45,7 @@ export function WizardChrome({
       </header>
 
       <main className="flex h-full w-full items-center justify-center px-6">
-        <div className="w-full max-w-[480px] rounded-[14px] bg-white p-7 shadow-[0_8px_40px_rgba(0,0,0,0.10)]">
+        <div className="w-full max-w-[480px] rounded-[14px] bg-surface p-7 shadow-[0_8px_40px_rgba(0,0,0,0.10)]">
           {children}
         </div>
       </main>

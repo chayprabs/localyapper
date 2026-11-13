@@ -3,10 +3,12 @@ import { useCallback } from "react";
 import { useSetAtom } from "jotai";
 import { setupCompleteAtom } from "@/stores/wizardStore";
 import { useWizard } from "@/hooks/useWizard";
+import { AccessibilityStep } from "./AccessibilityStep";
 import { HotkeyStep } from "./HotkeyStep";
 import { MicrophoneStep } from "./MicrophoneStep";
 import { ReadyStep } from "./ReadyStep";
 import { SpeechFilesStep } from "./SpeechFilesStep";
+import { TryStep } from "./TryStep";
 import { WelcomeStep } from "./WelcomeStep";
 import { WizardChrome } from "./WizardChrome";
 import { Icon } from "@/components/ui/Icon";
@@ -21,7 +23,7 @@ export function Wizard() {
 
   if (!wizard.hydrated) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[#F2F2F4]">
+      <div className="flex h-full w-full items-center justify-center bg-canvas">
         <Icon name="progress_activity" size={28} className="animate-spin text-black/[0.30]" />
       </div>
     );
@@ -51,6 +53,8 @@ export function Wizard() {
             onContinue={wizard.goNext}
           />
         );
+      case "accessibility":
+        return <AccessibilityStep onContinue={wizard.goNext} />;
       case "hotkey":
         return (
           <HotkeyStep
@@ -72,13 +76,15 @@ export function Wizard() {
             onContinue={wizard.goNext}
           />
         );
+      case "try":
+        return <TryStep hotkey={wizard.hotkey} onContinue={wizard.goNext} />;
       case "done":
         return (
           <ReadyStep
             hotkey={wizard.hotkey}
             permissions={wizard.permissions}
             filesInstalled={wizard.filesInstalled}
-            onFinish={wizard.finishWizard}
+            onFinish={(launchAtLogin) => void wizard.finishWizard(launchAtLogin)}
             error={wizard.setupError}
           />
         );

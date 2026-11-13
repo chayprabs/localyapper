@@ -1,0 +1,62 @@
+name: Fixtures
+
+# Builds the LibriSpeech WAV fixtures on a GitHub runner (the build
+# container cannot reach openslr.org) and commits them back.
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - scripts/make-fixtures.py
+      - .github/workflows/fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fixtures:
+    name: Make fixtures
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Download LibriSpeech test-clean
+        run: |
+          for url in https://www.openslr.org/resources/12/test-clean.tar.gz \
+                     https://us.openslr.org/resources/12/test-clean.tar.gz \
+                     https://openslr.trmal.net/resources/12/test-clean.tar.gz; do
+            curl -fL --retry 3 -o test-clean.tar.gz "$url" && break
+          done
+          tar xzf test-clean.tar.gz
+
+      - name: Build fixtures
+        run: |
+          pip install numpy scipy soundfile
+          rm -f src-tauri/tests/fixtures/*.wav src-tauri/tests/fixtures/*.txt
+          python3 scripts/make-fixtures.py LibriSpeech/test-clean src-tauri/tests/fixtures
+          du -sh src-tauri/tests/fixtures
+
+      - name: Commit fixtures
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/tests/fixtures
+          if git diff --cached --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git commit -m "P0.3: add LibriSpeech test fixtures from CI [skip ci]"
+          for i in 1 2 3 4; do
+            git pull --rebase origin "${{ github.ref_name }}" && git push origin HEAD:"${{ github.ref_name }}" \
+              && echo "changed=true" >> "$GITHUB_OUTPUT" && exit 0
+            sleep $((i * 10))
+          done
+          exit 1
+
+  bench:
+    needs: fixtures
+    if: needs.fixtures.outputs.changed == 'true'
+    uses: ./.github/workflows/bench.yml

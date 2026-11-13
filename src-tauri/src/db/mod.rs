@@ -8,7 +8,9 @@ use std::path::Path;
 use crate::error::LocalYapperError;
 
 /// Opens (or creates) the SQLite database and initializes the schema.
-pub fn open_database(app_data_dir: &Path) -> Result<Connection, LocalYapperError> {
+pub fn open_database(
+    app_data_dir: &Path,
+) -> Result<(Connection, schema::Migration), LocalYapperError> {
     std::fs::create_dir_all(app_data_dir)?;
     let db_path = app_data_dir.join("localyapper.db");
     let conn = Connection::open(db_path)?;
@@ -30,7 +32,7 @@ pub fn open_database(app_data_dir: &Path) -> Result<Connection, LocalYapperError
          PRAGMA synchronous=NORMAL;\
          PRAGMA mmap_size=0;",
     )?;
-    schema::initialize_database(&conn)?;
+    let migration = schema::initialize_database(&conn)?;
 
-    Ok(conn)
+    Ok((conn, migration))
 }

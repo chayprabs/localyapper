@@ -1,3 +1,4 @@
+import { DEFAULT_RECORD_HOTKEY, isMacPlatform } from "@/lib/hotkeyDefaults";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DownloadProgress, PermissionsStatus } from "@/types/commands";
 import { getAllSettings, setSetting } from "@/lib/commands/settings";
@@ -11,23 +12,31 @@ import { updateHotkey } from "@/lib/commands/hotkeys";
 import {
   checkPermissions,
   openMicSettings,
+  requestMicrophonePermission,
 } from "@/lib/commands/system";
 
 /**
  * Onboarding step identifiers, in display order. The last entry, `done`,
  * is the summary screen the user sees just before the wizard closes.
  */
-export const WIZARD_STEPS = [
+const ALL_WIZARD_STEPS = [
   "welcome",
   "microphone",
+  "accessibility",
   "hotkey",
   "files",
+  "try",
   "done",
 ] as const;
 
-export type WizardStep = (typeof WIZARD_STEPS)[number];
+export type WizardStep = (typeof ALL_WIZARD_STEPS)[number];
 
-const DEFAULT_HOTKEY = "F8";
+// The Accessibility grant only exists on macOS.
+export const WIZARD_STEPS: readonly WizardStep[] = isMacPlatform
+  ? ALL_WIZARD_STEPS
+  : ALL_WIZARD_STEPS.filter((s) => s !== "accessibility");
+
+const DEFAULT_HOTKEY = DEFAULT_RECORD_HOTKEY;
 
 function isWizardStep(value: string | undefined): value is WizardStep {
   if (value == null) return false;
@@ -148,6 +157,17 @@ export function useWizard(onComplete: () => void) {
     }
   }, []);
 
+  // Entering the microphone step asks the OS for access (macOS prompts
+  // once through AVFoundation), then reads the result.
+  useEffect(() => {
+    if (step !== "microphone") return;
+    void requestMicrophonePermission()
+      .catch((error: unknown) => {
+        console.error("Failed to request microphone access:", error);
+      })
+      .then(() => refreshPermissions());
+  }, [step, refreshPermissions]);
+
   const requestOpenMicSettings = useCallback(async () => {
     try {
       await openMicSettings();
@@ -198,10 +218,11 @@ export function useWizard(onComplete: () => void) {
     setDownloadProgress(null);
   }, []);
 
-  const finishWizard = useCallback(async () => {
+  const finishWizard = useCallback(async (launchAtLogin: boolean) => {
     setSetupError(null);
     try {
       await updateHotkey("hotkey_record", hotkey);
+      await setSetting("auto_start", launchAtLogin ? "true" : "false");
       await setSetting("setup_step", "done");
       await setSetting("setup_complete", "true");
       onComplete();

@@ -6,7 +6,18 @@
     <title>LocalYapper Overlay</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/overlay-main.tsx"></script>
+    <div id="pill" class="pill" data-kind="hidden" role="status" aria-live="polite">
+      <div class="bars" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="spinner" aria-hidden="true"></div>
+      <span id="label" class="label"></span>
+      <span id="text" class="text"></span>
+      <div class="actions">
+        <button id="copy" type="button">Copy</button>
+        <button id="dismiss" type="button" aria-label="Dismiss">&#x2715;</button>
+      </div>
+    </div>
+    <script type="module" src="/src/overlay-main.ts"></script>
   </body>
 </html>

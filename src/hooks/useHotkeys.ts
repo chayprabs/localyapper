@@ -1,4 +1,5 @@
 // Hotkeys hook -- settings load, optimistic update, and reset to defaults
+import { DEFAULT_RECORD_HOTKEY } from "@/lib/hotkeyDefaults";
 import { useState, useEffect, useCallback } from "react";
 import { getAllSettings } from "@/lib/commands/settings";
 import {
@@ -25,7 +26,7 @@ const HOTKEY_DEFINITIONS: {
     key: "hotkey_record",
     label: "Record",
     description: "Hold to dictate. Double-tap to toggle hands-free.",
-    defaultValue: "F8",
+    defaultValue: DEFAULT_RECORD_HOTKEY,
     readOnly: false,
   },
   {

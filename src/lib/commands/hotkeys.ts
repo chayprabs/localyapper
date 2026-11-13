@@ -9,3 +9,8 @@ export async function updateHotkey(key: string, value: string): Promise<void> {
 export async function resetHotkeys(): Promise<AllSettings> {
   return invoke<AllSettings>("reset_hotkeys");
 }
+
+/** While enabled, record-key presses emit `hotkey-detected` instead of dictating. */
+export async function setHotkeyProbe(enabled: boolean): Promise<void> {
+  return invoke<void>("set_hotkey_probe", { enabled });
+}

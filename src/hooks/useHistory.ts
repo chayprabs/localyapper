@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { HistoryEntry } from "@/types/commands";
-import type { PipelineEvent } from "@/types/overlay";
 import {
   getHistory,
   deleteHistoryEntry,
@@ -31,11 +30,7 @@ function toErrorMessage(error: unknown, fallback: string): string {
       : fallback;
 }
 
-function eventShouldRefreshHistory(event: PipelineEvent): boolean {
-  return event.state === "injected" || (event.state === "error" && Boolean(event.text));
-}
-
-export function useHistory(): HistoryData {
+export function useHistory(search = ""): HistoryData {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
@@ -45,7 +40,7 @@ export function useHistory(): HistoryData {
   const fetchInitial = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await getHistory(PAGE_SIZE, 0);
+      const result = await getHistory(PAGE_SIZE, 0, search || null);
       setEntries(result);
       setHasMore(result.length === PAGE_SIZE);
       offsetRef.current = result.length;
@@ -56,7 +51,7 @@ export function useHistory(): HistoryData {
       setError(toErrorMessage(fetchError, "Failed to load history"));
     }
     setIsLoading(false);
-  }, []);
+  }, [search]);
 
   useEffect(() => {
     void fetchInitial();
@@ -64,10 +59,8 @@ export function useHistory(): HistoryData {
 
   // Auto-refresh when a new dictation completes
   useEffect(() => {
-    const unlisten = listen<PipelineEvent>("pipeline-state", (event) => {
-      if (eventShouldRefreshHistory(event.payload)) {
-        void fetchInitial();
-      }
+    const unlisten = listen("history-updated", () => {
+      void fetchInitial();
     });
     return () => {
       unlisten.then((fn) => fn());
@@ -76,7 +69,7 @@ export function useHistory(): HistoryData {
 
   const loadMore = useCallback(async () => {
     try {
-      const result = await getHistory(PAGE_SIZE, offsetRef.current);
+      const result = await getHistory(PAGE_SIZE, offsetRef.current, search || null);
       setEntries((prev) => [...prev, ...result]);
       setHasMore(result.length === PAGE_SIZE);
       offsetRef.current += result.length;
@@ -85,7 +78,7 @@ export function useHistory(): HistoryData {
       setHasMore(false);
       setError(toErrorMessage(loadError, "Failed to load more history"));
     }
-  }, []);
+  }, [search]);
 
   const deleteEntry = useCallback(
     async (id: string) => {

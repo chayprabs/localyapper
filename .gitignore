@@ -127,3 +127,6 @@ src-tauri/gen/
 playwright-report/
 test-results/
 *.log
+
+# The bundled VAD model is committed on purpose (plan P1.15).
+!src-tauri/resources/silero_vad.onnx

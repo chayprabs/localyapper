@@ -1,525 +1,397 @@
-// IPC command handlers -- speech model download, status, and lifecycle
+// IPC command handlers -- speech model catalog, download, use and delete
 use std::sync::atomic::Ordering;
+use std::sync::OnceLock;
 
-use futures_util::StreamExt;
-use tauri::{Emitter, Manager};
+use serde::Serialize;
+use tauri::Emitter;
 
+use crate::core::download::{Downloader, FileSpec};
+use crate::core::stt::catalog::{self, Manifest};
 use crate::models::{DownloadProgress, ModelsStatus, SpeechModelFileStatus};
 use crate::state::AppState;
-use crate::stt::whisper::WhisperEngine;
 
-fn selected_speech_model_name(state: &AppState) -> String {
-    let model = state
-        .db
-        .lock()
-        .ok()
-        .and_then(|db| crate::db::queries::get_setting(&db, "speech_model").ok())
-        .unwrap_or_else(|| crate::stt::whisper::DEFAULT_STT_MODEL.to_string());
-
-    crate::stt::whisper::normalize_stt_model_name(&model).to_string()
+/// The embedded manifest, parsed once.
+pub(crate) fn manifest() -> Result<&'static Manifest, String> {
+    static M: OnceLock<Result<Manifest, String>> = OnceLock::new();
+    M.get_or_init(catalog::manifest)
+        .as_ref()
+        .map_err(|e| e.clone())
 }
 
-pub(crate) async fn ensure_speech_model_loaded(
-    app_handle: &tauri::AppHandle,
-    state: &AppState,
-) -> Result<std::sync::Arc<WhisperEngine>, String> {
-    let desired_model = selected_speech_model_name(state);
-
-    if let Ok(guard) = state.whisper.lock() {
-        if let Some(engine) = guard.as_ref() {
-            let loaded = state
-                .loaded_speech_model
-                .lock()
-                .ok()
-                .and_then(|g| g.clone());
-            if loaded.as_deref() == Some(desired_model.as_str()) {
-                return Ok(engine.clone());
-            }
-        }
-    }
-
-    // Wrong model cached or none loaded — drop the stale engine first.
-    if let Ok(mut guard) = state.whisper.lock() {
-        if guard.take().is_some() {
-            if let Ok(mut loaded) = state.loaded_speech_model.lock() {
-                *loaded = None;
-            }
-        }
-    }
-
-    // First touch since startup or eviction: tell the frontend so it can
-    // surface a brief "loading" indicator instead of looking frozen.
-    let _ = app_handle.emit(
-        crate::stt::lifecycle::MODEL_STATE_EVENT,
-        crate::stt::lifecycle::ModelStatePayload {
-            loaded: false,
-            state: "loading".to_string(),
-        },
-    );
-
-    let model_name = selected_speech_model_name(state);
-    let model_name_for_load = model_name.clone();
-    let load_handle = app_handle.clone();
-    let loaded_engine = tokio::task::spawn_blocking(move || {
-        crate::load_speech_model_from_setting(&load_handle, &model_name_for_load)
-    })
-    .await
-    .map_err(|e| format!("STT load task panicked: {e}"))??;
-
-    let mut guard = state
-        .whisper
-        .lock()
-        .map_err(|e| format!("STT lock failed: {e}"))?;
-    if guard.is_none() {
-        *guard = Some(loaded_engine.clone());
-        if let Ok(mut loaded) = state.loaded_speech_model.lock() {
-            *loaded = Some(model_name);
-        }
-    }
-    drop(guard);
-
-    state.lifecycle.emit_state(app_handle, true);
-
-    if let Ok(guard) = state.whisper.lock() {
-        if let Some(engine) = guard.as_ref() {
-            return Ok(engine.clone());
-        }
-    }
-    Ok(loaded_engine)
+fn speech_setting(state: &AppState) -> String {
+    state.settings.get_or_default("speech_model")
 }
 
-/// Lazily load the Silero VAD model if a model file is present on disk.
-/// Returns Ok(()) if Silero is loaded or unavailable (energy fallback is
-/// always usable). Idempotent and cheap to call repeatedly.
-pub(crate) async fn ensure_vad_loaded(
-    app_handle: &tauri::AppHandle,
-    state: &AppState,
-) -> Result<(), String> {
-    if state.vad.lock().map(|g| g.is_some()).unwrap_or(false) {
-        return Ok(());
-    }
+/// The model id the `speech_model` setting resolves to on this machine.
+pub(crate) fn active_model_id(state: &AppState) -> Result<String, String> {
+    Ok(catalog::resolve_id(
+        &speech_setting(state),
+        crate::platform::memory::total_ram_bytes(),
+        manifest()?,
+    ))
+}
 
-    let vad_path = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("models")
-        .join(crate::stt::whisper::SILERO_VAD_FILENAME);
+#[derive(Serialize, Clone, Debug)]
+pub struct ModelInfo {
+    pub id: String,
+    pub name: String,
+    pub languages: Vec<String>,
+    pub license: String,
+    pub size_bytes: u64,
+    /// `installed`, `partial` (a download was interrupted) or `missing`.
+    pub state: String,
+    /// The model dictation uses now.
+    pub active: bool,
+    /// What `auto` picks on this machine.
+    pub recommended: bool,
+    pub loaded: bool,
+}
 
-    if !vad_path.exists() {
-        return Ok(());
-    }
-
-    let vad_mutex = state.vad.clone();
-    tokio::task::spawn_blocking(move || -> Result<(), String> {
-        match crate::audio::vad::SileroVad::new(&vad_path) {
-            Ok(vad) => {
-                if let Ok(mut g) = vad_mutex.lock() {
-                    if g.is_none() {
-                        *g = Some(vad);
-                    }
+#[tauri::command]
+pub async fn list_models(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<ModelInfo>, String> {
+    let m = manifest()?;
+    let dir = crate::models_dir(&app_handle)?;
+    let active = active_model_id(state.inner())?;
+    let recommended = catalog::auto_choice(crate::platform::memory::total_ram_bytes(), m);
+    let loaded = state.models.loaded_id();
+    Ok(catalog::offered(m)
+        .into_iter()
+        .map(|(id, e)| {
+            let mdir = catalog::model_dir(&dir, id);
+            let installed = catalog::is_installed(&mdir, e) && catalog::marker_matches(&mdir, e);
+            let partial = !installed
+                && e.files.iter().any(|f| {
+                    crate::core::download::part_path(&mdir.join(&f.name)).exists()
+                        || mdir.join(&f.name).exists()
+                });
+            ModelInfo {
+                id: id.clone(),
+                name: e.name.clone(),
+                languages: e.languages.clone(),
+                license: e.license.clone(),
+                size_bytes: e.total_size(),
+                state: if installed {
+                    "installed"
+                } else if partial {
+                    "partial"
+                } else {
+                    "missing"
                 }
-                Ok(())
+                .into(),
+                active: *id == active,
+                recommended: *id == recommended,
+                loaded: loaded.as_deref() == Some(id.as_str()),
             }
-            Err(e) => Err(format!("Failed to load Silero VAD: {e}")),
-        }
-    })
-    .await
-    .map_err(|e| format!("VAD load task panicked: {e}"))??;
+        })
+        .collect())
+}
 
+#[derive(Serialize, Clone)]
+struct DownloadEvent {
+    id: String,
+    downloaded: u64,
+    total: u64,
+    percent: f64,
+}
+
+/// Download, verify and mark a model as installed. Resumes a partial
+/// download. Emits `model-download-progress` with real byte totals.
+#[tauri::command]
+pub async fn download_model(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    let m = manifest()?;
+    let entry = m
+        .models
+        .get(&id)
+        .filter(|e| !e.legacy)
+        .ok_or_else(|| format!("Unknown speech model: {id}"))?;
+    let dir = catalog::model_dir(&crate::models_dir(&app_handle)?, &id);
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("Could not create {}: {e}", dir.display()))?;
+    let files: Vec<FileSpec> = entry
+        .files
+        .iter()
+        .map(|f| FileSpec {
+            url: f.url.clone(),
+            size: f.size,
+            sha256: f.sha256.clone(),
+            dest: dir.join(&f.name),
+        })
+        .collect();
+    state.download_cancel.store(false, Ordering::SeqCst);
+    let _ = std::fs::remove_file(dir.join(catalog::VERIFIED_MARKER));
+    let downloader = Downloader::new()?;
+    let app = app_handle.clone();
+    let event_id = id.clone();
+    let started = std::time::Instant::now();
+    downloader
+        .fetch_all(&files, &state.download_cancel, &move |p| {
+            let secs = started.elapsed().as_secs_f64().max(0.001);
+            let _ = app.emit(
+                "speech_model_download_progress",
+                DownloadProgress {
+                    percent: if p.total > 0 {
+                        100.0 * p.downloaded as f64 / p.total as f64
+                    } else {
+                        0.0
+                    },
+                    downloaded_mb: p.downloaded / 1_000_000,
+                    total_mb: p.total / 1_000_000,
+                    speed_mbps: p.downloaded as f64 / 1e6 / secs,
+                },
+            );
+            let _ = app.emit(
+                "model-download-progress",
+                DownloadEvent {
+                    id: event_id.clone(),
+                    downloaded: p.downloaded,
+                    total: p.total,
+                    percent: if p.total > 0 {
+                        100.0 * p.downloaded as f64 / p.total as f64
+                    } else {
+                        0.0
+                    },
+                },
+            );
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    std::fs::write(
+        dir.join(catalog::VERIFIED_MARKER),
+        catalog::marker_text(entry),
+    )
+    .map_err(|e| format!("Could not finish the install: {e}"))?;
+    log::info!("models: {id} downloaded and verified");
+    let _ = app_handle.emit("models-changed", ());
     Ok(())
 }
 
-/// Cancel an in-progress model download.
+/// Cancel an in-progress model download. The partial file is kept.
 #[tauri::command]
 pub async fn cancel_model_download(state: tauri::State<'_, AppState>) -> Result<(), String> {
     state.download_cancel.store(true, Ordering::SeqCst);
-    log::info!("Speech model download cancellation requested");
     Ok(())
 }
 
-/// Download STT model files (Parakeet ONNX + Silero VAD) to app data dir.
-///
-/// Downloads multiple files into a model-specific subdirectory.
-/// Emits `speech_model_download_progress` events with `DownloadProgress` payload.
-/// Supports resume via HTTP Range headers.
+/// Make `id` (or `auto`) the dictation model. The old model is evicted.
+#[tauri::command]
+pub async fn use_model(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    let m = manifest()?;
+    if id != "auto" && !m.models.get(&id).is_some_and(|e| !e.legacy) {
+        return Err(format!("Unknown speech model: {id}"));
+    }
+    {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        crate::db::queries::set_setting(&conn, "speech_model", &id).map_err(|e| e.to_string())?;
+    }
+    let models = state.models.clone();
+    tokio::task::spawn_blocking(move || models.evict_blocking())
+        .await
+        .map_err(|e| e.to_string())?;
+    let _ = app_handle.emit("models-changed", ());
+    Ok(())
+}
+
+/// Delete a model's files. Deleting the active model returns the app to
+/// "needs download".
+#[tauri::command]
+pub async fn delete_model(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    let m = manifest()?;
+    if !m.models.contains_key(&id) {
+        return Err(format!("Unknown speech model: {id}"));
+    }
+    if state.models.loaded_id().as_deref() == Some(id.as_str()) {
+        let models = state.models.clone();
+        tokio::task::spawn_blocking(move || models.evict_blocking())
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    let dir = catalog::model_dir(&crate::models_dir(&app_handle)?, &id);
+    if dir.is_dir() {
+        std::fs::remove_dir_all(&dir).map_err(|e| format!("Could not delete {id}: {e}"))?;
+    }
+    log::info!("models: {id} deleted");
+    let _ = app_handle.emit("models-changed", ());
+    Ok(())
+}
+
+/// Model load state payload for the frontend `model-state` listener.
+#[derive(Serialize, Clone)]
+pub struct ModelStatePayload {
+    pub loaded: bool,
+    pub state: String,
+}
+
+/// Current model load state, for the `model-state` listener to hydrate.
+#[tauri::command]
+pub async fn get_model_state(
+    state: tauri::State<'_, AppState>,
+) -> Result<ModelStatePayload, String> {
+    let loaded = state.models.loaded_id().is_some();
+    Ok(ModelStatePayload {
+        loaded,
+        state: if loaded { "loaded" } else { "unloaded" }.to_string(),
+    })
+}
+
+/// Upgrade path for installs made before the catalog (P4.6): the old
+/// `parakeet-tdt-ctc-110m` folder becomes `parakeet-110m` when its files
+/// match the manifest, and is hash-checked once in the background.
+pub(crate) fn migrate_legacy_install(models_dir: &std::path::Path) {
+    let Ok(m) = manifest() else { return };
+    let Some(entry) = m.models.get(catalog::DEFAULT_MODEL) else {
+        return;
+    };
+    let legacy = models_dir.join(catalog::LEGACY_DIR);
+    let target = catalog::model_dir(models_dir, catalog::DEFAULT_MODEL);
+    if !legacy.is_dir() || target.exists() {
+        return;
+    }
+    let sizes_match = entry
+        .files
+        .iter()
+        .all(|f| std::fs::metadata(legacy.join(&f.name)).is_ok_and(|md| md.len() == f.size));
+    if !sizes_match {
+        log::info!("models: legacy folder does not match the catalog; leaving it");
+        return;
+    }
+    if let Err(e) = std::fs::rename(&legacy, &target) {
+        log::warn!("models: could not move the legacy install: {e}");
+        return;
+    }
+    let entry = entry.clone();
+    std::thread::spawn(move || {
+        let ok = entry.files.iter().all(|f| {
+            crate::core::download::sha256_file(&target.join(&f.name)).is_ok_and(|h| h == f.sha256)
+        });
+        if ok {
+            let _ = std::fs::write(
+                target.join(catalog::VERIFIED_MARKER),
+                catalog::marker_text(&entry),
+            );
+            log::info!("models: legacy install verified and kept");
+        } else {
+            log::warn!("models: legacy install failed its checksum; it must be downloaded again");
+        }
+    });
+}
+
+// Commands for the wizard and dashboard, which work on the active model.
+
+/// Download the model the `speech_model` setting resolves to.
 #[tauri::command]
 pub async fn download_speech_model(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    state.download_cancel.store(false, Ordering::SeqCst);
-
-    let model_name = selected_speech_model_name(state.inner());
-    let model_files = crate::stt::whisper::stt_model_files(&model_name);
-
-    if model_files.is_empty() {
-        return Err(format!("Unknown STT model: {model_name}"));
-    }
-
-    let models_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("models");
-
-    std::fs::create_dir_all(&models_dir)
-        .map_err(|e| format!("Failed to create models dir: {e}"))?;
-
-    let model_dir_name = crate::stt::whisper::stt_model_dir_name(&model_name);
-    let model_dir = models_dir.join(&model_dir_name);
-    std::fs::create_dir_all(&model_dir).map_err(|e| format!("Failed to create model dir: {e}"))?;
-
-    let estimated_total_bytes: u64 = match model_name.as_str() {
-        "parakeet-110m" => 458 * 1024 * 1024,
-        "parakeet-0.6b" => 661 * 1024 * 1024,
-        _ => 100 * 1024 * 1024,
-    };
-    let total_mb = estimated_total_bytes / (1024 * 1024);
-    let mut cumulative_downloaded: u64 = 0;
-    let start = std::time::Instant::now();
-    let cancel_flag = state.download_cancel.clone();
-
-    for (filename, url) in &model_files {
-        let dest_path = model_dir.join(filename);
-        let min_size = crate::stt::whisper::minimum_valid_stt_model_file_size(filename);
-
-        if dest_path.exists() {
-            let size = std::fs::metadata(&dest_path).map(|m| m.len()).unwrap_or(0);
-            if size > min_size {
-                log::info!(
-                    "STT file {} already exists ({} bytes), skipping",
-                    filename,
-                    size
-                );
-                cumulative_downloaded += size;
-                continue;
-            }
-        }
-
-        let temp_path = model_dir.join(format!("{filename}.download"));
-        let client = reqwest::Client::new();
-
-        let existing_bytes = if temp_path.exists() {
-            std::fs::metadata(&temp_path).map(|m| m.len()).unwrap_or(0)
-        } else {
-            0
-        };
-
-        let mut req = client.get(url.as_str());
-        if existing_bytes > 0 {
-            req = req.header("Range", format!("bytes={existing_bytes}-"));
-            log::info!(
-                "Resuming {} download from {} bytes",
-                filename,
-                existing_bytes
-            );
-        }
-
-        let resp = req
-            .send()
-            .await
-            .map_err(|e| format!("Download {} failed: {e}", filename))?;
-
-        let status = resp.status();
-        if !status.is_success() && status != reqwest::StatusCode::PARTIAL_CONTENT {
-            return Err(format!(
-                "Download {} failed with status: {status}",
-                filename
-            ));
-        }
-
-        let is_resume = status == reqwest::StatusCode::PARTIAL_CONTENT;
-        let mut stream = resp.bytes_stream();
-
-        use std::io::Write;
-        let mut file = if existing_bytes > 0 && is_resume {
-            std::fs::OpenOptions::new()
-                .append(true)
-                .open(&temp_path)
-                .map_err(|e| format!("Failed to open temp file for {}: {e}", filename))?
-        } else {
-            std::fs::File::create(&temp_path)
-                .map_err(|e| format!("Failed to create temp file for {}: {e}", filename))?
-        };
-
-        let mut file_downloaded: u64 = if is_resume { existing_bytes } else { 0 };
-
-        while let Some(chunk) = stream.next().await {
-            if cancel_flag.load(Ordering::SeqCst) {
-                drop(file);
-                let _ = std::fs::remove_file(&temp_path);
-                return Err("Download cancelled".to_string());
-            }
-
-            let chunk =
-                chunk.map_err(|e| format!("Download stream error for {}: {e}", filename))?;
-            file.write_all(&chunk)
-                .map_err(|e| format!("Failed to write {}: {e}", filename))?;
-
-            file_downloaded += chunk.len() as u64;
-            let total_so_far = cumulative_downloaded + file_downloaded;
-            let elapsed = start.elapsed().as_secs_f64();
-            let speed_mbps = if elapsed > 0.0 {
-                (total_so_far as f64 / (1024.0 * 1024.0)) / elapsed
-            } else {
-                0.0
-            };
-            let percent = if estimated_total_bytes > 0 {
-                ((total_so_far as f64 / estimated_total_bytes as f64) * 100.0).min(99.0)
-            } else {
-                0.0
-            };
-
-            let _ = app_handle.emit(
-                "speech_model_download_progress",
-                DownloadProgress {
-                    percent,
-                    downloaded_mb: total_so_far / (1024 * 1024),
-                    total_mb,
-                    speed_mbps,
-                },
-            );
-        }
-
-        drop(file);
-        let downloaded_size = std::fs::metadata(&temp_path)
-            .map_err(|e| format!("Failed to inspect downloaded {}: {e}", filename))?
-            .len();
-        if downloaded_size <= min_size {
-            let _ = std::fs::remove_file(&temp_path);
-            return Err(format!(
-                "Downloaded {} was incomplete ({} bytes)",
-                filename, downloaded_size
-            ));
-        }
-        if dest_path.exists() {
-            let metadata = std::fs::metadata(&dest_path)
-                .map_err(|e| format!("Failed to inspect existing {}: {e}", filename))?;
-            if metadata.is_file() {
-                std::fs::remove_file(&dest_path)
-                    .map_err(|e| format!("Failed to replace existing {}: {e}", filename))?;
-            } else {
-                return Err(format!(
-                    "Cannot replace {} because the destination path is not a file",
-                    filename
-                ));
-            }
-        }
-        std::fs::rename(&temp_path, &dest_path)
-            .map_err(|e| format!("Failed to rename {}: {e}", filename))?;
-
-        cumulative_downloaded += downloaded_size;
-        log::info!(
-            "STT file {} downloaded to {}",
-            filename,
-            dest_path.display()
-        );
-    }
-
-    let vad_path = models_dir.join(crate::stt::whisper::SILERO_VAD_FILENAME);
-    if !vad_path.exists() {
-        log::info!("Downloading Silero VAD model...");
-        let client = reqwest::Client::new();
-        let resp = client
-            .get(crate::stt::whisper::SILERO_VAD_URL)
-            .send()
-            .await
-            .map_err(|e| format!("Silero VAD download failed: {e}"))?;
-        if !resp.status().is_success() {
-            log::warn!("Silero VAD download failed with status: {}", resp.status());
-        } else {
-            let bytes = resp
-                .bytes()
-                .await
-                .map_err(|e| format!("Silero VAD read failed: {e}"))?;
-            std::fs::write(&vad_path, &bytes)
-                .map_err(|e| format!("Failed to write Silero VAD: {e}"))?;
-            log::info!("Silero VAD downloaded to {}", vad_path.display());
-        }
-    }
-
-    let _ = app_handle.emit(
-        "speech_model_download_progress",
-        DownloadProgress {
-            percent: 100.0,
-            downloaded_mb: total_mb,
-            total_mb,
-            speed_mbps: 0.0,
-        },
-    );
-
-    log::info!("STT model ({}) download complete", model_name);
-    Ok(())
+    let id = active_model_id(state.inner())?;
+    download_model(app_handle, state, id).await
 }
 
-/// Check if the STT model directory exists on disk.
+/// Whether the active model is installed.
 #[tauri::command]
 pub async fn check_speech_model_file_exists(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<SpeechModelFileStatus, String> {
-    let model_name = selected_speech_model_name(state.inner());
-    let dir_name = crate::stt::whisper::stt_model_dir_name(&model_name);
-
-    let models_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("models");
-
-    let model_dir = models_dir.join(&dir_name);
-
-    if crate::stt::whisper::is_valid_stt_model_dir(&model_dir) {
-        let total_size: u64 = std::fs::read_dir(&model_dir)
-            .map(|entries| {
-                entries
-                    .filter_map(|e| e.ok())
-                    .map(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
-                    .sum()
-            })
-            .unwrap_or(0);
-
-        return Ok(SpeechModelFileStatus {
-            exists: true,
-            size_mb: total_size / (1024 * 1024),
-            model_name,
-        });
-    }
-
+    let m = manifest()?;
+    let id = active_model_id(state.inner())?;
+    let entry = m.models.get(&id).ok_or("unknown model")?;
+    let dir = catalog::model_dir(&crate::models_dir(&app_handle)?, &id);
+    let exists = catalog::is_installed(&dir, entry) && catalog::marker_matches(&dir, entry);
     Ok(SpeechModelFileStatus {
-        exists: false,
-        size_mb: 0,
-        model_name,
+        exists,
+        size_mb: entry.total_size() / 1_000_000,
+        model_name: id,
     })
 }
 
-/// Delete the STT model directory and unload from AppState.
+/// Delete the active model.
 #[tauri::command]
 pub async fn delete_speech_model(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    let model = selected_speech_model_name(state.inner());
-
-    state.lifecycle.evict_now(&app_handle);
-
-    let dir_name = crate::stt::whisper::stt_model_dir_name(&model);
-    let models_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("models");
-
-    let model_dir = models_dir.join(&dir_name);
-    if model_dir.is_dir() {
-        std::fs::remove_dir_all(&model_dir)
-            .map_err(|e| format!("Failed to delete STT model directory: {e}"))?;
-    }
-
-    let has_other_models = std::fs::read_dir(&models_dir)
-        .map(|entries| {
-            entries
-                .filter_map(|entry| entry.ok())
-                .any(|entry| crate::stt::whisper::is_valid_stt_model_dir(&entry.path()))
-        })
-        .unwrap_or(false);
-
-    if !has_other_models {
-        let vad_path = models_dir.join(crate::stt::whisper::SILERO_VAD_FILENAME);
-        if vad_path.is_file() {
-            std::fs::remove_file(&vad_path)
-                .map_err(|e| format!("Failed to delete Silero VAD model: {e}"))?;
-        }
-    }
-
-    log::info!("STT model ({}) deleted", model);
-    Ok(())
+    let id = active_model_id(state.inner())?;
+    delete_model(app_handle, state, id).await
 }
 
-/// Reload speech models from disk into AppState.
+/// Drop the loaded model and load the active one again.
 #[tauri::command]
 pub async fn reload_models(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut errors: Vec<String> = Vec::new();
-
-    let speech_model_loaded = state.whisper.lock().map(|g| g.is_some()).unwrap_or(false);
-    log::info!("RELOAD: STT currently loaded: {speech_model_loaded}");
-
-    if let Ok(mut guard) = state.whisper.lock() {
-        guard.take();
-    }
-    if let Ok(mut loaded) = state.loaded_speech_model.lock() {
-        *loaded = None;
-    }
-
-    if let Err(e) = ensure_speech_model_loaded(&app_handle, state.inner()).await {
-        errors.push(e);
-    }
-
-    let vad_loaded = state.vad.lock().map(|g| g.is_some()).unwrap_or(false);
-
-    if !vad_loaded {
-        let models_dir = app_handle
-            .path()
-            .app_data_dir()
-            .map_err(|e: tauri::Error| e.to_string())?
-            .join("models");
-
-        let vad_path = models_dir.join(crate::stt::whisper::SILERO_VAD_FILENAME);
-        if vad_path.exists() {
-            let vad_mutex = state.vad.clone();
-            let vad_result = tokio::task::spawn_blocking(move || {
-                match crate::audio::vad::SileroVad::new(&vad_path) {
-                    Ok(vad) => {
-                        if let Ok(mut g) = vad_mutex.lock() {
-                            *g = Some(vad);
-                        }
-                        Ok(())
-                    }
-                    Err(e) => Err(format!("Failed to load Silero VAD: {e}")),
-                }
-            })
-            .await
-            .map_err(|e| format!("VAD load task panicked: {e}"))?;
-
-            if let Err(e) = vad_result {
-                log::warn!("{e}");
-            } else {
-                log::info!("RELOAD: Silero VAD loaded successfully");
-            }
-        }
-    }
-
-    if !errors.is_empty() {
-        return Err(errors.join("; "));
-    }
-    Ok(())
+    let spec = crate::resolve_model_spec(&app_handle)?;
+    let models = state.models.clone();
+    tokio::task::spawn_blocking(move || {
+        models.evict_blocking();
+        models.ensure_loaded_blocking(&spec).map(|_| ())
+    })
+    .await
+    .map_err(|e| format!("Reload task failed: {e}"))?
 }
 
-/// Check which models are currently loaded.
+/// Whether a model is loaded.
 #[tauri::command]
 pub async fn check_models_status(
     state: tauri::State<'_, AppState>,
 ) -> Result<ModelsStatus, String> {
-    let speech_model_loaded = state.whisper.lock().map(|g| g.is_some()).unwrap_or(false);
-
     Ok(ModelsStatus {
-        speech_model_loaded,
+        speech_model_loaded: state.models.loaded_id().is_some(),
     })
 }
 
-/// Return the current model load state for the frontend `model-state`
-/// listener to hydrate on mount.
-#[tauri::command]
-pub async fn get_model_state(
-    state: tauri::State<'_, AppState>,
-) -> Result<crate::stt::lifecycle::ModelStatePayload, String> {
-    let loaded = state.whisper.lock().map(|g| g.is_some()).unwrap_or(false);
-    Ok(crate::stt::lifecycle::ModelStatePayload {
-        loaded,
-        state: if loaded { "loaded" } else { "unloaded" }.to_string(),
-    })
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_folder_becomes_the_default_model() {
+        let m = manifest().expect("manifest");
+        let entry = &m.models[catalog::DEFAULT_MODEL];
+        let root = std::env::temp_dir().join(format!("ly-legacy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let legacy = root.join(catalog::LEGACY_DIR);
+        std::fs::create_dir_all(&legacy).expect("dir");
+        for f in &entry.files {
+            let file = std::fs::File::create(legacy.join(&f.name)).expect("file");
+            file.set_len(f.size).expect("size");
+        }
+        migrate_legacy_install(&root);
+        let target = catalog::model_dir(&root, catalog::DEFAULT_MODEL);
+        assert!(!legacy.exists());
+        assert!(entry.files.iter().all(|f| target.join(&f.name).is_file()));
+        // Zero-filled files fail the hash check, so no marker appears and
+        // the model still counts as not downloaded.
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        assert!(!catalog::marker_matches(&target, entry));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_legacy_folder_with_other_files_is_left_alone() {
+        let root = std::env::temp_dir().join(format!("ly-legacy2-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let legacy = root.join(catalog::LEGACY_DIR);
+        std::fs::create_dir_all(&legacy).expect("dir");
+        std::fs::write(legacy.join("model.onnx"), b"short").expect("file");
+        migrate_legacy_install(&root);
+        assert!(legacy.exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

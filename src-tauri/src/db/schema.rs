@@ -3,8 +3,27 @@ use rusqlite::Connection;
 
 use crate::error::LocalYapperError;
 
-/// Creates the application tables and seeds default data in a single transaction.
-pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
+/// The schema version `initialize_database` brings a database to.
+pub const SCHEMA_VERSION: i64 = 2;
+
+/// What `initialize_database` found and did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Migration {
+    /// `PRAGMA user_version` before (0 for databases older than versioning).
+    pub from_version: i64,
+    /// The database had no settings yet: a fresh install.
+    pub fresh: bool,
+}
+
+/// Creates the tables and migrates with `PRAGMA user_version` (plan P5.3).
+///
+/// - Version 1 is the schema the app shipped with before the rebuild,
+///   including its old clean-ups of removed features.
+/// - Version 2 adds every typed setting with its default, removes
+///   `overlay_x` and `overlay_y`, and maps values that are no longer
+///   valid. The caller then copies the OS launch-at-login state into
+///   `auto_start` for upgraded installs.
+pub fn initialize_database(conn: &Connection) -> Result<Migration, LocalYapperError> {
     conn.execute_batch(
         "
         CREATE TABLE IF NOT EXISTS transcription_history (
@@ -24,53 +43,67 @@ pub fn initialize_database(conn: &Connection) -> Result<(), LocalYapperError> {
         );
         ",
     )?;
+    let from_version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    let settings_rows: i64 = conn.query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0))?;
+    let fresh = settings_rows == 0;
 
-    seed_settings(conn)?;
-    migrate_removed_features(conn)?;
-    migrate_hotkey_defaults(conn)?;
-    migrate_legacy_speech_model_settings(conn)?;
-
-    Ok(())
+    if from_version < 1 {
+        migrate_removed_features(conn)?;
+        migrate_hotkey_defaults(conn)?;
+        migrate_legacy_speech_model_settings(conn)?;
+        conn.execute_batch("PRAGMA user_version = 1;")?;
+    }
+    if from_version < 2 {
+        migrate_v2(conn)?;
+        conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION};"))?;
+    }
+    Ok(Migration {
+        from_version,
+        fresh,
+    })
 }
 
-/// Inserts default settings. Uses INSERT OR IGNORE for idempotency.
-///
-/// `setup_step` tracks the active wizard step so the user resumes where they
-/// left off if they quit the app mid-onboarding. Valid values:
-/// `welcome | microphone | hotkey | files | done`.
-fn seed_settings(conn: &Connection) -> Result<(), LocalYapperError> {
-    let seeds = [
-        ("hotkey_record", "F8"),
-        ("hotkey_cancel", "Escape"),
-        ("hotkey_paste_last", "Ctrl+Alt+J"),
-        ("hotkey_open_app", "Ctrl+Alt+O"),
-        ("speech_model", "parakeet-110m"),
-        ("auto_start", "true"),
-        ("overlay_x", "100"),
-        ("overlay_y", "100"),
-        ("setup_complete", "false"),
-        ("setup_step", "welcome"),
-        ("idle_unload_seconds", "60"),
-    ];
-
+/// Version 2: typed settings.
+fn migrate_v2(conn: &Connection) -> Result<(), LocalYapperError> {
+    use crate::settings::keys;
     let tx = conn.unchecked_transaction()?;
-    for (key, value) in &seeds {
-        tx.execute(
-            "INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?1, ?2, datetime('now'))",
-            rusqlite::params![key, value],
-        )?;
+    tx.execute(
+        "DELETE FROM settings WHERE key IN ('overlay_x', 'overlay_y')",
+        [],
+    )?;
+    // Values the old app wrote that are no longer valid.
+    tx.execute(
+        "UPDATE settings SET value = 'auto' WHERE key = 'speech_model' AND value = 'parakeet-0.6b'",
+        [],
+    )?;
+    for key in keys::KEYS {
+        let current: Option<String> = tx
+            .query_row(
+                "SELECT value FROM settings WHERE key = ?1",
+                rusqlite::params![key.name],
+                |r| r.get(0),
+            )
+            .ok();
+        let valid = current
+            .as_deref()
+            .map(|v| key.kind == keys::Kind::Model || keys::validate(key, v, &[]).is_ok())
+            .unwrap_or(false);
+        if !valid {
+            tx.execute(
+                "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?1, ?2, datetime('now'))",
+                rusqlite::params![key.name, keys::default_of(key)],
+            )?;
+        }
     }
     tx.commit()?;
-
     Ok(())
 }
 
-/// Drop removed feature tables and stale settings from older builds.
 fn migrate_removed_features(conn: &Connection) -> Result<(), LocalYapperError> {
     conn.execute("DROP TABLE IF EXISTS corrections", [])?;
     conn.execute("DROP TABLE IF EXISTS personal_dictionary", [])?;
     conn.execute(
-        "DELETE FROM settings WHERE key IN ('confidence_threshold', 'correction_decay_days', 'training_paragraph_index', 'auto_inject_delay_ms', 'sound_effects', 'mute_media', 'language', 'max_recording_seconds', 'hotkey_hands_free')",
+        "DELETE FROM settings WHERE key IN ('confidence_threshold', 'correction_decay_days', 'training_paragraph_index', 'auto_inject_delay_ms', 'sound_effects', 'mute_media', 'language', 'hotkey_hands_free')",
         [],
     )?;
     Ok(())
@@ -88,10 +121,16 @@ fn migrate_hotkey_defaults(conn: &Connection) -> Result<(), LocalYapperError> {
         "Ctrl+Alt+X",
         "Ctrl+Alt+H",
     ];
-    for old_val in &legacy_record_values {
+    // Never rewrite this OS's own default (Alt+Space on macOS).
+    let current_default =
+        crate::platform::hotkey::default_combo(crate::platform::hotkey::HotkeyId::Record);
+    for old_val in legacy_record_values
+        .iter()
+        .filter(|v| **v != current_default)
+    {
         conn.execute(
-            "UPDATE settings SET value = 'F8', updated_at = datetime('now') WHERE key = 'hotkey_record' AND value = ?1",
-            rusqlite::params![old_val],
+            "UPDATE settings SET value = ?2, updated_at = datetime('now') WHERE key = 'hotkey_record' AND value = ?1",
+            rusqlite::params![old_val, current_default],
         )?;
     }
 
@@ -152,20 +191,29 @@ mod tests {
 
         assert_eq!(queries::get_setting(&conn, "setup_complete")?, "false");
         assert_eq!(queries::get_setting(&conn, "setup_step")?, "welcome");
-        assert_eq!(queries::get_setting(&conn, "hotkey_record")?, "F8");
-        assert_eq!(queries::get_setting(&conn, "hotkey_cancel")?, "Escape");
         assert_eq!(
-            queries::get_setting(&conn, "speech_model")?,
-            "parakeet-110m"
+            queries::get_setting(&conn, "hotkey_record")?,
+            crate::platform::hotkey::default_combo(crate::platform::hotkey::HotkeyId::Record)
         );
+        assert_eq!(queries::get_setting(&conn, "hotkey_cancel")?, "Escape");
+        assert_eq!(queries::get_setting(&conn, "speech_model")?, "auto");
         // hotkey_hands_free is no longer a separate hotkey -- hands-free is a
         // double-tap of the record hotkey.
         assert!(queries::get_setting(&conn, "hotkey_hands_free").is_err());
+        assert_eq!(queries::get_setting(&conn, "max_recording_seconds")?, "600");
 
         let settings_count: i64 =
             conn.query_row("SELECT COUNT(*) FROM settings", [], |row| row.get(0))?;
-        assert_eq!(settings_count, 11);
-        assert_eq!(queries::get_setting(&conn, "idle_unload_seconds")?, "60");
+        assert_eq!(settings_count, crate::settings::keys::KEYS.len() as i64);
+        assert_eq!(queries::get_setting(&conn, "cancel_key_enabled")?, "true");
+        assert_eq!(
+            queries::get_setting(&conn, "cancel_key_in_hands_free")?,
+            "false"
+        );
+        assert_eq!(queries::get_setting(&conn, "idle_unload_seconds")?, "120");
+        assert_eq!(queries::get_setting(&conn, "auto_start")?, "false");
+        let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        assert_eq!(version, SCHEMA_VERSION);
 
         Ok(())
     }

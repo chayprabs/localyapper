@@ -117,7 +117,7 @@ export function SpeechFilesStep({
           onClick={() => {
             void onCancel();
           }}
-          className="h-9 w-full rounded-[8px] border border-black/[0.10] bg-white text-[13px] font-medium text-black/75 transition-colors hover:bg-black/[0.02]"
+          className="h-9 w-full rounded-[8px] border border-black/[0.10] bg-surface text-[13px] font-medium text-black/75 transition-colors hover:bg-black/[0.02]"
         >
           Cancel download
         </button>

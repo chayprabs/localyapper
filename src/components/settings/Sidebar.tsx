@@ -14,8 +14,10 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
   { id: "history", label: "History", icon: "history" },
-  { id: "hotkeys", label: "Hotkeys", icon: "keyboard" },
-  { id: "models", label: "Speech", icon: "graphic_eq" },
+  { id: "dictation", label: "Dictation", icon: "keyboard" },
+  { id: "audio", label: "Audio", icon: "mic" },
+  { id: "speech", label: "Speech", icon: "graphic_eq" },
+  { id: "general", label: "General", icon: "settings" },
 ];
 
 export function Sidebar() {
@@ -26,7 +28,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "bg-[#eeeeee] flex flex-col h-full shrink-0 transition-[width] duration-200 overflow-hidden",
+        "bg-sidebar flex flex-col h-full shrink-0 transition-[width] duration-200 overflow-hidden",
         isCollapsed ? "w-12" : "w-[220px]"
       )}
     >

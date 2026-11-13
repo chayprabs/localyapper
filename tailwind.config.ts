@@ -16,9 +16,16 @@ export default {
         ],
       },
       colors: {
-        "window-bg": "#f9f9f9",
-        "sidebar-bg": "#eeeeee",
-        "card-bg": "#FFFFFF",
+        // Theme tokens (plan P5.10): RGB channels in CSS variables, so
+        // opacity modifiers like text-black/50 work in both themes.
+        // "black" is the ink colour: black in light, white in dark.
+        black: "rgb(var(--ink) / <alpha-value>)",
+        surface: "rgb(var(--surface) / <alpha-value>)",
+        canvas: "rgb(var(--canvas) / <alpha-value>)",
+        sidebar: "rgb(var(--sidebar) / <alpha-value>)",
+        "window-bg": "rgb(var(--canvas) / <alpha-value>)",
+        "sidebar-bg": "rgb(var(--sidebar) / <alpha-value>)",
+        "card-bg": "rgb(var(--surface) / <alpha-value>)",
         primary: "#0058bc",
         "primary-tint": "rgba(0,88,188,0.12)",
         success: "#006b19",

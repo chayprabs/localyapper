@@ -7,17 +7,30 @@ use crate::models::{HistoryEntry, Stats};
 
 // --- History ---
 
-/// Returns history entries in reverse chronological order.
+/// Returns history entries in reverse chronological order, optionally
+/// only those whose text or app name contains `search` (any case).
 pub fn get_history(
     conn: &Connection,
     limit: i64,
     offset: i64,
+    search: Option<&str>,
 ) -> Result<Vec<HistoryEntry>, LocalYapperError> {
+    let pattern = search.map(str::trim).filter(|s| !s.is_empty()).map(|s| {
+        let escaped = s
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_");
+        format!("%{escaped}%")
+    });
     let mut stmt = conn.prepare(
         "SELECT id, raw_text, final_text, app_name, duration_ms, word_count, created_at
-         FROM transcription_history ORDER BY created_at DESC LIMIT ?1 OFFSET ?2",
+         FROM transcription_history
+         WHERE ?3 IS NULL
+            OR final_text LIKE ?3 ESCAPE '\\'
+            OR app_name LIKE ?3 ESCAPE '\\'
+         ORDER BY julianday(created_at) DESC LIMIT ?1 OFFSET ?2",
     )?;
-    let rows = stmt.query_map(params![limit, offset], |row| {
+    let rows = stmt.query_map(params![limit, offset, pattern], |row| {
         Ok(HistoryEntry {
             id: row.get(0)?,
             raw_text: row.get(1)?,
@@ -73,17 +86,34 @@ pub fn clear_history(conn: &Connection) -> Result<(), LocalYapperError> {
     Ok(())
 }
 
-/// Returns dashboard statistics computed from history.
-pub fn get_stats(conn: &Connection) -> Result<Stats, LocalYapperError> {
+/// Deletes history older than `days`. Returns how many rows went.
+pub fn prune_history(conn: &Connection, days: i64) -> Result<usize, LocalYapperError> {
+    Ok(conn.execute(
+        "DELETE FROM transcription_history
+         WHERE julianday(created_at) < julianday('now', ?1)",
+        params![format!("-{days} days")],
+    )?)
+}
+
+/// Returns dashboard statistics. `day_start` and `week_start` are the
+/// local day and week boundaries as UTC timestamps (plan P5.9), so
+/// "today" follows the user's clock, not UTC.
+pub fn get_stats(
+    conn: &Connection,
+    day_start: &str,
+    week_start: &str,
+) -> Result<Stats, LocalYapperError> {
     let words_today: i64 = conn.query_row(
-        "SELECT COALESCE(SUM(word_count), 0) FROM transcription_history WHERE date(created_at) = date('now')",
-        [],
+        "SELECT COALESCE(SUM(word_count), 0) FROM transcription_history
+         WHERE julianday(created_at) >= julianday(?1)",
+        params![day_start],
         |row| row.get(0),
     )?;
 
     let words_week: i64 = conn.query_row(
-        "SELECT COALESCE(SUM(word_count), 0) FROM transcription_history WHERE created_at >= datetime('now', '-7 days')",
-        [],
+        "SELECT COALESCE(SUM(word_count), 0) FROM transcription_history
+         WHERE julianday(created_at) >= julianday(?1)",
+        params![week_start],
         |row| row.get(0),
     )?;
 
@@ -123,6 +153,7 @@ pub fn get_stats(conn: &Connection) -> Result<Stats, LocalYapperError> {
 // --- Settings ---
 
 /// Gets a single setting value by key.
+#[cfg(test)]
 pub fn get_setting(conn: &Connection, key: &str) -> Result<String, LocalYapperError> {
     conn.query_row(
         "SELECT value FROM settings WHERE key = ?1",
@@ -224,7 +255,7 @@ mod tests {
             ),
         )?;
 
-        let first_page = get_history(&conn, 2, 0)?;
+        let first_page = get_history(&conn, 2, 0, None)?;
         assert_eq!(
             first_page
                 .iter()
@@ -233,7 +264,7 @@ mod tests {
             vec!["three", "two"]
         );
 
-        let second_page = get_history(&conn, 2, 2)?;
+        let second_page = get_history(&conn, 2, 2, None)?;
         assert_eq!(
             second_page
                 .iter()
@@ -293,7 +324,8 @@ mod tests {
             [],
         )?;
 
-        let stats = get_stats(&conn)?;
+        let (day, week) = bounds(1, 3);
+        let stats = get_stats(&conn, &day, &week)?;
 
         assert_eq!(stats.words_today, 120);
         assert_eq!(stats.words_week, 150);
@@ -301,6 +333,66 @@ mod tests {
         assert_eq!(stats.total_sessions, 3);
         assert!((stats.avg_wpm - 100.0).abs() < f64::EPSILON);
 
+        Ok(())
+    }
+
+    /// Boundaries `hours` and `days` before now, as RFC 3339 UTC.
+    fn bounds(hours: i64, days: i64) -> (String, String) {
+        let now = chrono::Utc::now();
+        let f =
+            |d: chrono::DateTime<chrono::Utc>| d.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        (
+            f(now - chrono::Duration::hours(hours)),
+            f(now - chrono::Duration::days(days)),
+        )
+    }
+
+    #[test]
+    fn old_and_iso_timestamps_sort_count_and_prune_together() -> Result<(), LocalYapperError> {
+        let conn = test_connection()?;
+        let now = chrono::Utc::now();
+        let iso = |d: chrono::DateTime<chrono::Utc>| {
+            d.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+        };
+        let old_style = (now - chrono::Duration::days(20))
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
+        insert_history(
+            &conn,
+            &history_entry("new", "a b", &iso(now), Some(1_000), Some(2)),
+        )?;
+        insert_history(
+            &conn,
+            &history_entry(
+                "mid",
+                "c",
+                &iso(now - chrono::Duration::days(3)),
+                Some(1_000),
+                Some(1),
+            ),
+        )?;
+        insert_history(
+            &conn,
+            &history_entry("old", "d", &old_style, Some(1_000), Some(1)),
+        )?;
+        let ids: Vec<String> = get_history(&conn, 10, 0, None)?
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
+        assert_eq!(ids, vec!["new", "mid", "old"]);
+        let (day, week) = bounds(1, 7);
+        let stats = get_stats(&conn, &day, &week)?;
+        assert_eq!(
+            (stats.words_today, stats.words_week, stats.words_all_time),
+            (2, 3, 4)
+        );
+        assert_eq!(prune_history(&conn, 10)?, 1);
+        assert_eq!(prune_history(&conn, 1)?, 1);
+        let left: Vec<String> = get_history(&conn, 10, 0, None)?
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
+        assert_eq!(left, vec!["new"]);
         Ok(())
     }
 
@@ -346,12 +438,41 @@ mod tests {
 
         clear_history(&conn)?;
 
-        assert!(get_history(&conn, 20, 0)?.is_empty());
-        let stats = get_stats(&conn)?;
+        assert!(get_history(&conn, 20, 0, None)?.is_empty());
+        let (day, week) = bounds(1, 3);
+        let stats = get_stats(&conn, &day, &week)?;
         assert_eq!(stats.total_sessions, 0);
         assert_eq!(stats.words_all_time, 0);
         assert_eq!(stats.avg_wpm, 0.0);
 
+        Ok(())
+    }
+
+    #[test]
+    fn history_search_matches_text_and_app_and_escapes_wildcards() -> Result<(), LocalYapperError> {
+        let conn = test_connection()?;
+        for (id, text) in [
+            ("a", "Ship the release"),
+            ("b", "100% done"),
+            ("c", "snake_case name"),
+        ] {
+            insert_history(
+                &conn,
+                &history_entry(id, text, "2026-05-16T10:00:00.000Z", None, None),
+            )?;
+        }
+        let ids = |s: &str| -> Result<Vec<String>, LocalYapperError> {
+            Ok(get_history(&conn, 10, 0, Some(s))?
+                .into_iter()
+                .map(|e| e.id)
+                .collect())
+        };
+        assert_eq!(ids("RELEASE")?, vec!["a"]);
+        assert_eq!(ids("%")?, vec!["b"]);
+        assert_eq!(ids("_")?, vec!["c"]);
+        assert_eq!(ids("test app")?.len(), 3);
+        assert_eq!(ids("   ")?.len(), 3);
+        assert!(ids("absent")?.is_empty());
         Ok(())
     }
 }

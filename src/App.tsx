@@ -1,5 +1,5 @@
 // Root application component for the main settings window. The overlay
-// has its own entry point (`src/overlay-main.tsx`) so the overlay WebView
+// has its own plain-TypeScript entry (`src/overlay-main.ts`) so the overlay WebView
 // does not download or parse the settings/wizard module graph.
 import { Suspense, lazy, useEffect } from "react";
 import { useAtom } from "jotai";
@@ -9,6 +9,7 @@ import { TitleBar } from "@/components/settings/TitleBar";
 import { setupCompleteAtom } from "@/stores/wizardStore";
 import { getSetting } from "@/lib/commands/settings";
 import { usePausedState } from "@/hooks/usePausedState";
+import { useTheme } from "@/hooks/useTheme";
 import { Icon } from "@/components/ui/Icon";
 
 // The Wizard renders only on first launch. Lazy-importing it keeps the
@@ -20,6 +21,7 @@ const Wizard = lazy(() =>
 export function App() {
   const [setupComplete, setSetupComplete] = useAtom(setupCompleteAtom);
   usePausedState();
+  useTheme();
 
   useEffect(() => {
     getSetting("setup_complete")
@@ -39,13 +41,13 @@ export function App() {
       <TitleBar />
       <div className="flex-1 min-h-0">
         {setupComplete === null ? (
-          <div className="h-full bg-[#f9f9f9] flex items-center justify-center">
+          <div className="h-full bg-canvas flex items-center justify-center">
             <Icon name="progress_activity" size={32} className="text-black/[0.30] animate-spin" />
           </div>
         ) : !setupComplete ? (
           <Suspense
             fallback={
-              <div className="h-full bg-[#f9f9f9] flex items-center justify-center">
+              <div className="h-full bg-canvas flex items-center justify-center">
                 <Icon name="progress_activity" size={32} className="text-black/[0.30] animate-spin" />
               </div>
             }
