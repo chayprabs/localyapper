@@ -1,4 +1,4 @@
-// Dashboard hook -- stats, last dictation, model status with auto-refresh
+// Home page hook -- stats, last dictation, model status with auto-refresh
 import { DEFAULT_RECORD_HOTKEY } from "@/lib/hotkeyDefaults";
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
@@ -19,7 +19,7 @@ import {
 } from "@/lib/commands/models";
 import { getSetting } from "@/lib/commands/settings";
 
-interface DashboardData {
+interface HomeData {
   stats: Stats | null;
   lastDictation: HistoryEntry | null;
   modelStatus: ModelsStatus | null;
@@ -39,7 +39,7 @@ function toErrorMessage(error: unknown, fallback: string): string {
       : fallback;
 }
 
-export function useDashboard(): DashboardData {
+export function useHome(): HomeData {
   const [stats, setStats] = useState<Stats | null>(null);
   const [lastDictation, setLastDictation] = useState<HistoryEntry | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelsStatus | null>(null);
@@ -49,8 +49,8 @@ export function useDashboard(): DashboardData {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Only the first load shows a spinner; refreshes update in place.
   const fetchAll = useCallback(async () => {
-    setIsLoading(true);
     const [
       statsResult,
       historyResult,
@@ -90,7 +90,7 @@ export function useDashboard(): DashboardData {
     );
     setError(
       failed?.status === "rejected"
-        ? toErrorMessage(failed.reason, "Failed to load dashboard")
+        ? toErrorMessage(failed.reason, "Failed to load the home page")
         : null,
     );
 
@@ -102,12 +102,15 @@ export function useDashboard(): DashboardData {
   }, [fetchAll]);
 
   useEffect(() => {
-    const unlisten = listen("history-updated", () => {
-      void fetchAll();
-    });
+    const refresh = () => void fetchAll();
+    const unlisten = [
+      listen("history-updated", refresh),
+      listen("models-changed", refresh),
+      listen("model-state", refresh),
+    ];
 
     return () => {
-      unlisten.then((dispose) => dispose());
+      for (const u of unlisten) void u.then((dispose) => dispose());
     };
   }, [fetchAll]);
 

@@ -23,8 +23,8 @@ Read `CLAUDE.md` first for the stack and the rules, and
 - Rust: no `unwrap()`/`expect()` outside tests, `// SAFETY:` on every
   `unsafe` block, `clippy -D warnings` clean on all three OSes.
 - TypeScript: strict, no `any`.
-- Colours come from the theme tokens (`black/xx`, `surface`, `canvas`,
-  `sidebar`) so both themes work.
+- Colours come from the theme tokens (`ink/xx`, `accent`, `ok`, `warn`,
+  `danger`, `canvas`) so both themes work. See `DESIGN_SYSTEM.md`.
 - Hot paths read settings from `AppState.settings`, never SQLite.
 - Anything that touches GTK or window geometry runs on the main thread.
 

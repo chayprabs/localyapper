@@ -1,51 +1,13 @@
 // Wizard hotkey configuration -- set primary recording shortcut
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Icon } from "@/components/ui/Icon";
 import { setHotkeyProbe, updateHotkey } from "@/lib/commands/hotkeys";
-import { isMacPlatform as isMac } from "@/lib/hotkeyDefaults";
-
-function formatKey(key: string): string {
-  if (isMac) {
-    switch (key.toLowerCase()) {
-      case "alt":
-        return "\u2325";
-      case "shift":
-        return "\u21E7";
-      case "meta":
-      case "cmd":
-        return "\u2318";
-      case "ctrl":
-      case "control":
-        return "\u2303";
-      default:
-        return key;
-    }
-  }
-  return key;
-}
-
-function parseHotkeyParts(hotkey: string): string[] {
-  return hotkey.split("+").map(formatKey);
-}
-
-function eventToShortcut(e: KeyboardEvent): string | null {
-  if (["Alt", "Control", "Shift", "Meta", "AltGraph"].includes(e.key)) {
-    return null;
-  }
-  const parts: string[] = [];
-  if (e.ctrlKey) parts.push("Ctrl");
-  if (e.altKey) parts.push("Alt");
-  if (e.shiftKey) parts.push("Shift");
-  if (e.metaKey) parts.push("Meta");
-
-  let keyName = e.key;
-  if (keyName === " ") keyName = "Space";
-  else if (keyName.length === 1) keyName = keyName.toUpperCase();
-
-  parts.push(keyName);
-  return parts.join("+");
-}
+import { useHotkeyCapture } from "@/hooks/useHotkeyCapture";
+import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
+import { Keys } from "@/components/ui/Keys";
+import { cn } from "@/lib/utils";
+import { Step } from "./Step";
 
 export function HotkeyStep({
   hotkey,
@@ -56,10 +18,10 @@ export function HotkeyStep({
   onHotkeyChange: (hotkey: string) => void;
   onContinue: () => void;
 }) {
-  const [isCapturing, setIsCapturing] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const [detected, setDetected] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const fieldRef = useRef<HTMLButtonElement>(null);
 
   // Register the hotkey now and listen for it globally. While the probe
   // is on, presses only report detection and start no dictation.
@@ -90,114 +52,54 @@ export function HotkeyStep({
   const handleCapture = useCallback(
     (shortcut: string) => {
       onHotkeyChange(shortcut);
-      setIsCapturing(false);
+      setCapturing(false);
     },
     [onHotkeyChange],
   );
-
-  const handleCancel = useCallback(() => {
-    setIsCapturing(false);
-  }, []);
-
-  useEffect(() => {
-    if (!isCapturing) return;
-
-    function handleKeyDown(e: KeyboardEvent) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (e.key === "Escape") {
-        handleCancel();
-        return;
-      }
-
-      const shortcut = eventToShortcut(e);
-      if (shortcut) {
-        handleCapture(shortcut);
-      }
-    }
-
-    function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        handleCancel();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    document.addEventListener("mousedown", handleClickOutside);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isCapturing, handleCapture, handleCancel]);
-
-  const parts = parseHotkeyParts(hotkey);
+  const handleCancel = useCallback(() => setCapturing(false), []);
+  useHotkeyCapture(capturing, fieldRef, handleCapture, handleCancel);
 
   return (
-    <div className="flex flex-col items-center text-center">
-      <div className="w-14 h-14 bg-[#0058bc]/[0.08] rounded-full flex items-center justify-center mb-5">
-        <Icon name="keyboard" size={28} className="text-[#0058bc]" />
-      </div>
-
-      <h2 className="text-[20px] font-semibold text-black/85 mb-1">
-        Set your hotkey
-      </h2>
-      <p className="text-[13px] text-black/50 mb-6">
-        Hold this key to record, release to inject text.
-      </p>
-
-      {/* Key display */}
-      <div ref={containerRef} className="mb-6">
-        <div
-          onClick={() => setIsCapturing(true)}
-          className={`inline-flex items-center gap-2 px-5 h-12 bg-surface border rounded-[10px] shadow-sm cursor-pointer transition-all ${
-            isCapturing
-              ? "border-[#0058bc] ring-2 ring-[#0058bc]/20"
-              : "border-black/[0.10] hover:border-black/20"
-          }`}
-        >
-          {isCapturing ? (
-            <span className="text-[13px] text-black/30">Press keys...</span>
-          ) : (
-            <div className="flex items-center gap-1.5">
-              {parts.map((part, i) => (
-                <span
-                  key={i}
-                  className="px-2.5 h-7 flex items-center bg-black/[0.06] rounded-[6px] text-[13px] font-medium font-mono"
-                >
-                  {part}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-        <button
-          onClick={() => setIsCapturing(true)}
-          className="block mx-auto mt-2 text-[12px] text-[#0058bc] hover:underline"
-        >
-          Change Hotkey
-        </button>
-      </div>
+    <Step icon="keyboard" title="Choose your hotkey" text="Hold it to record, let go to paste. Click the key to change it.">
+      <button
+        ref={fieldRef}
+        type="button"
+        aria-label={`Record hotkey: ${hotkey}. Click to change.`}
+        onClick={() => setCapturing(true)}
+        className={cn(
+          "flex h-16 min-w-[168px] items-center justify-center rounded-3xl px-6 transition-[background-color,box-shadow] duration-200",
+          capturing
+            ? "bg-accent/[0.1] shadow-[0_0_0_1.5px_rgb(var(--accent)/0.6)]"
+            : detected
+              ? "bg-ok/10 shadow-[0_0_0_1.5px_rgb(var(--ok)/0.45)]"
+              : "bg-ink/[0.05] hover:bg-ink/[0.08]",
+        )}
+      >
+        {capturing ? (
+          <span className="animate-fade-in text-[13px] font-medium text-accent">Press keys</span>
+        ) : (
+          <Keys hotkey={hotkey} size="lg" />
+        )}
+      </button>
 
       <p
         role="status"
-        className={`text-[12px] mb-4 ${detected ? "text-[#1a7f37]" : "text-black/50"}`}
+        className={cn(
+          "flex min-h-5 items-center gap-1.5 text-[12.5px]",
+          registerError ? "text-danger" : detected ? "text-ok" : "text-ink/50",
+        )}
       >
+        {detected && !registerError && <Icon name="check" size={14} strokeWidth={2.25} />}
         {registerError
           ? registerError
           : detected
-            ? "Hotkey detected. It works from any app."
+            ? "Detected. It works from any app."
             : "Press your hotkey now to test it."}
       </p>
 
-      <button
-        onClick={onContinue}
-        disabled={!detected}
-        className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 active:brightness-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-      >
+      <Button variant="primary" size="lg" className="w-full" onClick={onContinue} disabled={!detected}>
         Continue
-      </button>
-    </div>
+      </Button>
+    </Step>
   );
 }

@@ -1,13 +1,16 @@
-// History page -- paginated list of all past dictations
+// History page -- searchable list of past dictations, grouped by day
 import { useEffect, useMemo, useState } from "react";
 import { useSetAtom } from "jotai";
 import { useHistory } from "@/hooks/useHistory";
 import { activePageAtom } from "@/stores/appStore";
-import { HistoryCard } from "./HistoryCard";
-import { Icon } from "@/components/ui/Icon";
 import { exportHistory } from "@/lib/commands/history";
-import { formatLocalDay } from "@/lib/formatters";
+import { formatLocalDay, formatLocalTime } from "@/lib/formatters";
 import type { HistoryEntry } from "@/types/commands";
+import { Button, IconButton } from "@/components/ui/Button";
+import { CopyButton } from "@/components/ui/CopyButton";
+import { Icon } from "@/components/ui/Icon";
+import { Chip, errorText, Notice, Page, PageHeader, Panel, Spinner } from "@/components/settings/controls";
+import { cn } from "@/lib/utils";
 
 /** Consecutive entries grouped by their local calendar day. */
 function groupByDay(entries: HistoryEntry[]): { day: string; items: HistoryEntry[] }[] {
@@ -24,28 +27,75 @@ function groupByDay(entries: HistoryEntry[]): { day: string; items: HistoryEntry
   return groups;
 }
 
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : typeof err === "string" ? err : "Export failed";
+/** One dictation. Click the text to show all of it; delete asks once more in place. */
+function Entry({ entry, onDelete }: { entry: HistoryEntry; onDelete: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  // The delete confirmation withdraws itself after a few seconds.
+  useEffect(() => {
+    if (!confirming) return;
+    const t = window.setTimeout(() => setConfirming(false), 3000);
+    return () => window.clearTimeout(t);
+  }, [confirming]);
+
+  return (
+    <li className="group flex gap-3 px-4 py-3">
+      <time className="w-[58px] shrink-0 pt-px text-[12px] tabular-nums leading-[21px] text-ink/40">
+        {formatLocalTime(entry.created_at)}
+      </time>
+      <div className="min-w-0 flex-1">
+        <p
+          onClick={() => setOpen((v) => !v)}
+          className={cn("selectable text-[13.5px] leading-[21px] text-ink/85", !open && "line-clamp-2")}
+        >
+          {entry.final_text}
+        </p>
+      </div>
+      {/* The app name rests on the right; the actions take its place on hover. */}
+      <div className="relative flex min-w-[64px] shrink-0 items-start justify-end">
+        {entry.app_name && (
+          <span
+            className={cn(
+              "mt-px flex max-w-[110px] transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0",
+              confirming && "opacity-0",
+            )}
+          >
+            <Chip>{entry.app_name}</Chip>
+          </span>
+        )}
+      <div
+        className={cn(
+          "absolute -right-2 -top-1 flex transition-opacity duration-150",
+          !confirming && "opacity-0 focus-within:opacity-100 group-hover:opacity-100",
+        )}
+      >
+        {confirming ? (
+          <Button variant="danger" size="sm" className="mr-2 mt-1 animate-fade-in" onClick={() => onDelete(entry.id)}>
+            Delete
+          </Button>
+        ) : (
+          <>
+            <CopyButton text={entry.final_text} />
+            <IconButton label="Delete dictation" tone="danger" onClick={() => setConfirming(true)}>
+              <Icon name="delete" size={16} />
+            </IconButton>
+          </>
+        )}
+      </div>
+      </div>
+    </li>
+  );
 }
 
-function EmptyState({ onOpenHotkeys }: { onOpenHotkeys: () => void }) {
+function Empty({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center -mt-16">
-      <div className="w-[56px] h-[56px] rounded-full bg-black/[0.05] flex items-center justify-center mb-4">
-        <Icon name="history" size={24} className="text-black/[0.20]" />
+    <div className="flex flex-1 flex-col items-center justify-center pb-16 text-center">
+      <div className="glass mb-5 flex h-16 w-16 items-center justify-center rounded-full">
+        <Icon name="history" size={24} strokeWidth={1.5} className="text-ink/40" />
       </div>
-      <p className="text-[14px] font-medium text-black/90 mb-1">
-        No dictations yet
-      </p>
-      <p className="text-[12px] text-black/[0.26] text-center mb-6">
-        Use your record hotkey to start your first dictation.
-      </p>
-      <button
-        onClick={onOpenHotkeys}
-        className="w-[140px] h-[36px] bg-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:bg-[#004ea8] transition-colors shadow-sm"
-      >
-        Set up dictation
-      </button>
+      <p className="text-[17px] font-semibold tracking-[-0.01em] text-ink">{title}</p>
+      {children}
     </div>
   );
 }
@@ -53,11 +103,10 @@ function EmptyState({ onOpenHotkeys }: { onOpenHotkeys: () => void }) {
 export function HistoryPage() {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
-  const { entries, isLoading, hasMore, error, loadMore, deleteEntry, clearAll } =
-    useHistory(search);
+  const { entries, isLoading, hasMore, error, loadMore, deleteEntry, clearAll } = useHistory(search);
   const setActivePage = useSetAtom(activePageAtom);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [exportNote, setExportNote] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [exportNote, setExportNote] = useState<{ ok: boolean; text: string } | null>(null);
   const groups = useMemo(() => groupByDay(entries), [entries]);
 
   // Search as the user types, without a query per keystroke.
@@ -69,130 +118,102 @@ export function HistoryPage() {
   const isEmpty = !isLoading && entries.length === 0;
   const noHistory = isEmpty && search === "";
 
+  useEffect(() => {
+    if (isEmpty) setConfirmClear(false);
+  }, [isEmpty]);
+
   const handleExport = () => {
     setExportNote(null);
     exportHistory()
-      .then((path) => setExportNote(path ? `Saved to ${path}` : null))
-      .catch((err: unknown) => setExportNote(errorText(err)));
-  };
-
-  useEffect(() => {
-    if (isEmpty && showClearConfirm) {
-      setShowClearConfirm(false);
-    }
-  }, [isEmpty, showClearConfirm]);
-
-  const handleDelete = (id: string) => {
-    void deleteEntry(id);
-  };
-
-  const handleConfirmClearAll = () => {
-    setShowClearConfirm(false);
-    void clearAll();
+      .then((path) => setExportNote(path ? { ok: true, text: `Saved to ${path}` } : null))
+      .catch((err: unknown) => setExportNote({ ok: false, text: errorText(err) }));
   };
 
   return (
-    <div className="flex flex-col h-full px-6 py-8 sm:px-12 sm:py-10">
-      <header className="mb-10 flex justify-between items-start gap-4 shrink-0">
-        <div>
-          <h1 className="text-[26px] font-semibold text-black/90">History</h1>
-          {exportNote && (
-            <p className="mt-2 max-w-[520px] break-all text-[12px] text-black/50">{exportNote}</p>
-          )}
-          {error && (
-            <p className="mt-3 max-w-[520px] rounded-lg border border-[#ba1a1a]/15 bg-[#ba1a1a]/[0.06] px-3 py-2 text-[12px] font-medium text-[#ba1a1a]">
-              {error}
-            </p>
-          )}
-        </div>
-        {showClearConfirm ? (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="text-[13px] text-black/50">Clear all history?</span>
-            <button
-              onClick={() => setShowClearConfirm(false)}
-              className="h-8 rounded-lg border border-black/[0.15] bg-surface px-3 text-[13px] font-medium shadow-sm transition-colors hover:bg-black/[0.02]"
+    <Page className="min-h-full">
+      <PageHeader title="History">
+        {confirmClear ? (
+          <div className="flex animate-fade-in items-center gap-2">
+            <span className="text-[13px] text-ink/55">Delete all history?</span>
+            <Button onClick={() => setConfirmClear(false)}>Cancel</Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                setConfirmClear(false);
+                void clearAll();
+              }}
             >
-              Cancel
-            </button>
-            <button
-              onClick={handleConfirmClearAll}
-              className="h-8 rounded-lg bg-[#ba1a1a] px-3 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-[#a01616]"
-            >
-              Clear All
-            </button>
+              Delete all
+            </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleExport}
-              disabled={noHistory}
-              className={
-                noHistory
-                  ? "text-[13px] font-medium text-black/[0.20] cursor-default"
-                  : "text-[13px] font-medium text-[#0058bc] hover:underline"
-              }
-            >
-              Export
-            </button>
-            <button
-              onClick={() => setShowClearConfirm(true)}
-              disabled={noHistory}
-              className={
-                noHistory
-                  ? "text-[13px] font-medium text-black/[0.20] cursor-default"
-                  : "text-[13px] font-medium text-[#ba1a1a] hover:underline transition-all"
-              }
-            >
-              Clear All
-            </button>
-          </div>
+          !noHistory && (
+            <div className="flex items-center gap-2">
+              <label className="glass flex h-8 w-[200px] cursor-text items-center gap-2 rounded-full px-3 text-ink/40 transition-[width] duration-300 ease-out focus-within:w-[260px] focus-within:text-ink/70">
+                <Icon name="search" size={14} className="shrink-0" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search"
+                  aria-label="Search dictations"
+                  className="min-w-0 flex-1 bg-transparent text-[13px] text-ink/90 outline-none placeholder:text-ink/35 [&::-webkit-search-cancel-button]:hidden"
+                />
+              </label>
+              <IconButton label="Export as text" onClick={handleExport}>
+                <Icon name="export" size={16} />
+              </IconButton>
+              <IconButton label="Delete all history" tone="danger" onClick={() => setConfirmClear(true)}>
+                <Icon name="delete" size={16} />
+              </IconButton>
+            </div>
+          )
         )}
-      </header>
+      </PageHeader>
 
-      <div className="mb-4 shrink-0">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search dictations"
-          aria-label="Search dictations"
-          className="h-9 w-full max-w-[360px] rounded-lg border border-black/[0.12] bg-surface px-3 text-[13px] text-black/85 outline-none focus:border-[#0058bc]"
-        />
-      </div>
+      {error && <Notice>{error}</Notice>}
+      {exportNote && <Notice tone={exportNote.ok ? "info" : "danger"}>{exportNote.text}</Notice>}
 
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Icon name="progress_activity" size={28} className="text-black/[0.30] animate-spin" />
+        <div className="flex flex-1 items-center justify-center pb-16">
+          <Spinner size={22} />
         </div>
       ) : noHistory ? (
-        <EmptyState onOpenHotkeys={() => setActivePage("dictation")} />
+        <Empty title="Nothing here yet">
+          <p className="mt-2 max-w-[340px] text-[13px] leading-relaxed text-ink/50">
+            What you dictate is kept here, on this computer only.
+          </p>
+          <Button className="mt-5" onClick={() => setActivePage("dictation")}>
+            Set up your hotkey
+          </Button>
+        </Empty>
       ) : isEmpty ? (
-        <p className="text-[13px] text-black/50">No dictations match “{search}”.</p>
+        <Empty title="No matches">
+          <p className="mt-2 max-w-[300px] break-words text-[13px] leading-relaxed text-ink/50">
+            Nothing you dictated contains “{search}”.
+          </p>
+        </Empty>
       ) : (
-        <div className="flex-1 overflow-y-auto pr-2 -mr-2 flex flex-col gap-2">
+        <>
           {groups.map((group) => (
-            <section key={group.day} className="flex flex-col gap-2">
-              <h2 className="mt-3 text-[12px] font-semibold uppercase tracking-wide text-black/40 first:mt-0">
-                {group.day}
-              </h2>
-              {group.items.map((entry) => (
-                <HistoryCard key={entry.id} entry={entry} onDelete={handleDelete} />
-              ))}
+            <section key={group.day}>
+              <h2 className="mb-2 px-4 text-[12px] font-medium text-ink/45">{group.day}</h2>
+              <Panel>
+                <ul className="divide-y divide-ink/[0.06]">
+                  {group.items.map((entry) => (
+                    <Entry key={entry.id} entry={entry} onDelete={(id) => void deleteEntry(id)} />
+                  ))}
+                </ul>
+              </Panel>
             </section>
           ))}
-
           {hasMore && (
-            <div className="flex justify-center mt-6 mb-10 shrink-0">
-              <button
-                onClick={loadMore}
-                className="h-8 px-4 bg-surface border border-black/[0.15] rounded-lg text-[13px] text-black/85 font-medium hover:bg-gray-50 transition-colors"
-              >
-                Load More
-              </button>
+            <div className="flex justify-center">
+              <Button onClick={loadMore}>Show more</Button>
             </div>
           )}
-        </div>
+        </>
       )}
-    </div>
+    </Page>
   );
 }

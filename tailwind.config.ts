@@ -1,63 +1,44 @@
 import type { Config } from "tailwindcss";
 
+// Colours are RGB channels in CSS variables (see src/index.css) so opacity
+// modifiers such as text-ink/50 work in both themes.
+const token = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
+
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       fontFamily: {
         sans: [
-          "Inter",
           "-apple-system",
           "BlinkMacSystemFont",
-          "SF Pro",
+          "SF Pro Text",
+          "Segoe UI Variable Text",
           "Segoe UI",
+          "Inter",
           "Roboto",
+          "Ubuntu",
           "sans-serif",
         ],
+        mono: ["ui-monospace", "SF Mono", "Cascadia Mono", "Menlo", "Consolas", "monospace"],
       },
       colors: {
-        // Theme tokens (plan P5.10): RGB channels in CSS variables, so
-        // opacity modifiers like text-black/50 work in both themes.
-        // "black" is the ink colour: black in light, white in dark.
-        black: "rgb(var(--ink) / <alpha-value>)",
-        surface: "rgb(var(--surface) / <alpha-value>)",
-        canvas: "rgb(var(--canvas) / <alpha-value>)",
-        sidebar: "rgb(var(--sidebar) / <alpha-value>)",
-        "window-bg": "rgb(var(--canvas) / <alpha-value>)",
-        "sidebar-bg": "rgb(var(--sidebar) / <alpha-value>)",
-        "card-bg": "rgb(var(--surface) / <alpha-value>)",
-        primary: "#0058bc",
-        "primary-tint": "rgba(0,88,188,0.12)",
-        success: "#006b19",
-        destructive: "#ba1a1a",
-        "card-border": "rgba(0,0,0,0.07)",
-        "text-secondary": "rgba(0,0,0,0.50)",
-        "text-tertiary": "rgba(0,0,0,0.26)",
-        "text-label": "rgba(0,0,0,0.26)",
-        separator: "rgba(0,0,0,0.08)",
+        // "ink" is the text colour: near-black in light, near-white in dark.
+        ink: token("ink"),
+        canvas: token("canvas"),
+        accent: token("accent"),
+        ok: token("ok"),
+        warn: token("warn"),
+        danger: token("danger"),
       },
-      keyframes: {
-        "waveform-bar": {
-          "0%, 100%": { transform: "scaleY(0.3)" },
-          "50%": { transform: "scaleY(1)" },
-        },
-        "pulse-subtle": {
-          "0%, 100%": { transform: "scale(1)" },
-          "50%": { transform: "scale(1.15)" },
-        },
-        spin: {
-          "0%": { transform: "rotate(0deg)" },
-          "100%": { transform: "rotate(360deg)" },
-        },
+      transitionTimingFunction: {
+        out: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        spring: "cubic-bezier(0.3, 1.4, 0.6, 1)",
       },
       animation: {
-        "waveform-1": "waveform-bar 1.2s ease-in-out infinite 0s",
-        "waveform-2": "waveform-bar 1.2s ease-in-out infinite 0.1s",
-        "waveform-3": "waveform-bar 1.2s ease-in-out infinite 0.2s",
-        "waveform-4": "waveform-bar 1.2s ease-in-out infinite 0.3s",
-        "waveform-5": "waveform-bar 1.2s ease-in-out infinite 0.4s",
-        "pulse-subtle": "pulse-subtle 2s ease-in-out infinite",
-        "spin-slow": "spin 1.5s linear infinite",
+        "rise-in": "rise-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "fade-in": "fade-in 240ms ease-out both",
+        ring: "ring 3.2s cubic-bezier(0.2, 0.6, 0.3, 1) infinite",
       },
     },
   },

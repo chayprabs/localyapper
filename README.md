@@ -100,7 +100,7 @@ The command line can drive a running instance:
 Accuracy and speed for each model are measured in CI on recorded
 speech: see [docs/MODEL_BENCHMARK.md](docs/MODEL_BENCHMARK.md). The model
 is loaded on the first dictation and unloaded after a period without
-dictation (2 minutes by default, set on the Speech page).
+dictation (2 minutes by default, set on the Voice page).
 
 ## Memory and speed
 

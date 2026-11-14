@@ -1,9 +1,11 @@
 // Wizard "Try it" step -- a real dictation into a text box in this window
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Icon } from "@/components/ui/Icon";
-
-const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent);
+import { isMacPlatform } from "@/lib/hotkeyDefaults";
+import { Button } from "@/components/ui/Button";
+import { Keys } from "@/components/ui/Keys";
+import { Notice } from "@/components/settings/controls";
+import { Step } from "./Step";
 
 export function TryStep({ hotkey, onContinue }: { hotkey: string; onContinue: () => void }) {
   const [text, setText] = useState("");
@@ -26,15 +28,15 @@ export function TryStep({ hotkey, onContinue }: { hotkey: string; onContinue: ()
   const failedOnce = attempts > 0 && !worked;
 
   return (
-    <div className="flex flex-col items-center text-center">
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#0058bc]/[0.08]">
-        <Icon name="mic" size={30} className="text-[#0058bc]" />
-      </div>
-      <h2 className="mb-2 text-[22px] font-semibold text-black/85">Try it</h2>
-      <p className="mb-5 max-w-[380px] text-[14px] leading-relaxed text-black/50">
-        Click in the box, hold <span className="font-mono text-black/70">{hotkey}</span>, say a
-        sentence, and let go.
-      </p>
+    <Step
+      icon="mic"
+      title="Try it"
+      text={
+        <>
+          Click in the box, hold <Keys hotkey={hotkey} />, say a sentence and let go.
+        </>
+      }
+    >
       <textarea
         ref={boxRef}
         value={text}
@@ -42,22 +44,18 @@ export function TryStep({ hotkey, onContinue }: { hotkey: string; onContinue: ()
         rows={4}
         aria-label="Try dictation here"
         placeholder="Your words appear here"
-        className="mb-4 w-full resize-none rounded-[10px] border border-black/[0.12] bg-surface px-3 py-2 text-[14px] text-black/85 outline-none focus:border-[#0058bc]"
+        className="selectable w-full resize-none rounded-2xl bg-ink/[0.05] px-4 py-3 text-left text-[14px] leading-relaxed text-ink/90 outline-none transition-[background-color,box-shadow] duration-200 placeholder:text-ink/35 focus:bg-ink/[0.03] focus:shadow-[0_0_0_1.5px_rgb(var(--accent)/0.6)]"
       />
       {failedOnce && (
-        <p className="mb-4 w-full rounded-lg border border-[#9a5a00]/20 bg-[#9a5a00]/[0.06] px-3 py-2 text-left text-[12px] text-[#7a4500]">
+        <Notice tone="warn">
           Nothing arrived. Make sure the box has the cursor and try again.
-          {isMac && " On macOS, LocalYapper also needs Accessibility access to paste."}
-          {" "}The overlay shows the reason if dictation failed.
-        </p>
+          {isMacPlatform && " On macOS, LocalYapper also needs Accessibility access to paste."} The overlay shows the
+          reason if dictation failed.
+        </Notice>
       )}
-      <button
-        type="button"
-        onClick={onContinue}
-        className="h-9 w-full rounded-[8px] bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-[13px] font-medium text-white transition-all hover:brightness-110 active:brightness-95"
-      >
+      <Button variant={worked ? "primary" : "soft"} size="lg" className="w-full" onClick={onContinue}>
         {worked ? "Continue" : "Skip for now"}
-      </button>
-    </div>
+      </Button>
+    </Step>
   );
 }

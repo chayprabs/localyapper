@@ -1,9 +1,11 @@
 // Setting controls -- each one loads its key, saves on change and shows the
-// backend's error inline (plan P5.4). The backend validates every value.
+// backend's error inline. The backend validates every value.
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getSetting, setSetting } from "@/lib/commands/settings";
 import { Switch } from "@/components/ui/Switch";
+import { Icon } from "@/components/ui/Icon";
+import { cn } from "@/lib/utils";
 
 export function errorText(err: unknown): string {
   return err instanceof Error ? err.message : typeof err === "string" ? err : "Something went wrong";
@@ -50,13 +52,40 @@ export function useSetting(key: string): SettingState {
   return { value, error, save };
 }
 
-export function Section({ title, children }: { title: string; children: ReactNode }) {
+/** A page: a centred column whose blocks rise in one after another. */
+export function Page({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <section className="mb-8">
-      <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-black/40">{title}</h2>
-      <div className="divide-y divide-black/[0.06] rounded-xl border border-black/[0.08] bg-surface">
-        {children}
+    <div className={cn("stagger mx-auto flex w-full max-w-[680px] flex-col gap-6 px-6 pb-10 pt-5", className)}>
+      {children}
+    </div>
+  );
+}
+
+export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
+  return (
+    <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+      <div className="min-w-0">
+        <h1 className="text-[22px] font-semibold leading-9 tracking-[-0.02em] text-ink">{title}</h1>
+        {subtitle && <p className="text-[13px] text-ink/50">{subtitle}</p>}
       </div>
+      {children}
+    </header>
+  );
+}
+
+/** A glass panel. */
+export function Panel({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("glass rounded-[20px]", className)}>{children}</div>;
+}
+
+export function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section>
+      <div className="mb-2 flex min-h-7 items-center justify-between gap-3 px-4">
+        <h2 className="text-[12px] font-medium text-ink/45">{title}</h2>
+        {action}
+      </div>
+      <Panel className="divide-y divide-ink/[0.06]">{children}</Panel>
     </section>
   );
 }
@@ -66,26 +95,57 @@ export function Row({
   hint,
   error,
   children,
+  below,
 }: {
-  label: string;
-  hint?: string;
+  label: ReactNode;
+  hint?: ReactNode;
   error?: string | null;
-  children: ReactNode;
+  children?: ReactNode;
+  /** Full-width content under the label line. */
+  below?: ReactNode;
 }) {
   return (
-    <div className="px-5 py-3">
-      <div className="flex items-center justify-between gap-4">
+    <div className="px-4 py-3">
+      <div className="flex min-h-8 items-center justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-[13px] font-medium text-black/85">{label}</div>
-          {hint && <div className="text-[12px] text-black/50">{hint}</div>}
+          <div className="text-[13px] font-medium text-ink/90">{label}</div>
+          {hint && <div className="mt-0.5 break-words text-[12px] leading-snug text-ink/45">{hint}</div>}
         </div>
-        <div className="shrink-0">{children}</div>
+        {children && <div className="shrink-0">{children}</div>}
       </div>
+      {below}
       {error && (
-        <p role="alert" className="mt-2 text-[12px] font-medium text-[#ba1a1a]">
+        <p role="alert" className="mt-1.5 text-[12px] font-medium text-danger">
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+/** An inline message: an error, a warning or a neutral note. */
+export function Notice({
+  tone = "danger",
+  children,
+  action,
+}: {
+  tone?: "danger" | "warn" | "info";
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div
+      role={tone === "danger" ? "alert" : "status"}
+      className={cn(
+        "flex animate-rise-in items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-[12px] font-medium",
+        tone === "danger" && "bg-danger/[0.08] text-danger",
+        tone === "warn" && "bg-warn/10 text-warn",
+        tone === "info" && "bg-ink/[0.05] text-ink/60",
+      )}
+    >
+      {tone !== "info" && <Icon name={tone === "danger" ? "error" : "warning"} size={15} className="shrink-0" />}
+      <span className="selectable min-w-0 flex-1 break-words text-left">{children}</span>
+      {action}
     </div>
   );
 }
@@ -104,35 +164,107 @@ export function ToggleSetting({ k, label, hint }: { k: string; label: string; hi
   );
 }
 
-export function SelectSetting({
-  k,
+/** A native select drawn as a pill. */
+export function Select({
   label,
-  hint,
-  options,
+  value,
+  disabled,
+  onChange,
+  children,
 }: {
-  k: string;
   label: string;
-  hint?: string;
-  options: { value: string; label: string }[];
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+  children: ReactNode;
 }) {
+  return (
+    <span className="relative inline-flex">
+      <select
+        aria-label={label}
+        className={
+          "h-8 max-w-[250px] cursor-pointer appearance-none truncate rounded-full bg-ink/[0.06] pl-3.5 pr-8 " +
+          "text-[13px] text-ink/85 transition-colors hover:bg-ink/[0.1] disabled:opacity-50"
+        }
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {children}
+      </select>
+      <Icon
+        name="expand_more"
+        size={14}
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink/45"
+      />
+    </span>
+  );
+}
+
+interface Option {
+  value: string;
+  label: string;
+}
+
+export function SelectSetting({ k, label, hint, options }: { k: string; label: string; hint?: string; options: Option[] }) {
   const { value, error, save } = useSetting(k);
   const known = value === null || options.some((o) => o.value === value);
   return (
     <Row label={label} hint={hint} error={error}>
-      <select
-        aria-label={label}
-        className="h-8 rounded-md border border-black/[0.12] bg-surface px-2 text-[13px] text-black/85"
-        value={value ?? ""}
-        disabled={value === null}
-        onChange={(e) => save(e.target.value)}
-      >
+      <Select label={label} value={value ?? ""} disabled={value === null} onChange={save}>
         {!known && value !== null && <option value={value}>{value}</option>}
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>
         ))}
-      </select>
+      </Select>
+    </Row>
+  );
+}
+
+/** A few options side by side; the chosen one is lifted. */
+export function Segmented({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string | null;
+  options: Option[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-full bg-ink/[0.06] p-[3px]">
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            disabled={value === null}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "h-[26px] rounded-full px-3 text-[12px] font-medium transition-[color,background-color,box-shadow] duration-200",
+              on ? "raised text-ink" : "text-ink/50 hover:text-ink/80",
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function SegmentedSetting({ k, label, hint, options }: { k: string; label: string; hint?: string; options: Option[] }) {
+  const { value, error, save } = useSetting(k);
+  return (
+    <Row label={label} hint={hint} error={error}>
+      <Segmented label={label} value={value} options={options} onChange={save} />
     </Row>
   );
 }
@@ -163,13 +295,13 @@ export function NumberSetting({
   };
   return (
     <Row label={label} hint={hint} error={error}>
-      <span className="flex items-center gap-2 text-[13px] text-black/50">
+      <label className="flex h-8 cursor-text items-center gap-1.5 rounded-full bg-ink/[0.06] pl-3 pr-3.5 text-[13px] text-ink/45 transition-colors focus-within:bg-ink/[0.1] hover:bg-ink/[0.1]">
         <input
           aria-label={label}
           type="number"
           min={min}
           max={max}
-          className="h-8 w-24 rounded-md border border-black/[0.12] bg-surface px-2 text-right text-[13px] text-black/85"
+          className="w-14 appearance-none bg-transparent text-right tabular-nums text-ink/90 outline-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
           value={draft}
           disabled={value === null}
           onChange={(e) => setDraft(e.target.value)}
@@ -179,16 +311,28 @@ export function NumberSetting({
           }}
         />
         {unit}
-      </span>
+      </label>
     </Row>
   );
 }
 
-export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+/** A small label with a status dot or plain text. */
+export function Chip({ tone = "neutral", children }: { tone?: "neutral" | "accent" | "ok" | "warn"; children: ReactNode }) {
   return (
-    <header className="mb-8">
-      <h1 className="text-[26px] font-semibold text-black/90">{title}</h1>
-      {subtitle && <p className="mt-1 text-[13px] text-black/50">{subtitle}</p>}
-    </header>
+    <span
+      className={cn(
+        "inline-flex h-5 max-w-full items-center truncate rounded-full px-2 text-[11px] font-medium",
+        tone === "neutral" && "bg-ink/[0.06] text-ink/55",
+        tone === "accent" && "bg-accent/[0.12] text-accent",
+        tone === "ok" && "bg-ok/[0.12] text-ok",
+        tone === "warn" && "bg-warn/[0.12] text-warn",
+      )}
+    >
+      {children}
+    </span>
   );
+}
+
+export function Spinner({ size = 20 }: { size?: number }) {
+  return <Icon name="progress_activity" size={size} className="animate-spin text-ink/30" />;
 }

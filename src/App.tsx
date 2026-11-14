@@ -1,16 +1,15 @@
-// Root application component for the main settings window. The overlay
-// has its own plain-TypeScript entry (`src/overlay-main.ts`) so the overlay WebView
-// does not download or parse the settings/wizard module graph.
+// Root application component for the main window. The overlay has its own
+// plain-TypeScript entry (`src/overlay-main.ts`) so the overlay WebView
+// does not download or parse this module graph.
 import { Suspense, lazy, useEffect } from "react";
 import { useAtom } from "jotai";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { SettingsLayout } from "@/components/settings/SettingsLayout";
-import { TitleBar } from "@/components/settings/TitleBar";
+import { Loading, Pages } from "@/components/shell/Pages";
+import { TitleBar } from "@/components/shell/TitleBar";
 import { setupCompleteAtom } from "@/stores/wizardStore";
 import { getSetting } from "@/lib/commands/settings";
 import { usePausedState } from "@/hooks/usePausedState";
 import { useTheme } from "@/hooks/useTheme";
-import { Icon } from "@/components/ui/Icon";
 
 // The Wizard renders only on first launch. Lazy-importing it keeps the
 // returning-user path off the wizard module graph entirely.
@@ -37,25 +36,17 @@ export function App() {
   }, [setupComplete]);
 
   return (
-    <div className="flex flex-col h-screen w-screen">
-      <TitleBar />
-      <div className="flex-1 min-h-0">
+    <div className="flex h-full w-full flex-col">
+      <TitleBar showNav={setupComplete === true} />
+      <div className="min-h-0 flex-1">
         {setupComplete === null ? (
-          <div className="h-full bg-canvas flex items-center justify-center">
-            <Icon name="progress_activity" size={32} className="text-black/[0.30] animate-spin" />
-          </div>
-        ) : !setupComplete ? (
-          <Suspense
-            fallback={
-              <div className="h-full bg-canvas flex items-center justify-center">
-                <Icon name="progress_activity" size={32} className="text-black/[0.30] animate-spin" />
-              </div>
-            }
-          >
+          <Loading />
+        ) : setupComplete ? (
+          <Pages />
+        ) : (
+          <Suspense fallback={<Loading />}>
             <Wizard />
           </Suspense>
-        ) : (
-          <SettingsLayout />
         )}
       </div>
     </div>

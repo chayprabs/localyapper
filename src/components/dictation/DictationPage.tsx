@@ -1,18 +1,20 @@
 // Dictation page -- hotkeys, recording behaviour, output and the overlay
 import { useEffect, useState } from "react";
 import { HotkeysSection } from "@/components/hotkeys/HotkeysSection";
+import { isMacPlatform } from "@/lib/hotkeyDefaults";
 import {
   NumberSetting,
+  Page,
   PageHeader,
   Row,
   Section,
+  SegmentedSetting,
   SelectSetting,
   ToggleSetting,
   useSetting,
 } from "@/components/settings/controls";
 
-const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent);
-const paste = isMac ? "Cmd" : "Ctrl";
+const paste = isMacPlatform ? "Cmd" : "Ctrl";
 
 const PASTE_METHODS = [
   { value: "auto", label: "Automatic" },
@@ -23,7 +25,38 @@ const PASTE_METHODS = [
   { value: "clipboard_only", label: "Copy only, do not paste" },
 ];
 
-/** Where the pill goes when the position is "custom": two percentages. */
+function Slider({
+  label,
+  value,
+  onInput,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  onInput: (n: number) => void;
+  onCommit: (n: number) => void;
+}) {
+  return (
+    <label className="flex items-center gap-3 text-[12px] text-ink/50">
+      <span className="w-16 shrink-0">{label}</span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={value}
+        aria-label={label}
+        className="h-1 min-w-0 flex-1 cursor-pointer accent-[rgb(var(--accent))]"
+        onChange={(e) => onInput(Number(e.target.value))}
+        onPointerUp={(e) => onCommit(Number((e.target as HTMLInputElement).value))}
+        onKeyUp={(e) => onCommit(Number((e.target as HTMLInputElement).value))}
+      />
+      <span className="w-9 shrink-0 text-right tabular-nums text-ink/70">{value}%</span>
+    </label>
+  );
+}
+
+/** Where the pill goes when the position is "custom": two percentages,
+ *  with a small picture of the screen showing the result. */
 function CustomPosition() {
   const position = useSetting("overlay_position");
   const { value, error, save } = useSetting("overlay_custom");
@@ -37,36 +70,36 @@ function CustomPosition() {
   }, [value]);
   if (position.value !== "custom") return null;
   const commit = (nx: number, ny: number) => save(`${(nx / 100).toFixed(2)},${(ny / 100).toFixed(2)}`);
-  const slider = (label: string, v: number, set: (n: number) => void, done: (n: number) => void) => (
-    <label className="flex items-center gap-3 text-[12px] text-black/50">
-      <span className="w-20">{label}</span>
-      <input
-        type="range"
-        min={0}
-        max={100}
-        value={v}
-        aria-label={label}
-        onChange={(e) => set(Number(e.target.value))}
-        onPointerUp={(e) => done(Number((e.target as HTMLInputElement).value))}
-        onKeyUp={(e) => done(Number((e.target as HTMLInputElement).value))}
-      />
-      <span className="w-10 text-right tabular-nums">{v}%</span>
-    </label>
-  );
   return (
-    <Row label="Custom position" hint="Where the centre of the pill sits on the screen." error={error}>
-      <div className="flex flex-col gap-1">
-        {slider("From left", x, setX, (n) => commit(n, y))}
-        {slider("From top", y, setY, (n) => commit(x, n))}
-      </div>
-    </Row>
+    <Row
+      label="Custom position"
+      hint="Where the centre of the pill sits on the screen."
+      error={error}
+      below={
+        <div className="mt-3 flex animate-fade-in items-center gap-5">
+          <div
+            aria-hidden="true"
+            className="relative h-[68px] w-[108px] shrink-0 overflow-hidden rounded-lg bg-ink/[0.05] shadow-[inset_0_0_0_1px_rgb(var(--ink)/0.08)]"
+          >
+            <span
+              className="absolute h-1.5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent"
+              style={{ left: `${8 + x * 0.84}%`, top: `${8 + y * 0.84}%` }}
+            />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <Slider label="From left" value={x} onInput={setX} onCommit={(n) => commit(n, y)} />
+            <Slider label="From top" value={y} onInput={setY} onCommit={(n) => commit(x, n)} />
+          </div>
+        </div>
+      }
+    />
   );
 }
 
 export function DictationPage() {
   return (
-    <div className="px-6 py-8 sm:px-12 sm:py-10">
-      <PageHeader title="Dictation" subtitle="How you start and stop dictation, and where the text goes." />
+    <Page>
+      <PageHeader title="Dictation" subtitle="How you start and stop, and where the text goes." />
 
       <HotkeysSection />
 
@@ -74,11 +107,11 @@ export function DictationPage() {
         <SelectSetting
           k="activation_mode"
           label="Record key"
-          hint="Hold to talk, press to start and stop, or both."
+          hint="Hold to talk, press once to start and again to stop, or hold with a double-tap for hands-free."
           options={[
-            { value: "hybrid", label: "Hold, or tap for hands-free" },
+            { value: "hybrid", label: "Hold or double-tap" },
             { value: "hold", label: "Hold to talk" },
-            { value: "toggle", label: "Press to start and stop" },
+            { value: "toggle", label: "Press to toggle" },
           ]}
         />
         <ToggleSetting k="cancel_key_enabled" label="Cancel key" hint="The cancel hotkey discards a recording." />
@@ -93,7 +126,7 @@ export function DictationPage() {
           hint="Recording stops on its own after this long (30 to 3600)."
           min={30}
           max={3600}
-          unit="seconds"
+          unit="s"
         />
         <ToggleSetting k="trailing_space" label="Add a space after the text" />
       </Section>
@@ -117,18 +150,18 @@ export function DictationPage() {
 
       <Section title="Overlay">
         <ToggleSetting k="overlay_enabled" label="Show the overlay" hint="A small pill while you dictate." />
-        <SelectSetting
+        <SegmentedSetting
           k="overlay_position"
           label="Position"
           options={[
-            { value: "bottom_center", label: "Bottom centre" },
-            { value: "top_center", label: "Top centre" },
+            { value: "bottom_center", label: "Bottom" },
+            { value: "top_center", label: "Top" },
             { value: "custom", label: "Custom" },
           ]}
         />
         <CustomPosition />
         <ToggleSetting k="overlay_preview" label="Show text as it is recognised" />
       </Section>
-    </div>
+    </Page>
   );
 }

@@ -1,77 +1,47 @@
-// Reusable copy-to-clipboard button with check animation feedback
-import { useState, useCallback, useRef } from "react";
+// Copy-to-clipboard icon button; the icon turns into a check for a moment.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { IconButton } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
 
-interface CopyButtonProps {
-  /** Text content to write to clipboard on click. */
-  text: string;
-  /** "icon" shows Material Symbols copy icon; "text" shows "Copy" label. */
-  variant?: "icon" | "text";
-  /** Called 500ms after copy — used by overlay to dismiss after copying. */
-  onAfterCopy?: () => void;
-  className?: string;
-  iconSize?: number;
-}
-
-export function CopyButton({
-  text,
-  variant = "icon",
-  onAfterCopy,
-  className,
-  iconSize = 18,
-}: CopyButtonProps) {
+export function CopyButton({ text, label = "Copy", className }: { text: string; label?: string; className?: string }) {
   const [copied, setCopied] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timer = useRef<number | null>(null);
 
-  const handleCopy = useCallback(async () => {
-    if (copied) return;
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
+  useEffect(() => {
+    return () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    };
+  }, []);
 
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-    if (onAfterCopy) {
-      timeoutRef.current = setTimeout(() => onAfterCopy(), 500);
-    } else {
-      timeoutRef.current = setTimeout(() => setCopied(false), 1000);
-    }
-  }, [text, onAfterCopy, copied]);
-
-  if (variant === "text") {
-    return (
-      <button onClick={handleCopy} className={className}>
-        <span
-          className="inline-block transition-opacity duration-150"
-          style={{ opacity: copied ? 0 : 1, position: copied ? "absolute" : "relative" }}
-        >
-          Copy
-        </span>
-        <span
-          className="inline-block transition-opacity duration-150"
-          style={{ opacity: copied ? 1 : 0, position: copied ? "relative" : "absolute" }}
-        >
-          &#x2713;
-        </span>
-      </button>
-    );
-  }
+  const handleCopy = useCallback(() => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      if (timer.current !== null) window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setCopied(false), 1200);
+    });
+  }, [text]);
 
   return (
-    <button onClick={handleCopy} className={className}>
-      <span className="relative inline-flex items-center justify-center" style={{ width: iconSize, height: iconSize }}>
+    <IconButton label={copied ? "Copied" : label} onClick={handleCopy} className={cn(copied && "text-ok", className)}>
+      <span className="relative h-4 w-4">
         <span
-          className="absolute inset-0 flex items-center justify-center transition-opacity duration-150"
-          style={{ opacity: copied ? 0 : 1 }}
+          className={cn(
+            "absolute inset-0 transition-[opacity,transform] duration-200 ease-out",
+            copied ? "scale-50 opacity-0" : "scale-100 opacity-100",
+          )}
         >
-          <Icon name="content_copy" size={iconSize} />
+          <Icon name="content_copy" size={16} />
         </span>
         <span
-          className="absolute inset-0 flex items-center justify-center transition-opacity duration-150"
-          style={{ opacity: copied ? 1 : 0 }}
+          className={cn(
+            "absolute inset-0 transition-[opacity,transform] duration-200 ease-spring",
+            copied ? "scale-100 opacity-100" : "scale-50 opacity-0",
+          )}
         >
-          <Icon name="check" size={iconSize} />
+          <Icon name="check" size={16} strokeWidth={2.25} />
         </span>
       </span>
-    </button>
+    </IconButton>
   );
 }

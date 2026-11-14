@@ -1,14 +1,11 @@
 // Global application state atoms -- page navigation and paused state
 import { atom } from "jotai";
 
-/** Main settings pages — order matches sidebar nav items. */
-export type PageId = "dashboard" | "history" | "dictation" | "audio" | "speech" | "general";
+/** Main pages, in navigation order. */
+export type PageId = "home" | "history" | "dictation" | "voice" | "general";
 
-/** Currently active page in the settings window sidebar. */
-export const activePageAtom = atom<PageId>("dashboard");
-
-/** Sidebar collapse state — persisted in settings table as "sidebar_collapsed". */
-export const sidebarCollapsedAtom = atom<boolean>(false);
+/** The page shown in the main window. */
+export const activePageAtom = atom<PageId>("home");
 
 /**
  * Tri-state atom mirroring the backend `state.paused` flag.

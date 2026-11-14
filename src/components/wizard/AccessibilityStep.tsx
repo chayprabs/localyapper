@@ -1,12 +1,14 @@
 // Wizard accessibility step (macOS) -- prompt for the grant and advance
 // automatically once System Settings reports it.
 import { useEffect, useState } from "react";
-import { Icon } from "@/components/ui/Icon";
+import { Button } from "@/components/ui/Button";
+import { Spinner } from "@/components/settings/controls";
 import {
   checkPermissions,
   openAccessibilitySettings,
   requestAccessibilityPermission,
 } from "@/lib/commands/system";
+import { Step, TextButton } from "./Step";
 
 export function AccessibilityStep({ onContinue }: { onContinue: () => void }) {
   const [granted, setGranted] = useState(false);
@@ -33,35 +35,19 @@ export function AccessibilityStep({ onContinue }: { onContinue: () => void }) {
   }, [granted, onContinue]);
 
   return (
-    <div className="flex flex-col items-center text-center">
-      <div className="w-14 h-14 bg-[#0058bc]/[0.08] rounded-full flex items-center justify-center mb-5">
-        <Icon name="keyboard" size={28} className="text-[#0058bc]" />
-      </div>
-      <h2 className="text-[20px] font-semibold text-black/85 mb-1">
-        Allow typing into other apps
-      </h2>
-      <p className="text-[13px] text-black/50 mb-6 max-w-[340px]">
-        LocalYapper pastes your words into the app you are using. macOS
-        needs Accessibility access for that. Turn on LocalYapper in System
-        Settings, Privacy &amp; Security, Accessibility.
+    <Step
+      icon="keyboard"
+      title="Allow typing into other apps"
+      text="LocalYapper pastes your words into the app you are using. macOS needs Accessibility access for that: turn on LocalYapper in System Settings, Privacy & Security, Accessibility."
+    >
+      <p role="status" className="flex items-center gap-2 text-[12.5px] text-ink/50">
+        {!granted && <Spinner size={14} />}
+        {granted ? "Access granted." : "Waiting for access"}
       </p>
-      <p role="status" className="text-[12px] text-black/50 mb-4">
-        {granted ? "Access granted." : "Waiting for access..."}
-      </p>
-      <button
-        onClick={() => {
-          void openAccessibilitySettings();
-        }}
-        className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 active:brightness-95 transition-all mb-2"
-      >
+      <Button variant="primary" size="lg" className="w-full" onClick={() => void openAccessibilitySettings()}>
         Open System Settings
-      </button>
-      <button
-        onClick={onContinue}
-        className="text-[12px] text-black/50 hover:underline"
-      >
-        Skip for now (text will be copied instead of pasted)
-      </button>
-    </div>
+      </Button>
+      <TextButton onClick={onContinue}>Skip for now (text will be copied instead of pasted)</TextButton>
+    </Step>
   );
 }
