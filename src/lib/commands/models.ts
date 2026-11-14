@@ -14,6 +14,11 @@ export async function cancelModelDownload(): Promise<void> {
   return invoke<void>("cancel_model_download");
 }
 
+/** Whether a model download is running in the backend right now. */
+export async function modelDownloadActive(): Promise<boolean> {
+  return invoke<boolean>("model_download_active");
+}
+
 /** Reload speech model assets from disk into AppState. */
 export async function reloadModels(): Promise<void> {
   return invoke<void>("reload_models");

@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn hook_overlay_custom() {
-        let (r, cs, _) = set("overlay_custom", "0.25,0.75");
+        let (r, cs, _) = set("overlay_custom", "0.2500,0.7500");
         assert!(r.saw("controller"));
         assert_eq!(
             cs.overlay.position,

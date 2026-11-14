@@ -101,7 +101,7 @@ repositories, so the default is fp32.
   runner keeps another app in front, so `end_to_end_dictation`,
   `end_to_end_cold_and_warm`, `inject_types_into_target`,
   `inject_restores_clipboard`, `inject_with_modifier_down`,
-  `overlay_does_not_take_focus`, `overlay_is_click_through` and
+  `overlay_does_not_take_focus`, `overlay_can_be_dragged` (formerly `overlay_is_click_through`) and
   `test_dictation_reports_without_pasting` print `SKIP:` there.
   (`back_to_back` did run and pass on macOS.)
 - macOS Accessibility and microphone permission prompts, and the

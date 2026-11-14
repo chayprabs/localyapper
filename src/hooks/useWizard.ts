@@ -1,5 +1,5 @@
 import { DEFAULT_RECORD_HOTKEY, isMacPlatform } from "@/lib/hotkeyDefaults";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DownloadProgress, PermissionsStatus } from "@/types/commands";
 import { getAllSettings, setSetting } from "@/lib/commands/settings";
 import {
@@ -7,8 +7,8 @@ import {
   reloadModels,
   cancelModelDownload,
   checkSpeechModelFileExists,
+  modelDownloadActive,
 } from "@/lib/commands/models";
-import { updateHotkey } from "@/lib/commands/hotkeys";
 import {
   checkPermissions,
   openMicSettings,
@@ -52,6 +52,9 @@ function errorToMessage(error: unknown, fallback: string): string {
 export function useWizard(onComplete: () => void) {
   const [step, setStepState] = useState<WizardStep>("welcome");
   const [hydrated, setHydrated] = useState(false);
+  // Whether the current step was reached by going back. Steps that move
+  // on by themselves must not do so then, or Back could never pass them.
+  const [cameBack, setCameBack] = useState(false);
 
   const [hotkey, setHotkey] = useState(DEFAULT_HOTKEY);
   const [permissions, setPermissions] = useState<PermissionsStatus | null>(
@@ -64,6 +67,11 @@ export function useWizard(onComplete: () => void) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [filesInstalled, setFilesInstalled] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [modelSizeMb, setModelSizeMb] = useState<number | null>(null);
+  // Set by Cancel so the rejection that follows is not shown as an error.
+  const cancelRequested = useRef(false);
+  const downloadRunning = useRef(false);
 
   const [setupError, setSetupError] = useState<string | null>(null);
 
@@ -92,7 +100,10 @@ export function useWizard(onComplete: () => void) {
 
       try {
         const status = await checkSpeechModelFileExists();
-        if (!cancelled) setFilesInstalled(status.exists);
+        if (!cancelled) {
+          setFilesInstalled(status.exists);
+          setModelSizeMb(status.size_mb);
+        }
       } catch (error) {
         console.error("Failed to check speech model files:", error);
       }
@@ -128,14 +139,20 @@ export function useWizard(onComplete: () => void) {
     const idx = WIZARD_STEPS.indexOf(step);
     if (idx < 0 || idx >= WIZARD_STEPS.length - 1) return;
     const next = WIZARD_STEPS[idx + 1];
-    if (next) setStep(next);
+    if (next) {
+      setCameBack(false);
+      setStep(next);
+    }
   }, [step, setStep]);
 
   const goBack = useCallback(() => {
     const idx = WIZARD_STEPS.indexOf(step);
     if (idx <= 0) return;
     const prev = WIZARD_STEPS[idx - 1];
-    if (prev) setStep(prev);
+    if (prev) {
+      setCameBack(true);
+      setStep(prev);
+    }
   }, [step, setStep]);
 
   const canGoBack = useMemo(() => {
@@ -145,28 +162,46 @@ export function useWizard(onComplete: () => void) {
   }, [step, downloading]);
 
   // Microphone step actions
-  const refreshPermissions = useCallback(async () => {
-    setPermissionsLoading(true);
+  const readPermissions = useCallback(async () => {
     try {
-      const status = await checkPermissions();
-      setPermissions(status);
+      setPermissions(await checkPermissions());
     } catch (error) {
       console.error("Failed to check permissions:", error);
-    } finally {
-      setPermissionsLoading(false);
     }
   }, []);
 
+  const refreshPermissions = useCallback(async () => {
+    setPermissionsLoading(true);
+    try {
+      await readPermissions();
+    } finally {
+      setPermissionsLoading(false);
+    }
+  }, [readPermissions]);
+
   // Entering the microphone step asks the OS for access (macOS prompts
-  // once through AVFoundation), then reads the result.
+  // once through AVFoundation), then reads the result. The answer to the
+  // prompt, a microphone plugged in, or a change made in system settings
+  // arrives later, so the status is read again every two seconds for as
+  // long as the step is open.
   useEffect(() => {
     if (step !== "microphone") return;
+    let live = true;
     void requestMicrophonePermission()
       .catch((error: unknown) => {
         console.error("Failed to request microphone access:", error);
       })
-      .then(() => refreshPermissions());
-  }, [step, refreshPermissions]);
+      .then(() => {
+        if (live) void refreshPermissions();
+      });
+    const timer = window.setInterval(() => {
+      void readPermissions();
+    }, 2000);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [step, refreshPermissions, readPermissions]);
 
   const requestOpenMicSettings = useCallback(async () => {
     try {
@@ -182,6 +217,10 @@ export function useWizard(onComplete: () => void) {
   }, []);
 
   const startDownload = useCallback(async () => {
+    // One download at a time; a second click while one runs does nothing.
+    if (downloadRunning.current) return;
+    downloadRunning.current = true;
+    cancelRequested.current = false;
     setDownloadError(null);
     setDownloadProgress(null);
     setDownloading(true);
@@ -196,33 +235,62 @@ export function useWizard(onComplete: () => void) {
           error,
           "The speech engine did not start",
         );
-        setSetupError(
-          `Download finished, but the speech engine needs attention. ${message}`,
+        setDownloadError(
+          `The download finished, but the speech engine did not start. ${message}`,
         );
       }
     } catch (error) {
-      const message = errorToMessage(error, "Download failed");
-      setDownloadError(message);
+      // A cancelled download is not a failure: the part is kept and the
+      // step goes back to offering the download.
+      if (!cancelRequested.current) {
+        setDownloadError(errorToMessage(error, "Download failed"));
+      }
     } finally {
+      downloadRunning.current = false;
       setDownloading(false);
+      setCancelling(false);
     }
   }, []);
 
+  // The step shows "downloading" until the download has really stopped,
+  // so a new one can never start while the old one still writes.
   const cancelDownload = useCallback(async () => {
+    cancelRequested.current = true;
+    setCancelling(true);
     try {
       await cancelModelDownload();
-    } catch {
-      // Ignore cancellation errors from already-finished downloads.
+    } catch (error) {
+      console.error("Failed to cancel the download:", error);
+      setCancelling(false);
     }
-    setDownloading(false);
-    setDownloadProgress(null);
   }, []);
 
+  // A download started before this window was closed keeps running in the
+  // background. Reopening the wizard joins it instead of starting over.
+  useEffect(() => {
+    if (!hydrated) return;
+    let live = true;
+    void modelDownloadActive()
+      .then((active) => {
+        if (live && active) void startDownload();
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [hydrated, startDownload]);
+
+  // The hotkey was registered on its own step. Launch at login can fail
+  // (some Linux packages, unsigned macOS builds); that must not keep the
+  // user in the wizard, and General has the same switch for later.
   const finishWizard = useCallback(async (launchAtLogin: boolean) => {
     setSetupError(null);
     try {
-      await updateHotkey("hotkey_record", hotkey);
       await setSetting("auto_start", launchAtLogin ? "true" : "false");
+    } catch (error) {
+      console.error("Failed to set launch at login:", error);
+    }
+    try {
       await setSetting("setup_step", "done");
       await setSetting("setup_complete", "true");
       onComplete();
@@ -231,7 +299,7 @@ export function useWizard(onComplete: () => void) {
       setSetupError(message);
       console.error("Failed to finish wizard:", error);
     }
-  }, [hotkey, onComplete]);
+  }, [onComplete]);
 
   const skipSetup = useCallback(async () => {
     setSetupError(null);
@@ -252,6 +320,7 @@ export function useWizard(onComplete: () => void) {
     stepIndex: WIZARD_STEPS.indexOf(step),
     stepCount: WIZARD_STEPS.length,
     canGoBack,
+    cameBack,
     goNext,
     goBack,
 
@@ -267,6 +336,8 @@ export function useWizard(onComplete: () => void) {
     downloadError,
     filesInstalled,
     downloading,
+    cancelling,
+    modelSizeMb,
     handleDownloadProgress,
     startDownload,
     cancelDownload,

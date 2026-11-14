@@ -478,8 +478,22 @@ impl Controller {
                 self.test_text = None;
                 self.cli(CliAction::Start);
             }
-            Msg::TestDictation(true) => {}
-            Msg::TestDictation(false) => self.cli(CliAction::Stop),
+            Msg::TestDictation(true) => {
+                // Busy with a real dictation: tell the page at once, or
+                // it would wait for a result that never comes.
+                if !self.test.load(Ordering::SeqCst) {
+                    let _ = self.app.emit_to(
+                        "main",
+                        "test-dictation-result",
+                        serde_json::json!({ "text": null, "timings": null }),
+                    );
+                }
+            }
+            Msg::TestDictation(false) => {
+                if self.test.load(Ordering::SeqCst) {
+                    self.cli(CliAction::Stop);
+                }
+            }
             Msg::Query(reply) => {
                 let _ = reply.send(Snapshot {
                     idle: self.session.is_idle(),

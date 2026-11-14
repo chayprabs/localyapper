@@ -1,6 +1,7 @@
 // Overlay page. Rust owns the window (position, show, hide); this page only
 // renders the view it is sent. It listens for `overlay-view` and
-// `overlay-level`, and sends back only the copy and dismiss clicks.
+// `overlay-level`, and sends back the copy and dismiss clicks and the
+// drag of the pill (Rust moves the window and remembers the new place).
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import "./overlay.css";
@@ -59,6 +60,8 @@ function render(view: View): void {
   if (view.kind !== "listening" && view.kind !== "hands_free" && view.kind !== "stopping_soon") {
     setLevel(0);
   }
+  // A hidden window sends no pointer-up; Rust ends the drag as well.
+  if (view.kind === "hidden") endDrag();
   if (window.__LY_TEST__) void invoke("test_overlay_seen", { kind: view.kind, level: null });
 }
 
@@ -90,3 +93,56 @@ document.getElementById("copy")?.addEventListener("click", () => {
 document.getElementById("dismiss")?.addEventListener("click", () => {
   void invoke("overlay_dismiss");
 });
+
+// Dragging the pill. The page only reports press, movement and release;
+// Rust reads the real cursor position, so the window follows the cursor
+// exactly on every monitor and scale factor. One `move` is in flight at
+// a time, and the newest movement is never dropped.
+let dragging = false;
+let moveInFlight = false;
+let movePending = false;
+
+function sendMove(): void {
+  if (!dragging) return;
+  if (moveInFlight) {
+    movePending = true;
+    return;
+  }
+  moveInFlight = true;
+  void invoke("overlay_drag", { phase: "move" })
+    .catch(() => undefined)
+    .finally(() => {
+      moveInFlight = false;
+      if (movePending) {
+        movePending = false;
+        sendMove();
+      }
+    });
+}
+
+function endDrag(): void {
+  if (!dragging) return;
+  dragging = false;
+  movePending = false;
+  pill.classList.remove("dragging");
+  void invoke("overlay_drag", { phase: "end" });
+}
+
+pill.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || dragging) return;
+  if (e.target instanceof Element && e.target.closest("button")) return;
+  dragging = true;
+  pill.classList.add("dragging");
+  // Keeps the events coming when the cursor outruns the window.
+  try {
+    pill.setPointerCapture(e.pointerId);
+  } catch {
+    // Without capture the drag still works while the cursor is over the pill.
+  }
+  void invoke("overlay_drag", { phase: "start" });
+  e.preventDefault();
+});
+pill.addEventListener("pointermove", sendMove);
+pill.addEventListener("pointerup", endDrag);
+pill.addEventListener("pointercancel", endDrag);
+pill.addEventListener("lostpointercapture", endDrag);

@@ -1,6 +1,6 @@
 // IPC command handlers -- speech model catalog, download, use and delete
-use std::sync::atomic::Ordering;
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use serde::Serialize;
 use tauri::Emitter;
@@ -9,6 +9,62 @@ use crate::core::download::{Downloader, FileSpec};
 use crate::core::stt::catalog::{self, Manifest};
 use crate::models::{DownloadProgress, ModelsStatus, SpeechModelFileStatus};
 use crate::state::AppState;
+
+/// Model downloads in progress.
+///
+/// Only one runs at a time, so two never write the same part file (the
+/// wizard reopened mid-download, or Cancel followed at once by Start). A
+/// second request waits for the first and then finds its files. Every
+/// request has its own cancel flag, so a cancel can never be undone by a
+/// later request starting.
+#[derive(Default)]
+pub struct Downloads {
+    running: tokio::sync::Mutex<()>,
+    flags: Mutex<Vec<Arc<AtomicBool>>>,
+}
+
+impl Downloads {
+    fn register(&self) -> Arc<AtomicBool> {
+        let flag = Arc::new(AtomicBool::new(false));
+        if let Ok(mut flags) = self.flags.lock() {
+            flags.push(flag.clone());
+        }
+        flag
+    }
+
+    fn unregister(&self, flag: &Arc<AtomicBool>) {
+        if let Ok(mut flags) = self.flags.lock() {
+            flags.retain(|f| !Arc::ptr_eq(f, flag));
+        }
+    }
+
+    /// Cancel every download that is running or waiting its turn.
+    pub fn cancel_all(&self) {
+        if let Ok(flags) = self.flags.lock() {
+            for f in flags.iter() {
+                f.store(true, Ordering::SeqCst);
+            }
+        }
+    }
+
+    /// Whether a download is running or waiting.
+    pub fn active(&self) -> bool {
+        self.flags.lock().map(|f| !f.is_empty()).unwrap_or(false)
+    }
+
+    /// Wait for the running download, if any, unless cancelled first.
+    async fn turn(&self, cancel: &AtomicBool) -> Result<tokio::sync::MutexGuard<'_, ()>, String> {
+        loop {
+            if let Ok(guard) = self.running.try_lock() {
+                return Ok(guard);
+            }
+            if cancel.load(Ordering::SeqCst) {
+                return Err(crate::core::download::DownloadError::Cancelled.to_string());
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }
+}
 
 /// The embedded manifest, parsed once.
 pub(crate) fn manifest() -> Result<&'static Manifest, String> {
@@ -99,19 +155,36 @@ struct DownloadEvent {
 
 /// Download, verify and mark a model as installed. Resumes a partial
 /// download. Emits `model-download-progress` with real byte totals.
+/// Downloading a model that is already installed checks its files and
+/// fetches only what is missing or damaged.
 #[tauri::command]
 pub async fn download_model(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     id: String,
 ) -> Result<(), String> {
+    let cancel = state.downloads.register();
+    let result = download_model_inner(&app_handle, state.inner(), &id, &cancel).await;
+    state.downloads.unregister(&cancel);
+    // Sent on failure too: the list then shows "partly downloaded".
+    let _ = app_handle.emit("models-changed", ());
+    result
+}
+
+async fn download_model_inner(
+    app_handle: &tauri::AppHandle,
+    state: &AppState,
+    id: &str,
+    cancel: &Arc<AtomicBool>,
+) -> Result<(), String> {
     let m = manifest()?;
     let entry = m
         .models
-        .get(&id)
+        .get(id)
         .filter(|e| !e.legacy)
         .ok_or_else(|| format!("Unknown speech model: {id}"))?;
-    let dir = catalog::model_dir(&crate::models_dir(&app_handle)?, &id);
+    let dir = catalog::model_dir(&crate::models_dir(app_handle)?, id);
+    let _turn = state.downloads.turn(cancel).await?;
     std::fs::create_dir_all(&dir)
         .map_err(|e| format!("Could not create {}: {e}", dir.display()))?;
     let files: Vec<FileSpec> = entry
@@ -124,41 +197,65 @@ pub async fn download_model(
             dest: dir.join(&f.name),
         })
         .collect();
-    state.download_cancel.store(false, Ordering::SeqCst);
+
+    let report = |downloaded: u64, total: u64, speed_mbps: f64| {
+        let percent = if total > 0 {
+            100.0 * downloaded as f64 / total as f64
+        } else {
+            0.0
+        };
+        let _ = app_handle.emit(
+            "speech_model_download_progress",
+            DownloadProgress {
+                percent,
+                downloaded_mb: downloaded / 1_000_000,
+                total_mb: total / 1_000_000,
+                speed_mbps,
+            },
+        );
+        let _ = app_handle.emit(
+            "model-download-progress",
+            DownloadEvent {
+                id: id.to_string(),
+                downloaded,
+                total,
+                percent,
+            },
+        );
+    };
+
+    // An install that still passes its checksums needs nothing, and stays
+    // usable while it is checked. Anything else loses its marker until
+    // every file has been fetched and verified again.
+    if catalog::is_installed(&dir, entry) && catalog::marker_matches(&dir, entry) {
+        let check = files.clone();
+        let intact = tokio::task::spawn_blocking(move || {
+            check
+                .iter()
+                .all(|f| crate::core::download::sha256_file(&f.dest).is_ok_and(|h| h == f.sha256))
+        })
+        .await
+        .unwrap_or(false);
+        if intact {
+            let total = entry.total_size();
+            report(total, total, 0.0);
+            log::info!("models: {id} is already downloaded and intact");
+            return Ok(());
+        }
+        log::warn!("models: {id} failed its checksum; downloading it again");
+    }
     let _ = std::fs::remove_file(dir.join(catalog::VERIFIED_MARKER));
+
     let downloader = Downloader::new()?;
-    let app = app_handle.clone();
-    let event_id = id.clone();
     let started = std::time::Instant::now();
+    // Speed counts only what this run fetched, not a resumed part.
+    let first = std::sync::OnceLock::new();
     downloader
-        .fetch_all(&files, &state.download_cancel, &move |p| {
+        .fetch_all(&files, cancel, &|p| {
+            let base = *first.get_or_init(|| p.downloaded);
             let secs = started.elapsed().as_secs_f64().max(0.001);
-            let _ = app.emit(
-                "speech_model_download_progress",
-                DownloadProgress {
-                    percent: if p.total > 0 {
-                        100.0 * p.downloaded as f64 / p.total as f64
-                    } else {
-                        0.0
-                    },
-                    downloaded_mb: p.downloaded / 1_000_000,
-                    total_mb: p.total / 1_000_000,
-                    speed_mbps: p.downloaded as f64 / 1e6 / secs,
-                },
-            );
-            let _ = app.emit(
-                "model-download-progress",
-                DownloadEvent {
-                    id: event_id.clone(),
-                    downloaded: p.downloaded,
-                    total: p.total,
-                    percent: if p.total > 0 {
-                        100.0 * p.downloaded as f64 / p.total as f64
-                    } else {
-                        0.0
-                    },
-                },
-            );
+            let fetched = p.downloaded.saturating_sub(base);
+            report(p.downloaded, p.total, fetched as f64 / 1e6 / secs);
         })
         .await
         .map_err(|e| e.to_string())?;
@@ -168,15 +265,20 @@ pub async fn download_model(
     )
     .map_err(|e| format!("Could not finish the install: {e}"))?;
     log::info!("models: {id} downloaded and verified");
-    let _ = app_handle.emit("models-changed", ());
     Ok(())
 }
 
 /// Cancel an in-progress model download. The partial file is kept.
 #[tauri::command]
 pub async fn cancel_model_download(state: tauri::State<'_, AppState>) -> Result<(), String> {
-    state.download_cancel.store(true, Ordering::SeqCst);
+    state.downloads.cancel_all();
     Ok(())
+}
+
+/// Whether a model download is running (the wizard asks when it opens).
+#[tauri::command]
+pub async fn model_download_active(state: tauri::State<'_, AppState>) -> Result<bool, String> {
+    Ok(state.downloads.active())
 }
 
 /// Make `id` (or `auto`) the dictation model. The old model is evicted.
@@ -190,16 +292,10 @@ pub async fn use_model(
     if id != "auto" && !m.models.get(&id).is_some_and(|e| !e.legacy) {
         return Err(format!("Unknown speech model: {id}"));
     }
-    {
-        let conn = state.db.lock().map_err(|e| e.to_string())?;
-        crate::db::queries::set_setting(&conn, "speech_model", &id).map_err(|e| e.to_string())?;
-    }
-    let models = state.models.clone();
-    tokio::task::spawn_blocking(move || models.evict_blocking())
-        .await
-        .map_err(|e| e.to_string())?;
-    let _ = app_handle.emit("models-changed", ());
-    Ok(())
+    // Through the typed settings path, so the cached value the rest of
+    // the app reads changes too; its hook evicts the old model.
+    let _ = state;
+    crate::commands::settings::set_setting_now(&app_handle, "speech_model", &id).map(|_| ())
 }
 
 /// Delete a model's files. Deleting the active model returns the app to
@@ -214,6 +310,10 @@ pub async fn delete_model(
     if !m.models.contains_key(&id) {
         return Err(format!("Unknown speech model: {id}"));
     }
+    // Never pull files out from under a download.
+    let Ok(_turn) = state.downloads.running.try_lock() else {
+        return Err("A download is in progress. Cancel it before deleting a model.".into());
+    };
     if state.models.loaded_id().as_deref() == Some(id.as_str()) {
         let models = state.models.clone();
         tokio::task::spawn_blocking(move || models.evict_blocking())

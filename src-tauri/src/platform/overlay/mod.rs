@@ -63,7 +63,7 @@ pub enum OverlayPosition {
 
 impl OverlayPosition {
     /// Parse `bottom_center`, `top_center` or `custom` with its
-    /// `overlay_custom` value ("0.50,0.85").
+    /// `overlay_custom` value ("0.5000,0.8500").
     pub fn parse(position: &str, custom: Option<&str>) -> Option<Self> {
         match position {
             "bottom_center" => Some(Self::BottomCenter),

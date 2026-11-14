@@ -48,6 +48,12 @@ body {
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   transition: opacity 120ms ease-out;
+  /* The pill can be dragged to a new place. */
+  cursor: grab;
+  touch-action: none;
+}
+.pill.dragging {
+  cursor: grabbing;
 }
 .pill[data-kind="hidden"] {
   opacity: 0;

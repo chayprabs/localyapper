@@ -6,11 +6,26 @@
 //! be complete and is verified on disk. Bytes are hashed while written;
 //! on completion size and SHA-256 are checked and the part is renamed.
 //! Cancelling keeps the part for the next attempt.
+//!
+//! A download never hangs: connecting and every wait for data are timed,
+//! a stalled connection is dropped, and a dropped connection is retried
+//! from where the part file ends. Cancel is noticed within a quarter of a
+//! second even when no data is arriving.
 
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+
+/// How long connecting, or waiting for the reply headers, may take.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
+/// A connection that delivers nothing for this long is dropped.
+const STALL_TIMEOUT: Duration = Duration::from_secs(30);
+/// How often a wait checks the cancel flag.
+const CANCEL_POLL: Duration = Duration::from_millis(250);
+/// Extra attempts after a connection problem, each resuming the part.
+const NETWORK_RETRIES: u32 = 3;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileSpec {
@@ -32,8 +47,14 @@ pub struct Progress {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DownloadError {
     Cancelled,
-    NoSpace { needed: u64, available: u64 },
+    NoSpace {
+        needed: u64,
+        available: u64,
+    },
+    /// The server answered with an error status.
     Http(String),
+    /// The connection failed, dropped or stalled; worth another try.
+    Network(String),
     Checksum(String),
     Io(String),
 }
@@ -49,6 +70,10 @@ impl std::fmt::Display for DownloadError {
                 *available as f64 / 1e6
             ),
             Self::Http(e) => write!(f, "Download failed: {e}"),
+            Self::Network(e) => write!(
+                f,
+                "Download failed: {e}. Check your internet connection and try again; the download continues where it stopped."
+            ),
             Self::Checksum(name) => write!(f, "{name} failed its checksum. Try again."),
             Self::Io(e) => write!(f, "Could not write the download: {e}"),
         }
@@ -121,6 +146,7 @@ impl Downloader {
     pub fn new() -> Result<Self, String> {
         let client = reqwest::Client::builder()
             .user_agent(concat!("LocalYapper/", env!("CARGO_PKG_VERSION")))
+            .connect_timeout(CONNECT_TIMEOUT)
             .build()
             .map_err(|e| e.to_string())?;
         Ok(Self { client })
@@ -130,6 +156,7 @@ impl Downloader {
     pub fn without_proxy() -> Result<Self, String> {
         let client = reqwest::Client::builder()
             .no_proxy()
+            .connect_timeout(CONNECT_TIMEOUT)
             .build()
             .map_err(|e| e.to_string())?;
         Ok(Self { client })
@@ -174,7 +201,19 @@ impl Downloader {
                     total,
                 })
             };
-            self.fetch_one(f, cancel, &report).await?;
+            let mut attempt = 0;
+            loop {
+                match self.fetch_one(f, cancel, &report).await {
+                    Err(DownloadError::Network(e)) if attempt < NETWORK_RETRIES => {
+                        attempt += 1;
+                        log::warn!(
+                            "download: {e}; retry {attempt} of {NETWORK_RETRIES} resumes the part"
+                        );
+                        wait(Duration::from_secs(1 << (attempt - 1)), cancel).await?;
+                    }
+                    other => break other?,
+                }
+            }
             done_before += f.size;
             report(f.size);
         }
@@ -222,10 +261,9 @@ impl Downloader {
             if have > 0 {
                 req = req.header(reqwest::header::RANGE, format!("bytes={have}-"));
             }
-            let mut resp = req
-                .send()
-                .await
-                .map_err(|e| DownloadError::Http(e.to_string()))?;
+            let mut resp = timed(req.send(), CONNECT_TIMEOUT, cancel)
+                .await?
+                .map_err(|e| DownloadError::Network(describe(&e)))?;
             let status = resp.status();
             let mut out = if status == reqwest::StatusCode::PARTIAL_CONTENT && have > 0 {
                 std::fs::OpenOptions::new()
@@ -250,14 +288,19 @@ impl Downloader {
             };
             report(have);
             loop {
-                if cancel.load(Ordering::Acquire) {
-                    out.flush().map_err(io)?;
-                    return Err(DownloadError::Cancelled);
-                }
-                let chunk = resp
-                    .chunk()
-                    .await
-                    .map_err(|e| DownloadError::Http(e.to_string()))?;
+                // Whatever arrived so far stays in the part file, so a
+                // cancelled, stalled or dropped download resumes from it.
+                let chunk = match timed(resp.chunk(), STALL_TIMEOUT, cancel).await {
+                    Ok(Ok(chunk)) => chunk,
+                    Ok(Err(e)) => {
+                        let _ = out.flush();
+                        return Err(DownloadError::Network(describe(&e)));
+                    }
+                    Err(e) => {
+                        let _ = out.flush();
+                        return Err(e);
+                    }
+                };
                 let Some(chunk) = chunk else { break };
                 out.write_all(&chunk).map_err(io)?;
                 hasher.update(&chunk);
@@ -269,6 +312,13 @@ impl Downloader {
             }
             out.flush().map_err(io)?;
             drop(out);
+            if have < f.size {
+                // The server closed early. The part is good as far as it
+                // goes, so it is kept and the caller resumes it.
+                return Err(DownloadError::Network(
+                    "the download ended before the file was complete".into(),
+                ));
+            }
             if have == f.size && hex(&hasher.finalize()) == f.sha256 {
                 std::fs::rename(&part, &f.dest).map_err(io)?;
                 return Ok(());
@@ -277,6 +327,62 @@ impl Downloader {
             let _ = std::fs::remove_file(&part);
         }
         Err(DownloadError::Checksum(name))
+    }
+}
+
+/// A transport error in plain words.
+fn describe(e: &reqwest::Error) -> String {
+    if e.is_connect() {
+        "could not connect to the download server".into()
+    } else if e.is_timeout() {
+        "the download server did not answer in time".into()
+    } else {
+        format!("the connection was interrupted ({})", root_cause(e))
+    }
+}
+
+/// The innermost cause is the readable part ("connection reset"); the
+/// outer layers repeat the long URL.
+fn root_cause(e: &reqwest::Error) -> String {
+    let mut source: &dyn std::error::Error = e;
+    while let Some(next) = source.source() {
+        source = next;
+    }
+    source.to_string()
+}
+
+/// Await `fut`, giving up when `cancel` is set or after `limit`.
+async fn timed<T>(
+    fut: impl std::future::Future<Output = T>,
+    limit: Duration,
+    cancel: &AtomicBool,
+) -> Result<T, DownloadError> {
+    tokio::pin!(fut);
+    let mut waited = Duration::ZERO;
+    loop {
+        if cancel.load(Ordering::Acquire) {
+            return Err(DownloadError::Cancelled);
+        }
+        match tokio::time::timeout(CANCEL_POLL, &mut fut).await {
+            Ok(v) => return Ok(v),
+            Err(_) => {
+                waited += CANCEL_POLL;
+                if waited >= limit {
+                    return Err(DownloadError::Network(
+                        "the download server stopped responding".into(),
+                    ));
+                }
+            }
+        }
+    }
+}
+
+/// Sleep for `d` unless cancelled first.
+async fn wait(d: Duration, cancel: &AtomicBool) -> Result<(), DownloadError> {
+    match timed(tokio::time::sleep(d), d + CANCEL_POLL * 2, cancel).await {
+        Ok(()) => Ok(()),
+        Err(DownloadError::Cancelled) => Err(DownloadError::Cancelled),
+        Err(_) => Ok(()),
     }
 }
 
@@ -298,6 +404,11 @@ mod tests {
         Always416,
         /// Send a body with one byte flipped.
         Corrupt,
+        /// Drop the connection halfway through the first reply, then
+        /// honour Range.
+        DropOnce,
+        /// Send the headers and half the body, then go quiet.
+        Stall,
     }
 
     struct Server {
@@ -311,7 +422,10 @@ mod tests {
         let requests = Arc::new(Mutex::new(Vec::new()));
         let log = requests.clone();
         std::thread::spawn(move || {
+            let mut served = 0usize;
+            let mut held = Vec::new();
             for stream in listener.incoming().flatten() {
+                served += 1;
                 let mut reader = BufReader::new(stream.try_clone().expect("clone"));
                 let mut range: Option<u64> = None;
                 let mut line = String::new();
@@ -332,13 +446,34 @@ mod tests {
                         *b ^= 0xFF;
                     }
                 }
+                if mode == Mode::Stall || (mode == Mode::DropOnce && served == 1) {
+                    let start = range.unwrap_or(0) as usize;
+                    let half = start + (data.len() - start) / 2;
+                    let head = format!(
+                        "HTTP/1.1 {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        if range.is_some() {
+                            "206 Partial Content"
+                        } else {
+                            "200 OK"
+                        },
+                        data.len() - start
+                    );
+                    let _ = out.write_all(head.as_bytes());
+                    let _ = out.write_all(&data[start..half]);
+                    let _ = out.flush();
+                    if mode == Mode::Stall {
+                        // Keep the socket open and silent.
+                        held.push(out);
+                    }
+                    continue;
+                }
                 let resp = match (mode, range) {
                     (Mode::Always416, Some(_)) => {
                         "HTTP/1.1 416 Range Not Satisfiable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                             .as_bytes()
                             .to_vec()
                     }
-                    (Mode::Ranges, Some(r)) => {
+                    (Mode::Ranges | Mode::DropOnce, Some(r)) => {
                         let slice = &data[r as usize..];
                         let mut v = format!(
                             "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -466,6 +601,46 @@ mod tests {
         assert!(matches!(err, DownloadError::Checksum(_)), "{err:?}");
         assert!(!f.dest.exists());
         assert!(!part_path(&f.dest).exists());
+    }
+
+    #[test]
+    fn a_dropped_connection_resumes_by_itself() {
+        let data = body();
+        let server = serve(data.clone(), Mode::DropOnce);
+        let f = spec(&server.url, &data, tmp("drop"));
+        run(&f, &AtomicBool::new(false)).expect("retried");
+        assert_eq!(std::fs::read(&f.dest).expect("read"), data);
+        // The retry asked only for the missing half.
+        assert_eq!(
+            server
+                .requests
+                .lock()
+                .map(|r| r.clone())
+                .unwrap_or_default(),
+            vec!["full".to_string(), "from 100000".to_string()]
+        );
+    }
+
+    #[test]
+    fn cancel_is_noticed_while_the_server_is_silent() {
+        let data = body();
+        let server = serve(data.clone(), Mode::Stall);
+        let f = spec(&server.url, &data, tmp("stall"));
+        let cancel = Arc::new(AtomicBool::new(false));
+        let flag = cancel.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(600));
+            flag.store(true, Ordering::Release);
+        });
+        let started = std::time::Instant::now();
+        let err = run(&f, &cancel).expect_err("cancelled");
+        assert_eq!(err, DownloadError::Cancelled);
+        assert!(started.elapsed() < Duration::from_secs(5));
+        // What arrived before the silence is kept for the next attempt.
+        assert_eq!(
+            std::fs::metadata(part_path(&f.dest)).map(|m| m.len()).ok(),
+            Some(100_000)
+        );
     }
 
     #[test]

@@ -4,11 +4,13 @@ import { listen } from "@tauri-apps/api/event";
 import type { DownloadProgress } from "@/types/commands";
 import { Icon } from "@/components/ui/Icon";
 
-const TOTAL_SIZE_MB = 458;
-
 interface SpeechFilesStepProps {
   filesInstalled: boolean;
   downloading: boolean;
+  /** Cancel was pressed and the download has not stopped yet. */
+  cancelling: boolean;
+  /** Size of the model this computer will use, once known. */
+  modelSizeMb: number | null;
   downloadProgress: DownloadProgress | null;
   downloadError: string | null;
   onProgress: (progress: DownloadProgress) => void;
@@ -20,6 +22,8 @@ interface SpeechFilesStepProps {
 export function SpeechFilesStep({
   filesInstalled,
   downloading,
+  cancelling,
+  modelSizeMb,
   downloadProgress,
   downloadError,
   onProgress,
@@ -64,9 +68,15 @@ export function SpeechFilesStep({
           Speech files ready
         </h2>
         <p className="mb-6 max-w-[360px] text-[13px] leading-relaxed text-black/50">
-          The local Parakeet speech engine is installed on this device.
-          Dictation will start the moment you press your hotkey.
+          The speech engine is installed on this device. Dictation will
+          start the moment you press your hotkey.
         </p>
+
+        {downloadError && (
+          <p className="mb-4 w-full rounded-lg border border-[#ba1a1a]/15 bg-[#ba1a1a]/[0.06] px-3 py-2 text-[12px] font-medium text-[#ba1a1a]">
+            {downloadError}
+          </p>
+        )}
 
         <button
           type="button"
@@ -82,7 +92,7 @@ export function SpeechFilesStep({
   if (downloading) {
     const percent = downloadProgress?.percent ?? 0;
     const downloadedMb = downloadProgress?.downloaded_mb ?? 0;
-    const totalMb = downloadProgress?.total_mb ?? TOTAL_SIZE_MB;
+    const totalMb = downloadProgress?.total_mb ?? modelSizeMb ?? 0;
     const speedMbps = downloadProgress?.speed_mbps ?? 0;
 
     return (
@@ -95,7 +105,9 @@ export function SpeechFilesStep({
           Downloading speech files
         </h2>
         <p className="mb-6 text-[13px] leading-relaxed text-black/50">
-          {downloadedMb.toFixed(0)} MB / {totalMb.toFixed(0)} MB
+          {totalMb > 0
+            ? `${downloadedMb.toFixed(0)} MB / ${totalMb.toFixed(0)} MB`
+            : "Checking what is already downloaded..."}
         </p>
 
         <div className="mb-2 h-2 w-full rounded-full bg-black/[0.06]">
@@ -108,7 +120,11 @@ export function SpeechFilesStep({
         <div className="mb-6 flex w-full justify-between text-[11px] text-black/[0.40]">
           <span>{percent.toFixed(0)}%</span>
           <span>
-            {speedMbps > 0 ? `${speedMbps.toFixed(1)} MB/s` : "Starting..."}
+            {cancelling
+              ? "Stopping..."
+              : speedMbps > 0
+                ? `${speedMbps.toFixed(1)} MB/s`
+                : "Starting..."}
           </span>
         </div>
 
@@ -117,9 +133,10 @@ export function SpeechFilesStep({
           onClick={() => {
             void onCancel();
           }}
-          className="h-9 w-full rounded-[8px] border border-black/[0.10] bg-surface text-[13px] font-medium text-black/75 transition-colors hover:bg-black/[0.02]"
+          disabled={cancelling}
+          className="h-9 w-full rounded-[8px] border border-black/[0.10] bg-surface text-[13px] font-medium text-black/75 transition-colors hover:bg-black/[0.02] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Cancel download
+          {cancelling ? "Cancelling..." : "Cancel download"}
         </button>
       </div>
     );
@@ -135,8 +152,9 @@ export function SpeechFilesStep({
         Install the speech engine
       </h2>
       <p className="mb-6 max-w-[360px] text-[13px] leading-relaxed text-black/50">
-        Parakeet (~458 MB) runs entirely on your device. After this one-time
-        download, dictation works offline and forever.
+        The speech model{modelSizeMb ? ` (about ${modelSizeMb} MB)` : ""} runs
+        entirely on your device. After this one-time download, dictation
+        works offline. An interrupted download continues where it stopped.
       </p>
 
       {downloadError && (
@@ -153,6 +171,15 @@ export function SpeechFilesStep({
         className="h-9 w-full rounded-[8px] bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-[13px] font-medium text-white transition-all hover:brightness-110 active:brightness-95"
       >
         {downloadError ? "Retry download" : "Start download"}
+      </button>
+
+      {/* The model can also be downloaded later from the Speech page. */}
+      <button
+        type="button"
+        onClick={onContinue}
+        className="mt-3 text-[12px] text-black/[0.45] hover:text-black/65"
+      >
+        Skip for now
       </button>
     </div>
   );

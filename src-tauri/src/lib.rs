@@ -22,7 +22,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use state::AppState;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
@@ -129,8 +128,10 @@ macro_rules! app_commands {
             commands::recording::overlay_copy,
             commands::recording::overlay_dismiss,
             commands::recording::overlay_current_view,
+            commands::recording::overlay_drag,
             commands::models::download_speech_model,
             commands::models::cancel_model_download,
+            commands::models::model_download_active,
             commands::models::reload_models,
             commands::models::check_models_status,
             commands::models::list_models,
@@ -266,7 +267,7 @@ pub fn run() {
                 models: started.manager,
                 paused: started.paused,
                 last_injection: started.last_injection,
-                download_cancel: Arc::new(AtomicBool::new(false)),
+                downloads: commands::models::Downloads::default(),
                 hotkeys: started.hotkeys,
                 settings: settings_cache,
             });
@@ -327,13 +328,27 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                if window.label() == "main" {
+            if window.label() != "main" {
+                return;
+            }
+            match event {
+                tauri::WindowEvent::CloseRequested { .. } => {
                     // Allow the close to destroy the WebView and free its
                     // renderer process. The tray + open-app hotkey rebuild
                     // it on demand via show_or_create_main_window.
                     log::info!("Main window closed; WebView will be released");
                 }
+                tauri::WindowEvent::Destroyed => {
+                    // The page cannot clean up after itself once it is
+                    // gone. A wizard closed on its hotkey step would leave
+                    // the record key in test mode, and a test dictation
+                    // would keep recording with nowhere to report.
+                    if let Some(state) = window.app_handle().try_state::<AppState>() {
+                        state.controller.send(controller::Msg::HotkeyProbe(false));
+                        state.controller.send(controller::Msg::TestDictation(false));
+                    }
+                }
+                _ => {}
             }
         })
         .invoke_handler({

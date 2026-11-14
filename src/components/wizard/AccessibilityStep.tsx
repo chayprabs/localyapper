@@ -8,7 +8,14 @@ import {
   requestAccessibilityPermission,
 } from "@/lib/commands/system";
 
-export function AccessibilityStep({ onContinue }: { onContinue: () => void }) {
+export function AccessibilityStep({
+  autoAdvance,
+  onContinue,
+}: {
+  /** Move on as soon as access is granted (not when the user came Back). */
+  autoAdvance: boolean;
+  onContinue: () => void;
+}) {
   const [granted, setGranted] = useState(false);
 
   useEffect(() => {
@@ -29,8 +36,8 @@ export function AccessibilityStep({ onContinue }: { onContinue: () => void }) {
   }, []);
 
   useEffect(() => {
-    if (granted) onContinue();
-  }, [granted, onContinue]);
+    if (granted && autoAdvance) onContinue();
+  }, [granted, autoAdvance, onContinue]);
 
   return (
     <div className="flex flex-col items-center text-center">
@@ -48,20 +55,31 @@ export function AccessibilityStep({ onContinue }: { onContinue: () => void }) {
       <p role="status" className="text-[12px] text-black/50 mb-4">
         {granted ? "Access granted." : "Waiting for access..."}
       </p>
-      <button
-        onClick={() => {
-          void openAccessibilitySettings();
-        }}
-        className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 active:brightness-95 transition-all mb-2"
-      >
-        Open System Settings
-      </button>
-      <button
-        onClick={onContinue}
-        className="text-[12px] text-black/50 hover:underline"
-      >
-        Skip for now (text will be copied instead of pasted)
-      </button>
+      {granted ? (
+        <button
+          onClick={onContinue}
+          className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 active:brightness-95 transition-all"
+        >
+          Continue
+        </button>
+      ) : (
+        <>
+          <button
+            onClick={() => {
+              void openAccessibilitySettings();
+            }}
+            className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 active:brightness-95 transition-all mb-2"
+          >
+            Open System Settings
+          </button>
+          <button
+            onClick={onContinue}
+            className="text-[12px] text-black/50 hover:underline"
+          >
+            Skip for now (text will be copied instead of pasted)
+          </button>
+        </>
+      )}
     </div>
   );
 }

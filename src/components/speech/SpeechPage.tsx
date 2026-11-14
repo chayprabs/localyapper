@@ -125,25 +125,29 @@ export function SpeechPage() {
                 )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {busy === m.id ? (
+                {busy === m.id && m.state !== "installed" ? (
                   <button
                     className="h-7 px-3 text-[12px] rounded-md border border-black/[0.12]"
                     onClick={() => void cancelModelDownload()}
                   >
                     Cancel
                   </button>
+                ) : busy === m.id ? (
+                  <span className="text-[12px] text-black/50">Working…</span>
                 ) : m.state === "installed" ? (
                   <>
                     {!m.active && (
                       <button
-                        className="h-7 px-3 bg-[#0058bc] text-white text-[12px] font-medium rounded-md"
+                        className="h-7 px-3 bg-[#0058bc] text-white text-[12px] font-medium rounded-md disabled:opacity-40"
+                        disabled={busy !== null}
                         onClick={() => void run(m.id, () => selectModel(m.id))}
                       >
                         Use
                       </button>
                     )}
                     <button
-                      className="text-[12px] text-[#ba1a1a] hover:underline"
+                      className="text-[12px] text-[#ba1a1a] hover:underline disabled:opacity-40"
+                      disabled={busy !== null}
                       onClick={() => void run(m.id, () => deleteModel(m.id))}
                     >
                       Delete

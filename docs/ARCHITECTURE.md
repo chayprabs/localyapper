@@ -47,9 +47,12 @@ for diagnostics; they never include text.
 ## Windows
 
 - **Overlay** (`platform/overlay`, `overlay.html`). Created hidden at
-  start so a key press never waits for a WebView. Non-activating and
-  click-through on every OS (an NSPanel on macOS). All window geometry
-  work runs on the main thread.
+  start so a key press never waits for a WebView. Non-activating on
+  every OS (an NSPanel on macOS): clicking or dragging the pill never
+  moves keyboard focus. The pill can be dragged; the page reports press,
+  move and release (`overlay_drag`), Rust moves the window with the real
+  cursor position and saves the spot as the custom overlay position. All
+  window geometry work runs on the main thread.
 - **Settings window** (`index.html`, `src/`). Built on demand (tray,
   open-app key, second launch, first-run wizard), destroyed on close,
   never built when the OS starts the app at login.

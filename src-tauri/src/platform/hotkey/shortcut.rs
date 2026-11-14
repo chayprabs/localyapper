@@ -11,6 +11,24 @@ use std::sync::Mutex;
 use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
+/// The combo as the shortcut plugin spells it. Settings and the UI call
+/// the Windows / Command key `Meta` (the browser's name for it); the
+/// plugin only knows it as `Super`.
+pub fn plugin_combo(combo: &str) -> String {
+    combo
+        .split('+')
+        .map(|part| {
+            let part = part.trim();
+            if part.eq_ignore_ascii_case("meta") {
+                "Super"
+            } else {
+                part
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("+")
+}
+
 pub struct ShortcutBackend {
     app: AppHandle,
     ctl: ControllerHandle,
@@ -39,9 +57,10 @@ impl HotkeyBackend for ShortcutBackend {
         let ctl = self.ctl.clone();
         #[cfg(target_os = "linux")]
         let gate = self.gate.clone();
+        let spelled = plugin_combo(combo);
         self.app
             .global_shortcut()
-            .on_shortcut(combo, move |_app, _shortcut, event| {
+            .on_shortcut(spelled.as_str(), move |_app, _shortcut, event| {
                 let pressed = event.state == ShortcutState::Pressed;
                 let at_ms = ctl.now_ms();
                 #[cfg(target_os = "linux")]
@@ -53,7 +72,7 @@ impl HotkeyBackend for ShortcutBackend {
             })
             .map_err(|e| format!("Failed to register {} hotkey '{combo}': {e}", id.label()))?;
         if let Ok(mut r) = self.registered.lock() {
-            r.insert(id, combo.to_string());
+            r.insert(id, spelled);
         }
         Ok(())
     }
@@ -163,6 +182,79 @@ mod linux {
             if spawned.is_err() {
                 self.polling.store(false, Ordering::Release);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::plugin_combo;
+    use std::str::FromStr;
+    use tauri_plugin_global_shortcut::Shortcut;
+
+    #[test]
+    fn meta_is_spelled_super_for_the_plugin() {
+        assert_eq!(plugin_combo("Meta+Shift+J"), "Super+Shift+J");
+        assert_eq!(plugin_combo("Ctrl + meta + Space"), "Ctrl+Super+Space");
+        assert_eq!(plugin_combo("F8"), "F8");
+        // The plugin rejects `Meta` itself, which is why it is respelled.
+        assert!(Shortcut::from_str("Meta+J").is_err());
+        assert!(Shortcut::from_str(&plugin_combo("Meta+J")).is_ok());
+    }
+
+    #[test]
+    fn the_plugin_parses_every_key_name_the_ui_sends() {
+        // Names produced by src/lib/hotkeyCapture.ts.
+        for key in [
+            "A",
+            "Z",
+            "0",
+            "9",
+            "F1",
+            "F12",
+            "F13",
+            "F24",
+            "Space",
+            "Enter",
+            "Tab",
+            "Escape",
+            "Backspace",
+            "Delete",
+            "Insert",
+            "Home",
+            "End",
+            "PageUp",
+            "PageDown",
+            "ArrowUp",
+            "ArrowDown",
+            "ArrowLeft",
+            "ArrowRight",
+            "Backquote",
+            "Minus",
+            "Equal",
+            "BracketLeft",
+            "BracketRight",
+            "Backslash",
+            "Semicolon",
+            "Quote",
+            "Comma",
+            "Period",
+            "Slash",
+            "Numpad0",
+            "Numpad9",
+            "NumpadAdd",
+            "NumpadSubtract",
+            "NumpadMultiply",
+            "NumpadDivide",
+            "NumpadDecimal",
+            "NumpadEnter",
+            "CapsLock",
+            "ScrollLock",
+            "Pause",
+            "PrintScreen",
+        ] {
+            let combo = plugin_combo(&format!("Ctrl+Alt+{key}"));
+            assert!(Shortcut::from_str(&combo).is_ok(), "{key}");
         }
     }
 }
