@@ -17,6 +17,12 @@ export function AccessibilityStep({
   onContinue: () => void;
 }) {
   const [granted, setGranted] = useState(false);
+  // After a while without the grant, explain the usual reason.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSlow(true), 12000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +61,13 @@ export function AccessibilityStep({
       <p role="status" className="text-[12px] text-black/50 mb-4">
         {granted ? "Access granted." : "Waiting for access..."}
       </p>
+      {!granted && slow && (
+        <p className="mb-4 w-full rounded-lg border border-[#9a5a00]/20 bg-[#9a5a00]/[0.06] px-3 py-2 text-left text-[12px] text-[#7a4500]">
+          Already switched on in the list? After an update macOS can keep an
+          old entry that no longer counts. Select LocalYapper there, remove
+          it with the minus button, then add it again.
+        </p>
+      )}
       {granted ? (
         <button
           onClick={onContinue}

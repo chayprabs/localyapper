@@ -124,6 +124,10 @@ body {
   color: var(--error);
   white-space: normal;
 }
+.pill[data-kind="notice"] .label {
+  color: var(--fg);
+  white-space: normal;
+}
 .actions {
   display: none;
   gap: 6px;

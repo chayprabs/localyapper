@@ -26,6 +26,11 @@ pub enum ViewPayload {
         message: String,
         text: Option<String>,
     },
+    /// A short message that is not part of a dictation (the app has
+    /// started and is waiting in the tray).
+    Notice {
+        message: String,
+    },
 }
 
 impl From<&View> for ViewPayload {
@@ -113,6 +118,8 @@ pub trait OverlayBackend: Send + Sync {
     /// Microphone level in `[0, 1]`, about 30 times a second.
     fn level(&self, v: f32);
     fn hide(&self);
+    /// Show a short message for a few seconds.
+    fn notice(&self, _message: &str) {}
     fn configure(&self, _config: OverlayConfig) {}
     /// Where the overlay is on screen, if shown.
     fn rect(&self) -> Option<OverlayRect> {

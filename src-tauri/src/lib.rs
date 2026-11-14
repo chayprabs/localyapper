@@ -304,6 +304,18 @@ pub fn run() {
             if !setup_complete && !at_login && cli_action.is_none() {
                 show_or_create_main_window(app.handle());
             }
+            // Opened by hand after setup, the app starts in the tray with
+            // no window. Without a sign of life that looks like it failed
+            // to open, so the pill says it is running. Not at login, and
+            // not in test builds, which watch what the overlay shows.
+            if setup_complete && !at_login && cli_action.is_none() && !cfg!(feature = "test-hooks")
+            {
+                let state = app.state::<AppState>();
+                let hotkey = state.settings.get_or_default("hotkey_record");
+                state.controller.send(controller::Msg::Notice(format!(
+                    "LocalYapper is running in the tray. Hold {hotkey} to dictate."
+                )));
+            }
 
             {
                 use tauri_plugin_autostart::ManagerExt;

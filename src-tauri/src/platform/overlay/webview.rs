@@ -22,6 +22,9 @@ pub const HEIGHT: f64 = 96.0;
 /// Distance from the work-area edge in logical pixels.
 pub const MARGIN: f64 = 48.0;
 
+/// How long a notice stays on screen.
+pub const NOTICE_TIME: Duration = Duration::from_secs(5);
+
 /// How long a view stays before the overlay hides itself.
 pub fn hide_after(view: &View, preview: bool) -> Option<Duration> {
     match view {
@@ -312,6 +315,23 @@ impl WebviewOverlay {
         }
     }
 
+    /// Hide after `after`, unless something else was shown meanwhile.
+    fn hide_later(&self, generation: u64, after: Duration) {
+        let (gen, app) = (self.generation.clone(), self.app.clone());
+        let visible = self.visible.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(after).await;
+            if gen.load(Ordering::Acquire) == generation {
+                visible.store(false, Ordering::Release);
+                finish_drag_on_hide(&app);
+                let _ = app.emit_to(LABEL, "overlay-view", ViewPayload::Hidden);
+                if let Some(w) = app.get_webview_window(LABEL) {
+                    hide_window(&app, &w);
+                }
+            }
+        });
+    }
+
     fn config(&self) -> OverlayConfig {
         self.config.lock().map(|c| *c).unwrap_or_default()
     }
@@ -329,16 +349,44 @@ impl WebviewOverlay {
             };
             // A pill being dragged stays under the cursor when the view
             // changes (for example the key is released mid-drag).
-            if !dragging() {
-                if let Some(area) = work_area(&app) {
-                    let size = logical_size(&window, area.scale);
-                    let (x, y) = place_sized(area, position, size);
-
-                    let _ = window.set_position(PhysicalPosition::new(x, y));
-                }
+            let area = if dragging() { None } else { work_area(&app) };
+            if let Some(area) = area {
+                let size = logical_size(&window, area.scale);
+                let (x, y) = place_sized(area, position, size);
+                let _ = window.set_position(PhysicalPosition::new(x, y));
             }
             show_no_activate(&app, &window);
             let _ = window.set_ignore_cursor_events(false);
+        });
+        self.settle_position(position);
+    }
+
+    /// Some window systems only settle the window's size once it is on
+    /// screen (GTK grows it on its first show), which leaves it placed
+    /// for the wrong size. Shortly after a show, place it again if so.
+    fn settle_position(&self, position: OverlayPosition) {
+        let generation = self.generation.load(Ordering::Acquire);
+        let (gen, app) = (self.generation.clone(), self.app.clone());
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(120)).await;
+            if gen.load(Ordering::Acquire) != generation {
+                return;
+            }
+            let handle = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                if dragging() {
+                    return;
+                }
+                let (Some(window), Some(area)) =
+                    (handle.get_webview_window(LABEL), work_area(&handle))
+                else {
+                    return;
+                };
+                let want = place_sized(area, position, logical_size(&window, area.scale));
+                if window.outer_position().is_ok_and(|p| (p.x, p.y) != want) {
+                    let _ = window.set_position(PhysicalPosition::new(want.0, want.1));
+                }
+            });
         });
     }
 
@@ -479,20 +527,24 @@ impl OverlayBackend for WebviewOverlay {
         }
         self.show_window();
         if let Some(after) = hide {
-            let (gen, app) = (self.generation.clone(), self.app.clone());
-            let visible = self.visible.clone();
-            tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(after).await;
-                if gen.load(Ordering::Acquire) == generation {
-                    visible.store(false, Ordering::Release);
-                    finish_drag_on_hide(&app);
-                    let _ = app.emit_to(LABEL, "overlay-view", ViewPayload::Hidden);
-                    if let Some(w) = app.get_webview_window(LABEL) {
-                        hide_window(&app, &w);
-                    }
-                }
-            });
+            self.hide_later(generation, after);
         }
+    }
+
+    fn notice(&self, message: &str) {
+        let generation = self.generation.fetch_add(1, Ordering::AcqRel) + 1;
+        if !self.config().enabled {
+            return;
+        }
+        let _ = self.app.emit_to(
+            LABEL,
+            "overlay-view",
+            ViewPayload::Notice {
+                message: message.to_string(),
+            },
+        );
+        self.show_window();
+        self.hide_later(generation, NOTICE_TIME);
     }
 
     fn level(&self, v: f32) {

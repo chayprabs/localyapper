@@ -66,6 +66,8 @@ pub enum Msg {
     Cli(CliAction),
     /// Wizard hotkey test: record presses emit `hotkey-detected` only.
     HotkeyProbe(bool),
+    /// Show a short message in the overlay (the app started in the tray).
+    Notice(String),
     /// The overlay's Copy button: put the error's text on the clipboard.
     OverlayCopy,
     /// The overlay's dismiss button.
@@ -500,6 +502,16 @@ impl Controller {
                 self.overlay.hide();
             }
             Msg::OverlayDismiss => self.overlay.hide(),
+            Msg::Notice(message) => {
+                // Never over a dictation.
+                if self.session.is_idle() {
+                    self.last_view = Some(crate::platform::overlay::ViewPayload::Notice {
+                        message: message.clone(),
+                    });
+                    self.overlay.ensure();
+                    self.overlay.notice(&message);
+                }
+            }
             Msg::HotkeyProbe(on) => {
                 self.probe = on;
                 if on {

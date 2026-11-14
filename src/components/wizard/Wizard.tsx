@@ -80,7 +80,13 @@ export function Wizard() {
           />
         );
       case "try":
-        return <TryStep hotkey={wizard.hotkey} onContinue={wizard.goNext} />;
+        return (
+          <TryStep
+            hotkey={wizard.hotkey}
+            filesInstalled={wizard.filesInstalled}
+            onContinue={wizard.goNext}
+          />
+        );
       case "done":
         return (
           <ReadyStep

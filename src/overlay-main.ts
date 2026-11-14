@@ -14,7 +14,8 @@ type View =
   | { kind: "processing" }
   | { kind: "done"; text: string }
   | { kind: "no_speech" }
-  | { kind: "error"; message: string; text: string | null };
+  | { kind: "error"; message: string; text: string | null }
+  | { kind: "notice"; message: string };
 
 declare global {
   interface Window {
@@ -44,6 +45,7 @@ function labelFor(view: View): string {
     case "no_speech":
       return "No speech heard";
     case "error":
+    case "notice":
       return view.message;
     case "hidden":
       return "";
