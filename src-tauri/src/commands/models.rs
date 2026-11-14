@@ -260,6 +260,12 @@ async fn download_model_inner(
             return Ok(());
         }
         log::warn!("models: {id} failed its checksum; downloading it again");
+        // A loaded model keeps its files open, and on Windows an open
+        // file cannot be replaced.
+        if state.models.loaded_id().as_deref() == Some(id) {
+            let models = state.models.clone();
+            let _ = tokio::task::spawn_blocking(move || models.evict_blocking()).await;
+        }
     }
     let _ = std::fs::remove_file(dir.join(catalog::VERIFIED_MARKER));
 

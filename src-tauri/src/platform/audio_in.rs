@@ -43,10 +43,10 @@ enum Cmd {
         on_error: ErrorFn,
         reply: mpsc::Sender<Result<Capture, String>>,
     },
-    /// Stop the stream. With a flag, only the capture that was started
-    /// with that same `stopped` flag: a late stop for an old recording
-    /// must never end the next one.
-    Stop(Option<Arc<AtomicBool>>),
+    /// Stop the capture that was started with this `stopped` flag, and
+    /// no other: a late stop for an old recording must never end the
+    /// next one.
+    Stop(Arc<AtomicBool>),
     Shutdown,
 }
 
@@ -89,15 +89,12 @@ impl AudioThread {
         }
     }
 
-    /// Stop whatever stream is running. The `stopped` flag given to
-    /// `start` is set once the stream has been dropped.
-    pub fn stop(&self) {
-        let _ = self.tx.send(Cmd::Stop(None));
-    }
-
     /// Stop the capture started with this `stopped` flag, and no other.
+    /// The flag is set once the stream has been dropped. A stop that
+    /// arrives before its start has been handled finds nothing; whoever
+    /// started the capture then stops it once `start` returns.
     pub fn stop_capture(&self, stopped: &Arc<AtomicBool>) {
-        let _ = self.tx.send(Cmd::Stop(Some(stopped.clone())));
+        let _ = self.tx.send(Cmd::Stop(stopped.clone()));
     }
 }
 
@@ -182,11 +179,9 @@ fn run(rx: mpsc::Receiver<Cmd>) {
                 }
             }
             Cmd::Stop(target) => {
-                let matches = match (&active, &target) {
-                    (Some(a), Some(flag)) => Arc::ptr_eq(&a.stopped, flag),
-                    (Some(_), None) => true,
-                    (None, _) => false,
-                };
+                let matches = active
+                    .as_ref()
+                    .is_some_and(|a| Arc::ptr_eq(&a.stopped, &target));
                 if matches {
                     if let Some(a) = active.take() {
                         a.finish();
