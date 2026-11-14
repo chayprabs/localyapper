@@ -25,7 +25,13 @@ export function CopyButton({
 
   const handleCopy = useCallback(async () => {
     if (copied) return;
-    await navigator.clipboard.writeText(text);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (error) {
+      // No tick when nothing was copied.
+      console.error("Copy failed:", error);
+      return;
+    }
     setCopied(true);
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current);

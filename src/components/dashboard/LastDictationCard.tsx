@@ -2,7 +2,7 @@
 import type { HistoryEntry } from "@/types/commands";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Icon } from "@/components/ui/Icon";
-import { formatRelativeTime } from "@/lib/formatters";
+import { formatRelativeTime, formatWordCount } from "@/lib/formatters";
 
 interface LastDictationCardProps {
   entry: HistoryEntry | null;
@@ -64,7 +64,7 @@ export function LastDictationCard({ entry, onDelete }: LastDictationCardProps) {
         <div className="flex items-center gap-2">
           <Icon name="description" size={18} className="text-black/50" />
           <span className="text-[13px] font-medium text-black/50">
-            {entry.word_count ?? 0} words
+            {formatWordCount(entry.word_count)}
           </span>
         </div>
         <button

@@ -145,6 +145,16 @@ export function SpeechPage() {
                         Use
                       </button>
                     )}
+                    {/* Checks every file against its checksum and fetches
+                        again only what is missing or damaged. */}
+                    <button
+                      className="text-[12px] text-[#0058bc] hover:underline disabled:opacity-40"
+                      disabled={busy !== null}
+                      title="Check the downloaded files and repair them if needed"
+                      onClick={() => void run(m.id, () => downloadModel(m.id))}
+                    >
+                      Check files
+                    </button>
                     <button
                       className="text-[12px] text-[#ba1a1a] hover:underline disabled:opacity-40"
                       disabled={busy !== null}

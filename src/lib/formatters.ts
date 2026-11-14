@@ -5,6 +5,12 @@ export function formatNumber(n: number): string {
   return numberFormatter.format(n);
 }
 
+/** "1 word", "12 words". */
+export function formatWordCount(count: number | null | undefined): string {
+  const n = count ?? 0;
+  return `${formatNumber(n)} word${n === 1 ? "" : "s"}`;
+}
+
 /**
  * History rows store UTC: ISO-8601 with `Z` now, "YYYY-MM-DD HH:MM:SS"
  * in databases written before version 2.

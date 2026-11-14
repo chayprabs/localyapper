@@ -45,13 +45,13 @@ function SummaryRow({ icon, label, value, tone, detail }: SummaryRowProps) {
         : "text-black/55";
 
   return (
-    <div className="flex items-start gap-3 border-b border-black/[0.06] py-3 last:border-b-0">
+    <div className="flex items-start gap-3 border-b border-black/[0.06] py-2 last:border-b-0">
       <Icon name={icon} size={18} className={`${toneClass} mt-[2px] shrink-0`} />
       <div className="min-w-0 flex-1 text-left">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.06em] text-black/[0.40]">
-          {label}
+        <p className="text-[13px] text-black/85">
+          <span className="text-black/50">{label}: </span>
+          <span className="font-medium">{value}</span>
         </p>
-        <p className="mt-0.5 text-[13px] font-medium text-black/85">{value}</p>
         {detail && (
           <p className="mt-0.5 text-[12px] text-black/50">{detail}</p>
         )}
@@ -81,62 +81,63 @@ export function ReadyStep({
 
   return (
     <div className="flex flex-col items-center text-center">
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#006b19]/[0.08] shadow-[0_0_24px_rgba(40,205,65,0.20)]">
-        <Icon name="check_circle" size={32} className="text-[#006b19]" />
+      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#006b19]/[0.08] shadow-[0_0_24px_rgba(40,205,65,0.20)]">
+        <Icon name="check_circle" size={26} className="text-[#006b19]" />
       </div>
 
-      <h2 className="mb-2 text-[22px] font-semibold text-black/85">
+      <h2 className="mb-1.5 text-[22px] font-semibold text-black/85">
         You're ready to dictate
       </h2>
-      <p className="mb-6 max-w-[360px] text-[14px] leading-relaxed text-black/50">
-        Hold your hotkey anywhere on this device and speak. Words appear in the
-        focused app the moment you let go.
+      <p className="mb-4 max-w-[380px] text-[13px] leading-relaxed text-black/50">
+        Hold your hotkey in any app and speak. The words appear where your
+        cursor is when you let go.
       </p>
 
-      <div className="mb-6 inline-flex items-center gap-1.5 rounded-[10px] border border-black/[0.07] bg-black/[0.03] px-4 py-2">
-        {hotkeyParts.map((part, i) => (
-          <span
-            key={i}
-            className="flex h-7 items-center rounded-[6px] border border-black/[0.06] bg-surface px-2.5 font-mono text-[13px] font-medium text-black/85 shadow-sm"
-          >
-            {part}
-          </span>
-        ))}
-      </div>
-
-      <div className="mb-6 w-full rounded-[10px] border border-black/[0.07] bg-surface px-4 py-1 text-left">
-        <SummaryRow
-          icon="keyboard"
-          label="Dictation hotkey"
-          value={hotkey}
-          tone="ok"
-          detail="Hold to dictate. Double-tap to toggle hands-free."
-        />
+      <div className="mb-4 w-full rounded-[10px] border border-black/[0.07] bg-surface px-4 py-1 text-left">
+        <div className="flex items-start gap-3 border-b border-black/[0.06] py-2">
+          <Icon name="keyboard" size={18} className="mt-[2px] shrink-0 text-[#006b19]" />
+          <div className="min-w-0 flex-1 text-left">
+            <p className="flex flex-wrap items-center gap-1.5 text-[13px] text-black/50">
+              Hotkey:
+              {hotkeyParts.map((part, i) => (
+                <span
+                  key={i}
+                  className="flex h-6 items-center rounded-[6px] border border-black/[0.08] bg-black/[0.03] px-2 font-mono text-[12px] font-medium text-black/85"
+                >
+                  {part}
+                </span>
+              ))}
+            </p>
+            <p className="mt-0.5 text-[12px] text-black/50">
+              Hold to dictate. Double-tap to keep recording hands-free.
+            </p>
+          </div>
+        </div>
         <SummaryRow
           icon={micGranted ? "mic" : "mic_off"}
           label="Microphone"
-          value={micGranted ? "Detected" : "No input device found"}
+          value={micGranted ? "Ready" : "Not found"}
           tone={micGranted ? "ok" : "warn"}
           detail={
             micGranted
-              ? "Default input device is ready."
-              : "Add or grant a microphone before dictating."
+              ? undefined
+              : "Connect or allow a microphone before dictating."
           }
         />
         <SummaryRow
           icon={filesInstalled ? "check_circle" : "cloud_off"}
-          label="Speech engine"
-          value={filesInstalled ? "Speech model installed" : "Not installed yet"}
+          label="Speech model"
+          value={filesInstalled ? "Installed" : "Not installed yet"}
           tone={filesInstalled ? "ok" : "warn"}
           detail={
             filesInstalled
-              ? "The model runs on this computer, offline."
-              : "Open Speech in the app to install the model later."
+              ? undefined
+              : "Dictation will not work until it is downloaded from the Speech page."
           }
         />
       </div>
 
-      <label className="mb-5 flex w-full items-center gap-2 text-left text-[13px] text-black/70">
+      <label className="mb-4 flex w-full items-center gap-2 text-left text-[13px] text-black/70">
         <input
           type="checkbox"
           checked={launchAtLogin}

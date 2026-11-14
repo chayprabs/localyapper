@@ -52,3 +52,20 @@ body {
 * {
   scrollbar-width: none;
 }
+
+/* The wizard's card area is the one place where a hidden scrollbar would
+   hide a button on a small window, so it shows a thin one when needed. */
+.wizard-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--ink) / 0.2) transparent;
+}
+
+.wizard-scroll::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+}
+
+.wizard-scroll::-webkit-scrollbar-thumb {
+  background: rgb(var(--ink) / 0.2);
+  border-radius: 4px;
+}

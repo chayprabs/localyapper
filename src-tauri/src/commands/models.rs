@@ -66,6 +66,9 @@ impl Downloads {
     }
 }
 
+/// The shortest time between two download progress events.
+const PROGRESS_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
+
 /// The embedded manifest, parsed once.
 pub(crate) fn manifest() -> Result<&'static Manifest, String> {
     static M: OnceLock<Result<Manifest, String>> = OnceLock::new();
@@ -198,7 +201,21 @@ async fn download_model_inner(
         })
         .collect();
 
+    // The downloader reports every network chunk, tens of thousands of
+    // times for one model. The windows hear about it ten times a second,
+    // and always about the last byte.
+    let last_emit = Mutex::new(None::<std::time::Instant>);
     let report = |downloaded: u64, total: u64, speed_mbps: f64| {
+        if downloaded < total {
+            let Ok(mut last) = last_emit.lock() else {
+                return;
+            };
+            let now = std::time::Instant::now();
+            if last.is_some_and(|t| now.duration_since(t) < PROGRESS_INTERVAL) {
+                return;
+            }
+            *last = Some(now);
+        }
         let percent = if total > 0 {
             100.0 * downloaded as f64 / total as f64
         } else {
@@ -416,7 +433,8 @@ pub async fn check_speech_model_file_exists(
     Ok(SpeechModelFileStatus {
         exists,
         size_mb: entry.total_size() / 1_000_000,
-        model_name: id,
+        // The catalog's display name ("Parakeet 110M"), not the id.
+        model_name: entry.name.clone(),
     })
 }
 

@@ -26,6 +26,12 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 /// Everything the controller can be told.
 /// How long the overlay window stays alive after the last dictation.
 const OVERLAY_IDLE: Duration = Duration::from_secs(600);
+/// After the key is released, transcription may go this long without any
+/// progress (a segment decoded, the capture ending, the model loading)
+/// before the dictation is given up. Without it a capture or decode that
+/// died would leave the app showing "Transcribing" and ignoring the key
+/// until it was restarted.
+const FINISH_STALL: Duration = Duration::from_secs(90);
 
 #[derive(Debug)]
 pub enum Msg {
@@ -42,6 +48,12 @@ pub enum Msg {
     /// Ten minutes after the last dictation: release the overlay window.
     OverlayTimer {
         generation: u64,
+    },
+    /// `FINISH_STALL` after the release of recording `id`, or after the
+    /// last check that found progress.
+    FinishWatchdog {
+        id: SessionId,
+        progress: u64,
     },
     /// Release the overlay window now (the timer, and the test channel).
     ReleaseOverlay,
@@ -236,8 +248,12 @@ impl ControllerSettings {
 
 /// Flags for one recording's capture.
 struct CaptureFlags {
+    /// Set by the audio thread once the stream is gone.
     stopped: Arc<AtomicBool>,
     discard: Arc<AtomicBool>,
+    /// The key was released. A release that beats the stream's start is
+    /// honoured as soon as the stream exists.
+    stop_requested: Arc<AtomicBool>,
 }
 
 /// Timestamps for the stage-timing log line.
@@ -283,6 +299,8 @@ pub struct Controller {
     record_ups: u64,
     captures: HashMap<SessionId, CaptureFlags>,
     current_id: Option<SessionId>,
+    /// Counts signs of life from the capture and the decoder.
+    finish_progress: u64,
     timing: Timing,
     target_app: ForegroundApp,
     /// The cancel combo registered now, if any. Never re-read from
@@ -361,6 +379,7 @@ pub fn start(parts: ControllerParts) -> Result<Started, String> {
         record_ups: 0,
         captures: HashMap::new(),
         current_id: None,
+        finish_progress: 0,
         timing: Timing::default(),
         target_app: ForegroundApp::default(),
         cancel_registered: None,
@@ -434,6 +453,26 @@ impl Controller {
             Msg::OverlayTimer { generation } => {
                 if generation == self.overlay_generation && self.session.is_idle() {
                     self.overlay.release();
+                }
+            }
+            Msg::FinishWatchdog { id, progress } => {
+                let finishing = self.current_id == Some(id)
+                    && !self.session.is_idle()
+                    && !self.session.is_recording();
+                if !finishing {
+                    return;
+                }
+                if progress == self.finish_progress {
+                    log::error!(
+                        "controller: session {id} made no progress for {} s after release; giving up",
+                        FINISH_STALL.as_secs()
+                    );
+                    self.feed(Event::CaptureFailed {
+                        id,
+                        message: "Transcription did not finish. Please try again.".into(),
+                    });
+                } else {
+                    self.watch_finish(id);
                 }
             }
             Msg::ReleaseOverlay => {
@@ -569,10 +608,12 @@ impl Controller {
                 segments,
                 audio_ms,
             } if self.current_id == Some(*id) => {
+                self.finish_progress += 1;
                 self.timing.segments = *segments;
                 self.timing.audio_ms = *audio_ms;
                 self.captures.remove(id);
             }
+            Event::SegmentQueued { .. } | Event::SegmentText { .. } => self.finish_progress += 1,
             _ => {}
         }
         let effects = self.session.handle(ev);
@@ -612,14 +653,20 @@ impl Controller {
                 if self.current_id == Some(id) {
                     self.timing.released = Some(Instant::now());
                 }
-                self.audio.stop();
+                // Stops are aimed at this recording's stream only, so one
+                // that arrives late can never end the next recording.
+                if let Some(f) = self.captures.get(&id) {
+                    f.stop_requested.store(true, Ordering::Release);
+                    self.audio.stop_capture(&f.stopped);
+                }
+                self.watch_finish(id);
             }
             Effect::DiscardCapture { id } => {
                 if let Some(f) = self.captures.remove(&id) {
                     f.discard.store(true, Ordering::Release);
+                    self.audio.stop_capture(&f.stopped);
                 }
                 self.worker.discard(id);
-                self.audio.stop();
             }
             Effect::Overlay(view) => {
                 self.last_view = Some((&view).into());
@@ -655,9 +702,11 @@ impl Controller {
         let flags = CaptureFlags {
             stopped: Arc::new(AtomicBool::new(false)),
             discard: Arc::new(AtomicBool::new(false)),
+            stop_requested: Arc::new(AtomicBool::new(false)),
         };
         let stopped = flags.stopped.clone();
         let discard = flags.discard.clone();
+        let stop_requested = flags.stop_requested.clone();
         self.captures.insert(id, flags);
 
         let audio = self.audio.clone();
@@ -681,8 +730,14 @@ impl Controller {
                 }
             };
             if discard.load(Ordering::Acquire) {
-                audio.stop();
+                audio.stop_capture(&stopped);
                 return;
+            }
+            if stop_requested.load(Ordering::Acquire) {
+                // Released before the stream existed: the stop sent then
+                // found nothing, so stop now. The segmenter still runs and
+                // reports the (near empty) capture as ended.
+                audio.stop_capture(&stopped);
             }
             handle.send(Msg::CaptureStarted {
                 id,
@@ -720,6 +775,7 @@ impl Controller {
     fn on_worker(&mut self, ev: WorkerEvent) {
         match ev {
             WorkerEvent::Loaded { model, outcome } => {
+                self.finish_progress += 1;
                 if self.timing.model_ready.is_none() {
                     self.timing.model_ready = Some(Instant::now());
                 }
@@ -780,6 +836,16 @@ impl Controller {
         if self.timing.released.is_some() {
             self.timing.tail_decode_ms += decode_ms;
         }
+    }
+
+    /// Check on recording `id` once `FINISH_STALL` has passed.
+    fn watch_finish(&self, id: SessionId) {
+        let handle = self.handle.clone();
+        let progress = self.finish_progress;
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(FINISH_STALL).await;
+            handle.send(Msg::FinishWatchdog { id, progress });
+        });
     }
 
     fn start_timer(&self, kind: TimerKind, id: SessionId, after_ms: u64) {
@@ -984,6 +1050,7 @@ fn spawn_segmenter(
     handle: ControllerHandle,
     tap: LevelTap,
 ) {
+    let spawn_failed = handle.clone();
     let spawned = std::thread::Builder::new()
         .name(format!("segmenter-{id}"))
         .spawn(move || {
@@ -1026,6 +1093,11 @@ fn spawn_segmenter(
         });
     if let Err(e) = spawned {
         log::error!("controller: could not start the segmenter: {e}");
+        // Without this the recording would never end.
+        spawn_failed.send(Msg::Session(Event::CaptureFailed {
+            id,
+            message: "Could not start recording. Please try again.".into(),
+        }));
     }
 }
 

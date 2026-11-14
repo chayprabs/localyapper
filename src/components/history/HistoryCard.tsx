@@ -2,7 +2,8 @@
 import type { HistoryEntry } from "@/types/commands";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Icon } from "@/components/ui/Icon";
-import { formatLocalTime } from "@/lib/formatters";
+import { useEffect, useState } from "react";
+import { formatLocalTime, formatWordCount } from "@/lib/formatters";
 
 interface HistoryCardProps {
   entry: HistoryEntry;
@@ -11,10 +12,23 @@ interface HistoryCardProps {
 }
 
 export function HistoryCard({ entry, onDelete, confirmDelete = true }: HistoryCardProps) {
+  // The first click asks, the second deletes. (A browser confirm box is
+  // not shown by every system WebView, which made Delete do nothing.)
+  const [asking, setAsking] = useState(false);
+  // Long dictations show two lines until clicked.
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    if (!asking) return;
+    const timer = window.setTimeout(() => setAsking(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [asking]);
+
   const handleDelete = () => {
-    if (confirmDelete && !window.confirm("Delete this dictation?")) {
+    if (confirmDelete && !asking) {
+      setAsking(true);
       return;
     }
+    setAsking(false);
     onDelete(entry.id);
   };
 
@@ -27,7 +41,7 @@ export function HistoryCard({ entry, onDelete, confirmDelete = true }: HistoryCa
           </span>
           <span className="text-[12px] text-black/[0.26]">&middot;</span>
           <span className="text-[12px] text-black/[0.26]">
-            {entry.word_count ?? 0} words
+            {formatWordCount(entry.word_count)}
           </span>
         </div>
 
@@ -46,15 +60,25 @@ export function HistoryCard({ entry, onDelete, confirmDelete = true }: HistoryCa
           <button
             type="button"
             onClick={handleDelete}
-            aria-label="Delete dictation"
-            className="w-8 h-8 flex items-center justify-center rounded-md text-black/[0.26] hover:bg-[#ba1a1a]/[0.08] hover:text-[#ba1a1a] transition-colors"
+            aria-label={asking ? "Confirm delete" : "Delete dictation"}
+            className={
+              asking
+                ? "h-8 px-2.5 flex items-center justify-center rounded-md bg-[#ba1a1a] text-[12px] font-medium text-white transition-colors"
+                : "w-8 h-8 flex items-center justify-center rounded-md text-black/[0.26] hover:bg-[#ba1a1a]/[0.08] hover:text-[#ba1a1a] transition-colors"
+            }
           >
-            <Icon name="delete" size={18} />
+            {asking ? "Delete?" : <Icon name="delete" size={18} />}
           </button>
         </div>
       </div>
 
-      <p className="text-[13px] leading-[1.5] text-black/85 line-clamp-2">
+      <p
+        onClick={() => setExpanded((v) => !v)}
+        title={expanded ? undefined : "Click to show all of it"}
+        className={`cursor-pointer whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-black/85 ${
+          expanded ? "" : "line-clamp-2"
+        }`}
+      >
         {entry.final_text}
       </p>
     </div>

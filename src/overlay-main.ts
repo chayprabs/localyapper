@@ -87,6 +87,20 @@ void listen<number>("overlay-level", (e) => {
   if (window.__LY_TEST__) void invoke("test_overlay_seen", { kind: null, level: e.payload });
 });
 
+// The pill follows the app's theme setting, like the settings window.
+function applyTheme(theme: string): void {
+  const root = document.documentElement;
+  if (theme === "light" || theme === "dark") {
+    root.dataset.theme = theme;
+  } else {
+    delete root.dataset.theme;
+  }
+}
+void invoke<string>("get_setting", { key: "theme" })
+  .then(applyTheme)
+  .catch(() => undefined);
+void listen<string>("theme-changed", (e) => applyTheme(e.payload));
+
 document.getElementById("copy")?.addEventListener("click", () => {
   void invoke("overlay_copy");
 });

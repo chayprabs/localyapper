@@ -9,8 +9,10 @@
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
   color-scheme: light dark;
 }
+/* "system" follows the OS; the theme setting puts data-theme on <html>
+   to force light or dark, as in the settings window. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: rgba(32, 32, 36, 0.96);
     --fg: rgba(255, 255, 255, 0.9);
     --muted: rgba(255, 255, 255, 0.55);
@@ -19,6 +21,15 @@
     --error: #ff7b72;
     --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   }
+}
+:root[data-theme="dark"] {
+  --bg: rgba(32, 32, 36, 0.96);
+  --fg: rgba(255, 255, 255, 0.9);
+  --muted: rgba(255, 255, 255, 0.55);
+  --border: rgba(255, 255, 255, 0.12);
+  --accent: #4c9bff;
+  --error: #ff7b72;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 html,
 body {
