@@ -97,6 +97,8 @@ export function Row({
       <div className="flex min-h-7 items-center justify-between gap-4">
         <div className="flex min-w-0 items-baseline gap-2.5">
           <span className="shrink-0 text-[13px] text-ink/90">{label}</span>
+          {/* Sighted users get the hint as a tooltip; screen readers read it here. */}
+          {hint && <span className="sr-only">{hint}</span>}
           {detail && <span className="min-w-0 truncate text-[12px] text-ink/40">{detail}</span>}
         </div>
         {children && <div className="shrink-0">{children}</div>}

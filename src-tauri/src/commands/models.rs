@@ -290,7 +290,7 @@ pub(crate) fn migrate_legacy_install(models_dir: &std::path::Path) {
     });
 }
 
-// Commands for the wizard and dashboard, which work on the active model.
+// Commands for the wizard and History page, which work on the active model.
 
 /// Download the model the `speech_model` setting resolves to.
 #[tauri::command]

@@ -1,6 +1,5 @@
 // Icons: short names mapped to tree-shakable lucide-react SVGs, so only the
 // icons that are drawn ship in the bundle.
-import type { CSSProperties } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -38,7 +37,6 @@ interface IconProps {
   size?: number;
   /** Extra classes to compose alongside any layout/colour utilities. */
   className?: string;
-  style?: CSSProperties;
   /** SVG stroke weight. */
   strokeWidth?: number;
 }
@@ -47,7 +45,6 @@ export function Icon({
   name,
   size = 20,
   className,
-  style,
   strokeWidth = 1.75,
 }: IconProps) {
   const Component = REGISTRY[name];
@@ -56,7 +53,6 @@ export function Icon({
       size={size}
       strokeWidth={strokeWidth}
       className={className}
-      style={style}
       aria-hidden="true"
     />
   );

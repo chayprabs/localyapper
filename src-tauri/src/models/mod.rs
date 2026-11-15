@@ -31,7 +31,7 @@ pub struct DownloadProgress {
     pub speed_mbps: f64,
 }
 
-/// Dashboard statistics aggregated from transcription_history.
+/// Word statistics aggregated from transcription_history.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Stats {
     /// Words dictated in the current calendar day (UTC).

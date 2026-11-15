@@ -15,18 +15,21 @@ interface MicrophoneStepProps {
 }
 
 export function MicrophoneStep({ permissions, loading, refresh, openSettings, onContinue }: MicrophoneStepProps) {
+  // Until the first answer arrives (the OS may be showing its prompt), the
+  // status reads as checking.
+  const checking = loading || permissions === null;
   const granted = permissions?.microphone === true;
   const denied = permissions != null && permissions.microphone === false;
 
   return (
     <Step title="Microphone" text="Used only while you hold the hotkey.">
       <p role="status" className="flex h-5 items-center gap-2.5 text-[13px] text-ink/90">
-        {loading ? (
+        {checking ? (
           <Spinner size={13} />
         ) : (
-          <span className={cn("h-1.5 w-1.5 rounded-full", granted ? "bg-ink" : denied ? "bg-signal" : "border border-ink/30")} />
+          <span className={cn("h-1.5 w-1.5 rounded-full", granted ? "bg-ink" : "bg-signal")} />
         )}
-        {loading ? "Checking" : granted ? "Ready" : denied ? "No microphone available" : "Not checked"}
+        {checking ? "Checking" : granted ? "Ready" : "No microphone available"}
       </p>
       <Actions>
         <Button variant="primary" size="lg" onClick={onContinue} disabled={loading}>

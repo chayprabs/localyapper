@@ -1,9 +1,9 @@
 // History page -- the main page: hotkey and status on top, then the
 // searchable list of past dictations grouped by day
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useHistory } from "@/hooks/useHistory";
-import { useHome } from "@/hooks/useHome";
+import { useStatus } from "@/hooks/useStatus";
 import { activePageAtom, pausedAtom } from "@/stores/appStore";
 import { exportHistory } from "@/lib/commands/history";
 import { formatLocalDay, formatLocalTime, formatNumber } from "@/lib/formatters";
@@ -34,6 +34,7 @@ function groupByDay(entries: HistoryEntry[]): { day: string; items: HistoryEntry
 function Entry({ entry, onDelete }: { entry: HistoryEntry; onDelete: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const armedAt = useRef(0);
 
   // The delete confirmation withdraws itself after a few seconds.
   useEffect(() => {
@@ -48,7 +49,10 @@ function Entry({ entry, onDelete }: { entry: HistoryEntry; onDelete: (id: string
         {formatLocalTime(entry.created_at)}
       </time>
       <p
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          // Dragging to select text ends in a click too; leave the text as it is.
+          if (window.getSelection()?.isCollapsed !== false) setOpen((v) => !v);
+        }}
         className={cn("selectable min-w-0 flex-1 text-[13px] leading-5 text-ink/90", !open && "line-clamp-2")}
       >
         {entry.final_text}
@@ -72,13 +76,29 @@ function Entry({ entry, onDelete }: { entry: HistoryEntry; onDelete: (id: string
           )}
         >
           {confirming ? (
-            <Button variant="danger" className="h-6 animate-fade-in px-2" onClick={() => onDelete(entry.id)}>
+            <Button
+              variant="danger"
+              autoFocus
+              className="h-6 animate-fade-in px-2"
+              onClick={() => {
+                // A double-click on the bin must not also confirm.
+                if (Date.now() - armedAt.current > 400) onDelete(entry.id);
+              }}
+            >
               Delete
             </Button>
           ) : (
             <>
               <CopyButton text={entry.final_text} />
-              <IconButton label="Delete" tone="danger" className="-mr-1.5" onClick={() => setConfirming(true)}>
+              <IconButton
+                label="Delete"
+                tone="danger"
+                className="-mr-1.5"
+                onClick={() => {
+                  armedAt.current = Date.now();
+                  setConfirming(true);
+                }}
+              >
                 <Icon name="delete" size={14} />
               </IconButton>
             </>
@@ -101,7 +121,7 @@ export function HistoryPage() {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const { entries, isLoading, hasMore, error, loadMore, deleteEntry, clearAll } = useHistory(search);
-  const home = useHome();
+  const app = useStatus();
   const paused = useAtomValue(pausedAtom) === true;
   const setActivePage = useSetAtom(activePageAtom);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -121,7 +141,7 @@ export function HistoryPage() {
     if (isEmpty) setConfirmClear(false);
   }, [isEmpty]);
 
-  if (isLoading || home.isLoading) {
+  if (isLoading || app.isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
         <Spinner />
@@ -136,20 +156,20 @@ export function HistoryPage() {
       .catch((err: unknown) => setExportNote({ ok: false, text: errorText(err) }));
   };
 
-  const noModel = home.modelFileStatus !== null && !home.modelFileStatus.exists;
-  const status: ReactNode = paused ? (
-    "Paused"
-  ) : noModel ? (
+  const noModel = app.modelFileStatus !== null && !app.modelFileStatus.exists;
+  const status: ReactNode = noModel ? (
     <>
       No speech model
       <Button onClick={() => setActivePage("voice")}>Download</Button>
     </>
+  ) : paused ? (
+    "Paused"
   ) : (
     "Hold to dictate"
   );
   const notices = (
     <>
-      {home.error && <Notice>{home.error}</Notice>}
+      {app.error && <Notice>{app.error}</Notice>}
       {error && <Notice>{error}</Notice>}
       {exportNote && <Notice tone={exportNote.ok ? "note" : "error"}>{exportNote.text}</Notice>}
     </>
@@ -159,19 +179,19 @@ export function HistoryPage() {
   if (noHistory) {
     return (
       <div className="flex h-full animate-fade-in flex-col items-center justify-center gap-5 px-6 pb-10">
-        <Keys hotkey={home.recordHotkey} size="xl" />
+        <Keys hotkey={app.recordHotkey} size="xl" />
         <div className="flex items-center gap-3 text-[13px] text-ink/55">{status}</div>
         {notices}
       </div>
     );
   }
 
-  const stats = home.stats;
+  const stats = app.stats;
   return (
     <Page className="gap-0">
       <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <div className="flex items-center gap-3 text-[13px] text-ink/55">
-          <Keys hotkey={home.recordHotkey} size="lg" />
+          <Keys hotkey={app.recordHotkey} size="lg" />
           {status}
         </div>
         {stats && (
@@ -206,7 +226,7 @@ export function HistoryPage() {
               className="h-6 px-2"
               onClick={() => {
                 setConfirmClear(false);
-                void clearAll();
+                void clearAll().then(app.refresh);
               }}
             >
               Delete all
@@ -235,7 +255,7 @@ export function HistoryPage() {
               <h2 className="pb-1 text-[12px] text-ink/45">{group.day}</h2>
               <ul className="divide-y divide-ink/[0.08]">
                 {group.items.map((entry) => (
-                  <Entry key={entry.id} entry={entry} onDelete={(id) => void deleteEntry(id)} />
+                  <Entry key={entry.id} entry={entry} onDelete={(id) => void deleteEntry(id).then(app.refresh)} />
                 ))}
               </ul>
             </section>

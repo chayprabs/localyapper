@@ -102,6 +102,7 @@ export function TitleBar({ showTabs }: { showTabs: boolean }) {
       <div data-tauri-drag-region className="flex min-w-0 flex-1 items-center justify-end pr-3">
         {paused === true && (
           <span
+            data-tauri-drag-region
             className="animate-fade-in text-[12px] text-ink/45"
             title="Resume from the tray menu to use the hotkey again."
           >

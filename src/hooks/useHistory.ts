@@ -19,7 +19,6 @@ interface HistoryData {
   loadMore: () => void;
   deleteEntry: (id: string) => Promise<void>;
   clearAll: () => Promise<void>;
-  refresh: () => void;
 }
 
 function toErrorMessage(error: unknown, fallback: string): string {
@@ -37,8 +36,10 @@ export function useHistory(search = ""): HistoryData {
   const [error, setError] = useState<string | null>(null);
   const offsetRef = useRef(0);
 
+  // Only the first load reports isLoading; later fetches (a new search, a
+  // finished dictation) swap the entries in place so the page keeps its
+  // search field, focus and scroll position.
   const fetchInitial = useCallback(async () => {
-    setIsLoading(true);
     try {
       const result = await getHistory(PAGE_SIZE, 0, search || null);
       setEntries(result);
@@ -116,6 +117,5 @@ export function useHistory(search = ""): HistoryData {
     loadMore: () => void loadMore(),
     deleteEntry,
     clearAll,
-    refresh: () => void fetchInitial(),
   };
 }

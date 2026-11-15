@@ -61,7 +61,7 @@ pub enum Msg {
     SetPaused(bool),
     /// Settings changed in the database: re-read them.
     ReloadSettings,
-    /// The Audio page's test: start (true) or stop (false) a dictation
+    /// The Voice page's test: start (true) or stop (false) a dictation
     /// whose text is reported to the settings window instead of pasted.
     TestDictation(bool),
     /// Read the state for diagnostics and the test channel.
@@ -118,7 +118,7 @@ pub struct Snapshot {
     /// Record-key events received (after any repeat filter).
     pub record_downs: u64,
     pub record_ups: u64,
-    /// Test dictations finished (Audio page).
+    /// Test dictations finished (Voice page).
     pub tests: u64,
     /// Text of the last test dictation, for the smoke test only.
     #[cfg(feature = "test-hooks")]
@@ -296,7 +296,7 @@ pub struct Controller {
     last_view: Option<crate::platform::overlay::ViewPayload>,
     last_timings: Option<StageTimings>,
     dictations: u64,
-    /// A test dictation from the Audio page is running. Shared with the
+    /// A test dictation from the Voice page is running. Shared with the
     /// segmenter, which then also sends levels to the settings window.
     test: Arc<AtomicBool>,
     /// The text of the running test dictation, once decoded.
@@ -952,7 +952,7 @@ impl Controller {
     }
 }
 
-/// Where a test dictation's levels also go (the Audio page's meter).
+/// Where a test dictation's levels also go (the Voice page's meter).
 struct LevelTap {
     app: AppHandle,
     test: Arc<AtomicBool>,

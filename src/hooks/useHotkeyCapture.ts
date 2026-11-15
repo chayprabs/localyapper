@@ -15,6 +15,8 @@ export function useHotkeyCapture(
     function handleKeyDown(e: KeyboardEvent) {
       e.preventDefault();
       e.stopPropagation();
+      // A key still held from opening the field (Enter, Space) is not a choice.
+      if (e.repeat) return;
       if (e.key === "Escape") {
         onCancel();
         return;

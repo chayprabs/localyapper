@@ -34,9 +34,11 @@ Everything still runs on your computer.
 
 ## Settings app
 
-- New pages: Dictation, Audio (microphone, sound cues and a test
-  dictation with timings), Speech, General (launch at login, appearance,
-  history retention, About).
+- Four pages: History (record key, word counts, searchable transcript
+  list), Dictation, Voice (microphone, sound cues, a test dictation with
+  timings, speech models), General (launch at login, theme, history
+  retention, About).
+- Flat monochrome interface in light and dark; see `DESIGN_SYSTEM.md`.
 - Dark theme.
 - History is grouped by day, searchable, exportable and can expire.
 - Every setting takes effect immediately and is checked by the app.

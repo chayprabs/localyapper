@@ -99,9 +99,10 @@ export function Models() {
                 {/* Solid dot: the model in use. */}
                 <span
                   title={m.active ? "In use" : undefined}
-                  className={cn("h-1.5 w-1.5 rounded-full", m.active ? "bg-ink" : "border border-ink/30")}
+                  className={cn("h-1.5 w-1.5 shrink-0 rounded-full", m.active ? "bg-ink" : "border border-ink/30")}
                 />
                 {m.name}
+                {m.active && <span className="sr-only">, in use</span>}
               </span>
             }
             hint={`${m.license}${m.recommended ? ". Recommended for this computer." : ""}`}

@@ -38,7 +38,7 @@ fn fresh_profile_downloads_verifies_and_dictates() {
     let _ = std::fs::remove_dir_all(&models);
     let dir = catalog::model_dir(&models, id);
 
-    // Download and verify, as the Speech page does.
+    // Download and verify, as the Voice page does.
     let files: Vec<FileSpec> = entry
         .files
         .iter()

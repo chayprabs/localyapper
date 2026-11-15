@@ -105,7 +105,7 @@ pub(crate) fn local_boundaries() -> (String, String) {
     (fmt(day), fmt(week))
 }
 
-/// Returns dashboard statistics using the local day and week.
+/// Returns word statistics using the local day and week.
 #[tauri::command]
 pub async fn get_stats(state: tauri::State<'_, AppState>) -> Result<Stats, String> {
     let (day, week) = local_boundaries();

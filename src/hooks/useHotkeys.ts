@@ -12,7 +12,6 @@ interface HotkeyEntry {
   label: string;
   description: string;
   value: string;
-  readOnly: boolean;
 }
 
 const HOTKEY_DEFINITIONS: {
@@ -20,35 +19,30 @@ const HOTKEY_DEFINITIONS: {
   label: string;
   description: string;
   defaultValue: string;
-  readOnly: boolean;
 }[] = [
   {
     key: "hotkey_record",
     label: "Record",
     description: "Hold to dictate. Double-tap for hands-free.",
     defaultValue: DEFAULT_RECORD_HOTKEY,
-    readOnly: false,
   },
   {
     key: "hotkey_cancel",
     label: "Cancel",
     description: "Discards the recording in progress.",
     defaultValue: "Escape",
-    readOnly: false,
   },
   {
     key: "hotkey_paste_last",
     label: "Paste last",
     description: "Pastes the latest dictation again.",
     defaultValue: "Ctrl+Alt+J",
-    readOnly: false,
   },
   {
     key: "hotkey_open_app",
     label: "Open app",
     description: "Shows this window.",
     defaultValue: "Ctrl+Alt+O",
-    readOnly: false,
   },
 ];
 
@@ -139,7 +133,6 @@ export function useHotkeys() {
     label: def.label,
     description: def.description,
     value: hotkeys[def.key] ?? def.defaultValue,
-    readOnly: def.readOnly,
   }));
 
   return {

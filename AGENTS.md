@@ -14,7 +14,7 @@ Read `CLAUDE.md` first for the stack and the rules, and
 | OS-specific behaviour | `platform/<area>/<os>.rs` |
 | A new setting | `settings/keys.rs` (type, default, validator, hook), a `hook_<key>` test in `settings/mod.rs`, a control in the matching page |
 | A new IPC command | `commands/*.rs`, `app_commands!` in `lib.rs`, a typed wrapper in `src/lib/commands/` |
-| Settings UI | `src/components/<page>/`, shared controls in `src/components/settings/controls.tsx` |
+| Settings UI | `src/components/<page>/`, shared controls in `src/components/settings/controls.tsx` and `src/components/ui/`, title bar and tabs in `src/components/shell/` |
 | Overlay UI | `overlay.html`, `src/overlay-main.ts`, `src/overlay.css` |
 
 ## Conventions

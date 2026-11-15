@@ -51,6 +51,15 @@ body {
   -webkit-user-select: none;
 }
 
+/* Fields must stay editable: WebKit applies an inherited user-select: none
+   to inputs and then refuses typing. */
+input,
+textarea,
+select {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 ::selection {
   background: rgb(var(--ink) / 0.16);
 }

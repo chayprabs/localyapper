@@ -785,7 +785,7 @@ fn back_to_back() {
     assert_words(&got, &both);
 }
 
-/// The Audio page's test dictation runs the real pipeline, reports the
+/// The Voice page's test dictation runs the real pipeline, reports the
 /// text, and neither pastes it nor counts it as a dictation.
 #[test]
 fn test_dictation_reports_without_pasting() {

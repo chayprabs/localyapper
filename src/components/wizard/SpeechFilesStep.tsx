@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/settings/controls";
 import { Step } from "./Step";
 
-const TOTAL_SIZE_MB = 458;
-
 interface SpeechFilesStepProps {
   filesInstalled: boolean;
   downloading: boolean;
@@ -66,7 +64,7 @@ export function SpeechFilesStep({
   if (downloading) {
     const percent = Math.min(downloadProgress?.percent ?? 0, 100);
     const downloadedMb = downloadProgress?.downloaded_mb ?? 0;
-    const totalMb = downloadProgress?.total_mb ?? TOTAL_SIZE_MB;
+    const totalMb = downloadProgress?.total_mb ?? 0;
     const speedMbps = downloadProgress?.speed_mbps ?? 0;
 
     return (
@@ -80,9 +78,7 @@ export function SpeechFilesStep({
             <div className="-mt-px h-[3px] bg-ink transition-[width] duration-300 ease-out" style={{ width: `${percent}%` }} />
           </div>
           <div className="mt-3 flex justify-between text-[11.5px] text-ink/45">
-            <span>
-              {downloadedMb.toFixed(0)} / {totalMb.toFixed(0)} MB
-            </span>
+            <span>{totalMb > 0 ? `${downloadedMb.toFixed(0)} / ${totalMb.toFixed(0)} MB` : "Starting"}</span>
             <span>{speedMbps > 0 ? `${speedMbps.toFixed(1)} MB/s` : ""}</span>
           </div>
         </div>
@@ -94,7 +90,7 @@ export function SpeechFilesStep({
   }
 
   return (
-    <Step key="start" title="Speech model" text="Parakeet, 458 MB. One download, then it runs offline.">
+    <Step key="start" title="Speech model" text="One download, then it runs offline.">
       {downloadError && <Notice>{downloadError}</Notice>}
       <Button variant="primary" size="lg" onClick={() => void onStartDownload()}>
         {downloadError ? "Try again" : "Download"}

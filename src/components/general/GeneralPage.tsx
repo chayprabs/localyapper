@@ -25,7 +25,10 @@ const NOTICES = [
 
 function PathRow({ label, path }: { label: string; path: string }) {
   return (
-    <Row label={label} detail={<span className="selectable font-mono text-[11.5px]">{path}</span>}>
+    <Row
+      label={label}
+      below={<p className="selectable break-all pb-1 font-mono text-[11.5px] leading-snug text-ink/45">{path}</p>}
+    >
       <CopyButton text={path} label="Copy path" className="-mr-1.5" />
     </Row>
   );
@@ -77,7 +80,7 @@ function About() {
       {info && <PathRow label="Logs" path={info.log_dir} />}
       <Row
         label="Reset settings"
-        hint="Hotkeys, audio, output and overlay go back to their defaults."
+        hint="Every setting goes back to its default. History and downloaded models are kept."
         detail={reset?.ok ? reset.text : undefined}
         error={reset && !reset.ok ? reset.text : null}
       >
