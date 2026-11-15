@@ -194,7 +194,8 @@ export function HistoryPage() {
           <Keys hotkey={app.recordHotkey} size="lg" />
           {status}
         </div>
-        {stats && (
+        {/* The download prompt takes the counts' place until a model is installed. */}
+        {stats && !noModel && (
           <div className="flex gap-4 font-mono text-[11.5px] text-ink/40">
             <Figure value={stats.words_today} unit="today" />
             <Figure value={stats.words_week} unit="week" />
