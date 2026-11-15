@@ -10,7 +10,7 @@ const SIZES = {
 
 export function Keys({ hotkey, size = "sm" }: { hotkey: string; size?: keyof typeof SIZES }) {
   return (
-    <span className={cn("inline-flex items-center align-middle", size === "xl" ? "gap-2" : "gap-1")}>
+    <span className={cn("inline-flex max-w-full flex-wrap items-center align-middle", size === "xl" ? "gap-2" : "gap-1")}>
       {hotkeyParts(hotkey).map((part, i) => (
         <kbd
           key={i}

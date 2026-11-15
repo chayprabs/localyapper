@@ -65,7 +65,7 @@ export function HotkeyStep({
         type="button"
         aria-label={`Record hotkey: ${hotkey}. Click to change.`}
         onClick={() => setCapturing(true)}
-        className="flex h-16 items-center rounded-lg"
+        className="flex min-h-16 max-w-full items-center rounded-lg text-left"
       >
         {capturing ? (
           <span className="flex h-16 animate-fade-in items-center rounded-lg border border-ink px-5 font-mono text-[14px] text-ink">

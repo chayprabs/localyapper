@@ -100,9 +100,14 @@ body {
 .pill[data-kind="error"] .text {
   display: none;
 }
+/* At most three lines, so the pill always fits its window. */
 .pill[data-kind="error"] .label {
   color: var(--signal);
   white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 .actions {
   display: none;
