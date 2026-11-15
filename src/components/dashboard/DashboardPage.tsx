@@ -9,10 +9,17 @@ import { LastDictationCard } from "./LastDictationCard";
 import { Icon } from "@/components/ui/Icon";
 
 interface SpeechFilesMissingBannerProps {
+  /** Display name and size of the model this computer uses. */
+  modelName: string;
+  sizeMb: number;
   onInstall: () => void;
 }
 
-function SpeechFilesMissingBanner({ onInstall }: SpeechFilesMissingBannerProps) {
+function SpeechFilesMissingBanner({
+  modelName,
+  sizeMb,
+  onInstall,
+}: SpeechFilesMissingBannerProps) {
   return (
     <div className="mt-3 flex flex-wrap items-center justify-between gap-4 rounded-[10px] border border-[#ff9500]/30 bg-[#ff9500]/[0.08] px-4 py-3">
       <div className="flex items-center gap-3">
@@ -22,8 +29,8 @@ function SpeechFilesMissingBanner({ onInstall }: SpeechFilesMissingBannerProps) 
             Speech files aren't installed
           </p>
           <p className="text-[12px] text-[#9a5a00]">
-            Dictation needs the local Parakeet model. About 458 MB, downloaded
-            once.
+            Dictation needs the {modelName} speech model. About {sizeMb} MB,
+            downloaded once.
           </p>
         </div>
       </div>
@@ -97,14 +104,16 @@ export function DashboardPage() {
             {error}
           </p>
         )}
-        {filesMissing && (
+        {filesMissing && modelFileStatus && (
           <SpeechFilesMissingBanner
+            modelName={modelFileStatus.model_name}
+            sizeMb={modelFileStatus.size_mb}
             onInstall={() => setActivePage("speech")}
           />
         )}
       </header>
 
-      {isLoading ? (
+      {isLoading && stats === null ? (
         <div className="flex min-h-[260px] items-center justify-center">
           <Icon name="progress_activity" size={28} className="text-black/[0.30] animate-spin" />
         </div>
@@ -130,7 +139,7 @@ export function DashboardPage() {
               label="WORDS ALL TIME"
               value={formatNumber(stats.words_all_time)}
             />
-            <StatCard label="AVG WPM" value={formatNumber(stats.avg_wpm)} />
+            <StatCard label="AVG WPM" value={formatNumber(Math.round(stats.avg_wpm))} />
           </section>
 
           <section className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">

@@ -420,7 +420,8 @@ impl App {
         let settings = format!(
             "setup_complete=true;setup_step=done;auto_start=false;idle_unload_seconds=0;\
              speech_model=parakeet-110m;\
-             overlay_preview=true;activation_mode=hold;{extra_settings}"
+             overlay_preview=true;activation_mode=hold;overlay_position=bottom_center;\
+             {extra_settings}"
         );
         let child = quiet(Command::new(env!("CARGO_BIN_EXE_localyapper")))
             .args(args)
@@ -606,50 +607,97 @@ fn overlay_does_not_take_focus() {
     assert_eq!(after, Some(target), "focus moved after the overlay hid");
 }
 
+/// The pill follows the mouse when dragged, never takes focus, and comes
+/// back where it was dropped.
 #[test]
-fn overlay_is_click_through() {
+fn overlay_can_be_dragged() {
     use enigo::{Button, Coordinate, Direction, Enigo, Mouse, Settings};
     let (wav, _) = fixture("clip01_16k");
     let mut t = TextTarget::spawn();
-    t.command("cover");
     // Launch first: starting the app can raise another window (on the
     // Windows runner, a terminal) above the target.
     let mut app = App::launch(&wav);
     if !keys_reach(&mut t) {
         return;
     }
+    let rect_of = |app: &mut App| -> Option<(f64, f64, f64, f64, f64)> {
+        let r = app.state()["state"]["overlay_rect"].clone();
+        Some((
+            r["x"].as_f64()?,
+            r["y"].as_f64()?,
+            r["width"].as_f64()?,
+            r["height"].as_f64()?,
+            r["scale"].as_f64().unwrap_or(1.0),
+        ))
+    };
     app.cmd("down");
     std::thread::sleep(Duration::from_millis(500));
-    let rect = app.state()["state"]["overlay_rect"].clone();
-    assert!(!rect.is_null(), "overlay was not shown");
-    let scale = rect["scale"].as_f64().unwrap_or(1.0);
-    let px = rect["x"].as_f64().unwrap_or(0.0) + rect["width"].as_f64().unwrap_or(0.0) / 2.0;
-    let py = rect["y"].as_f64().unwrap_or(0.0) + rect["height"].as_f64().unwrap_or(0.0) / 2.0;
+    let (x0, y0, w, h, scale) = rect_of(&mut app).expect("overlay was not shown");
     // enigo takes points on macOS and pixels elsewhere.
-    let (cx, cy) = if cfg!(target_os = "macos") {
-        (px / scale, py / scale)
+    let unit = if cfg!(target_os = "macos") {
+        scale
     } else {
-        (px, py)
+        1.0
     };
-    let before: usize = t.command("clicks").parse().unwrap_or(0);
+    let (cx, cy) = ((x0 + w / 2.0) / unit, (y0 + h / 2.0) / unit);
+    let (dx, dy) = (-140.0, -120.0);
     let mut enigo = Enigo::new(&Settings::default()).expect("enigo");
-    enigo
-        .move_mouse(cx.round() as i32, cy.round() as i32, Coordinate::Abs)
-        .expect("move");
-    enigo.button(Button::Left, Direction::Click).expect("click");
+    let go = |enigo: &mut Enigo, x: f64, y: f64| {
+        enigo
+            .move_mouse(x.round() as i32, y.round() as i32, Coordinate::Abs)
+            .expect("move");
+        std::thread::sleep(Duration::from_millis(60));
+    };
+    go(&mut enigo, cx, cy);
+    std::thread::sleep(Duration::from_millis(200));
+    enigo.button(Button::Left, Direction::Press).expect("press");
+    std::thread::sleep(Duration::from_millis(200));
+    for step in 1..=10 {
+        let f = f64::from(step) / 10.0;
+        go(&mut enigo, cx + dx * f, cy + dy * f);
+    }
     std::thread::sleep(Duration::from_millis(300));
-    let after: usize = t.command("clicks").parse().unwrap_or(0);
-    let under = window_under(cx.round() as i32, cy.round() as i32);
+    let held = rect_of(&mut app);
+    let front = fg_pid();
+    enigo
+        .button(Button::Left, Direction::Release)
+        .expect("release");
+    std::thread::sleep(Duration::from_millis(400));
+    let dropped = rect_of(&mut app);
+    let under = window_under((cx + dx).round() as i32, (cy + dy).round() as i32);
     app.cmd("cancel");
+    std::thread::sleep(Duration::from_millis(400));
+
+    let (x1, y1, ..) = held.expect("overlay vanished during the drag");
+    let close = |a: f64, b: f64| (a - b).abs() <= 6.0 * scale.max(1.0);
     assert!(
-        after > before,
-        "the click at the pill's centre ({cx:.0}, {cy:.0}) did not reach the window below; \
-         rect {rect}, clicks {before} -> {after}, window there: {under}"
+        close(x1 - x0, dx * unit) && close(y1 - y0, dy * unit),
+        "the pill did not follow the mouse: ({x0}, {y0}) -> ({x1}, {y1}), wanted a move of \
+         ({}, {}); window under the cursor: {under}",
+        dx * unit,
+        dy * unit
+    );
+    assert_ne!(front, Some(app.pid()), "dragging the pill took focus");
+    let (x2, y2, ..) = dropped.expect("overlay vanished when dropped");
+    assert!(
+        close(x2, x1) && close(y2, y1),
+        "the pill jumped when dropped: ({x1}, {y1}) -> ({x2}, {y2})"
+    );
+
+    // The next dictation shows it where it was dropped.
+    app.cmd("down");
+    std::thread::sleep(Duration::from_millis(500));
+    let again = rect_of(&mut app);
+    app.cmd("cancel");
+    let (x3, y3, ..) = again.expect("overlay was not shown again");
+    assert!(
+        close(x3, x2) && close(y3, y2),
+        "the dropped position was not kept: ({x2}, {y2}) then ({x3}, {y3})"
     );
 }
 
 /// Which window the OS hit-tests at a screen point (Windows only; used to
-/// explain a click-through failure).
+/// explain a drag failure).
 #[cfg(windows)]
 fn window_under(x: i32, y: i32) -> String {
     use windows::Win32::Foundation::POINT;

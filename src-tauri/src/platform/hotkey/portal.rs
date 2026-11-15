@@ -26,13 +26,66 @@ pub fn to_portal_trigger(combo: &str) -> String {
             "alt" | "option" => "ALT".to_string(),
             "shift" => "SHIFT".to_string(),
             "super" | "meta" | "cmd" | "command" | "logo" => "LOGO".to_string(),
-            "space" => "space".to_string(),
-            "escape" | "esc" => "Escape".to_string(),
             _ if p.chars().count() == 1 => p.to_lowercase(),
-            _ => p.to_string(),
+            other => keysym_name(other).map_or_else(|| p.to_string(), str::to_string),
         })
         .collect::<Vec<_>>()
         .join("+")
+}
+
+/// The XKB keysym name the portal expects for a key the settings window
+/// names after its physical position ("ArrowUp", "Backquote"). Function
+/// keys and letters already match and are passed through.
+fn keysym_name(lower: &str) -> Option<&'static str> {
+    Some(match lower {
+        "space" => "space",
+        "escape" | "esc" => "Escape",
+        "enter" => "Return",
+        "tab" => "Tab",
+        "backspace" => "BackSpace",
+        "delete" => "Delete",
+        "insert" => "Insert",
+        "home" => "Home",
+        "end" => "End",
+        "pageup" => "Page_Up",
+        "pagedown" => "Page_Down",
+        "arrowup" | "up" => "Up",
+        "arrowdown" | "down" => "Down",
+        "arrowleft" | "left" => "Left",
+        "arrowright" | "right" => "Right",
+        "backquote" => "grave",
+        "minus" => "minus",
+        "equal" => "equal",
+        "bracketleft" => "bracketleft",
+        "bracketright" => "bracketright",
+        "backslash" => "backslash",
+        "semicolon" => "semicolon",
+        "quote" => "apostrophe",
+        "comma" => "comma",
+        "period" => "period",
+        "slash" => "slash",
+        "capslock" => "Caps_Lock",
+        "scrolllock" => "Scroll_Lock",
+        "pause" => "Pause",
+        "printscreen" => "Print",
+        "numpad0" => "KP_0",
+        "numpad1" => "KP_1",
+        "numpad2" => "KP_2",
+        "numpad3" => "KP_3",
+        "numpad4" => "KP_4",
+        "numpad5" => "KP_5",
+        "numpad6" => "KP_6",
+        "numpad7" => "KP_7",
+        "numpad8" => "KP_8",
+        "numpad9" => "KP_9",
+        "numpadadd" => "KP_Add",
+        "numpadsubtract" => "KP_Subtract",
+        "numpadmultiply" => "KP_Multiply",
+        "numpaddivide" => "KP_Divide",
+        "numpaddecimal" => "KP_Decimal",
+        "numpadenter" => "KP_Enter",
+        _ => return None,
+    })
 }
 
 struct Shared {
@@ -210,5 +263,12 @@ mod tests {
         assert_eq!(to_portal_trigger("F8"), "F8");
         assert_eq!(to_portal_trigger("Super+Space"), "LOGO+space");
         assert_eq!(to_portal_trigger("Shift+Escape"), "SHIFT+Escape");
+        // Keys named after their position get their keysym name.
+        assert_eq!(to_portal_trigger("Meta+ArrowUp"), "LOGO+Up");
+        assert_eq!(to_portal_trigger("Ctrl+Backquote"), "CTRL+grave");
+        assert_eq!(to_portal_trigger("Alt+Enter"), "ALT+Return");
+        assert_eq!(to_portal_trigger("Ctrl+Numpad5"), "CTRL+KP_5");
+        assert_eq!(to_portal_trigger("Ctrl+Shift+1"), "CTRL+SHIFT+1");
+        assert_eq!(to_portal_trigger("F13"), "F13");
     }
 }

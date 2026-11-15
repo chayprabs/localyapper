@@ -44,17 +44,18 @@ export function Wizard() {
           <MicrophoneStep
             permissions={wizard.permissions}
             loading={wizard.permissionsLoading}
-            refresh={() => {
-              void wizard.refreshPermissions();
-            }}
-            openSettings={() => {
-              void wizard.requestOpenMicSettings();
-            }}
+            refresh={wizard.refreshPermissions}
+            openSettings={wizard.requestOpenMicSettings}
             onContinue={wizard.goNext}
           />
         );
       case "accessibility":
-        return <AccessibilityStep onContinue={wizard.goNext} />;
+        return (
+          <AccessibilityStep
+            autoAdvance={!wizard.cameBack}
+            onContinue={wizard.goNext}
+          />
+        );
       case "hotkey":
         return (
           <HotkeyStep
@@ -68,6 +69,8 @@ export function Wizard() {
           <SpeechFilesStep
             filesInstalled={wizard.filesInstalled}
             downloading={wizard.downloading}
+            cancelling={wizard.cancelling}
+            modelSizeMb={wizard.modelSizeMb}
             downloadProgress={wizard.downloadProgress}
             downloadError={wizard.downloadError}
             onProgress={wizard.handleDownloadProgress}
@@ -77,7 +80,13 @@ export function Wizard() {
           />
         );
       case "try":
-        return <TryStep hotkey={wizard.hotkey} onContinue={wizard.goNext} />;
+        return (
+          <TryStep
+            hotkey={wizard.hotkey}
+            filesInstalled={wizard.filesInstalled}
+            onContinue={wizard.goNext}
+          />
+        );
       case "done":
         return (
           <ReadyStep

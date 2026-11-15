@@ -16,6 +16,7 @@
 
 1. Hold the record key (or tap it to dictate hands-free) and speak.
 2. A small pill at the bottom of the screen shows the microphone level.
+   Drag it wherever you like; it stays there.
 3. Let go. The text is pasted where your cursor is, and your clipboard is
    put back the way it was.
 

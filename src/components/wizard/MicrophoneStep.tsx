@@ -1,13 +1,13 @@
-// Wizard microphone step -- request permission and verify a default input device
-import { useEffect } from "react";
+// Wizard microphone step -- shows whether a microphone can be used. The
+// wizard hook asks for access and keeps the status up to date.
 import type { PermissionsStatus } from "@/types/commands";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
 interface MicrophoneStepProps {
   permissions: PermissionsStatus | null;
   loading: boolean;
-  refresh: () => void;
-  openSettings: () => void;
+  refresh: () => Promise<void>;
+  openSettings: () => Promise<void>;
   onContinue: () => void;
 }
 
@@ -18,12 +18,10 @@ export function MicrophoneStep({
   openSettings,
   onContinue,
 }: MicrophoneStepProps) {
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
   const micGranted = permissions?.microphone === true;
   const micDenied = permissions != null && permissions.microphone === false;
+  // Only the first check shows a spinner; later ones update in place.
+  const checking = loading && permissions == null;
 
   return (
     <div className="flex flex-col items-center text-center">
@@ -51,7 +49,7 @@ export function MicrophoneStep({
         <div className="flex items-center gap-3">
           <Icon
             name={
-              (loading
+              (checking
                 ? "sync"
                 : micGranted
                   ? "check_circle"
@@ -78,7 +76,7 @@ export function MicrophoneStep({
                     : "text-black/85"
               }`}
             >
-              {loading
+              {checking
                 ? "Checking microphone..."
                 : micGranted
                   ? "Microphone detected"
@@ -98,7 +96,9 @@ export function MicrophoneStep({
       {micDenied && (
         <button
           type="button"
-          onClick={openSettings}
+          onClick={() => {
+            void openSettings();
+          }}
           className="mb-3 inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-black/[0.10] bg-surface px-4 text-[13px] font-medium text-black/85 shadow-sm transition-colors hover:bg-black/[0.02]"
         >
           <Icon name="open_in_new" size={16} />
@@ -109,15 +109,16 @@ export function MicrophoneStep({
       <button
         type="button"
         onClick={onContinue}
-        className="h-9 w-full rounded-[8px] bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-[13px] font-medium text-white transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={loading}
+        className="h-9 w-full rounded-[8px] bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-[13px] font-medium text-white transition-all hover:brightness-110 active:brightness-95"
       >
-        {micGranted ? "Continue" : micDenied ? "Continue anyway" : "Continue"}
+        {micDenied ? "Continue anyway" : "Continue"}
       </button>
 
       <button
         type="button"
-        onClick={refresh}
+        onClick={() => {
+          void refresh();
+        }}
         className="mt-3 text-[12px] text-black/[0.45] hover:text-black/65"
       >
         Re-check microphone

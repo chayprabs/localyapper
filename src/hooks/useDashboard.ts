@@ -49,8 +49,9 @@ export function useDashboard(): DashboardData {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // `isLoading` is true only until the first load finishes; refreshes
+  // update the numbers in place instead of flashing a spinner.
   const fetchAll = useCallback(async () => {
-    setIsLoading(true);
     const [
       statsResult,
       historyResult,
@@ -101,13 +102,18 @@ export function useDashboard(): DashboardData {
     void fetchAll();
   }, [fetchAll]);
 
+  // A finished dictation, a model loading or unloading, and a download or
+  // delete all change what the dashboard shows.
   useEffect(() => {
-    const unlisten = listen("history-updated", () => {
-      void fetchAll();
-    });
+    const unlisten = ["history-updated", "model-state", "models-changed"].map(
+      (event) =>
+        listen(event, () => {
+          void fetchAll();
+        }),
+    );
 
     return () => {
-      unlisten.then((dispose) => dispose());
+      for (const u of unlisten) void u.then((dispose) => dispose());
     };
   }, [fetchAll]);
 

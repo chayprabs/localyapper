@@ -8,8 +8,21 @@ import {
   requestAccessibilityPermission,
 } from "@/lib/commands/system";
 
-export function AccessibilityStep({ onContinue }: { onContinue: () => void }) {
+export function AccessibilityStep({
+  autoAdvance,
+  onContinue,
+}: {
+  /** Move on as soon as access is granted (not when the user came Back). */
+  autoAdvance: boolean;
+  onContinue: () => void;
+}) {
   const [granted, setGranted] = useState(false);
+  // After a while without the grant, explain the usual reason.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSlow(true), 12000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,8 +42,8 @@ export function AccessibilityStep({ onContinue }: { onContinue: () => void }) {
   }, []);
 
   useEffect(() => {
-    if (granted) onContinue();
-  }, [granted, onContinue]);
+    if (granted && autoAdvance) onContinue();
+  }, [granted, autoAdvance, onContinue]);
 
   return (
     <div className="flex flex-col items-center text-center">
@@ -48,20 +61,38 @@ export function AccessibilityStep({ onContinue }: { onContinue: () => void }) {
       <p role="status" className="text-[12px] text-black/50 mb-4">
         {granted ? "Access granted." : "Waiting for access..."}
       </p>
-      <button
-        onClick={() => {
-          void openAccessibilitySettings();
-        }}
-        className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 active:brightness-95 transition-all mb-2"
-      >
-        Open System Settings
-      </button>
-      <button
-        onClick={onContinue}
-        className="text-[12px] text-black/50 hover:underline"
-      >
-        Skip for now (text will be copied instead of pasted)
-      </button>
+      {!granted && slow && (
+        <p className="mb-4 w-full rounded-lg border border-[#9a5a00]/20 bg-[#9a5a00]/[0.06] px-3 py-2 text-left text-[12px] text-[#7a4500]">
+          Already switched on in the list? After an update macOS can keep an
+          old entry that no longer counts. Select LocalYapper there, remove
+          it with the minus button, then add it again.
+        </p>
+      )}
+      {granted ? (
+        <button
+          onClick={onContinue}
+          className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 active:brightness-95 transition-all"
+        >
+          Continue
+        </button>
+      ) : (
+        <>
+          <button
+            onClick={() => {
+              void openAccessibilitySettings();
+            }}
+            className="w-full h-9 bg-gradient-to-b from-[#0062d0] to-[#0058bc] text-white text-[13px] font-medium rounded-[8px] hover:brightness-110 active:brightness-95 transition-all mb-2"
+          >
+            Open System Settings
+          </button>
+          <button
+            onClick={onContinue}
+            className="text-[12px] text-black/50 hover:underline"
+          >
+            Skip for now (text will be copied instead of pasted)
+          </button>
+        </>
+      )}
     </div>
   );
 }

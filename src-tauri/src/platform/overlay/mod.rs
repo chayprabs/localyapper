@@ -26,6 +26,11 @@ pub enum ViewPayload {
         message: String,
         text: Option<String>,
     },
+    /// A short message that is not part of a dictation (the app has
+    /// started and is waiting in the tray).
+    Notice {
+        message: String,
+    },
 }
 
 impl From<&View> for ViewPayload {
@@ -63,7 +68,7 @@ pub enum OverlayPosition {
 
 impl OverlayPosition {
     /// Parse `bottom_center`, `top_center` or `custom` with its
-    /// `overlay_custom` value ("0.50,0.85").
+    /// `overlay_custom` value ("0.5000,0.8500").
     pub fn parse(position: &str, custom: Option<&str>) -> Option<Self> {
         match position {
             "bottom_center" => Some(Self::BottomCenter),
@@ -113,6 +118,8 @@ pub trait OverlayBackend: Send + Sync {
     /// Microphone level in `[0, 1]`, about 30 times a second.
     fn level(&self, v: f32);
     fn hide(&self);
+    /// Show a short message for a few seconds.
+    fn notice(&self, _message: &str) {}
     fn configure(&self, _config: OverlayConfig) {}
     /// Where the overlay is on screen, if shown.
     fn rect(&self) -> Option<OverlayRect> {

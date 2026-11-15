@@ -20,7 +20,7 @@ pub enum Kind {
     Device,
     /// `auto` or a catalog model id.
     Model,
-    /// Two fractions "0.50,0.85" (custom overlay position).
+    /// Two fractions "0.5000,0.8500" (custom overlay position).
     Fraction2,
     /// Free text kept for the app's own bookkeeping.
     Text,
@@ -148,7 +148,7 @@ pub const KEYS: &[Key] = &[
     k(
         "overlay_custom",
         Kind::Fraction2,
-        "0.50,0.85",
+        "0.5000,0.8500",
         Hook::Controller,
     ),
     k("overlay_preview", Kind::Bool, "true", Hook::Controller),
@@ -278,7 +278,8 @@ pub fn validate(key: &Key, value: &str, models: &[String]) -> Result<String, Str
                 .and_then(|(a, b)| Some((a.trim().parse().ok()?, b.trim().parse().ok()?)));
             match parsed {
                 Some((x, y)) if (0.0..=1.0).contains(&x) && (0.0..=1.0).contains(&y) => {
-                    Ok(format!("{x:.2},{y:.2}"))
+                    // Four decimals: a dragged pill comes back within a pixel.
+                    Ok(format!("{x:.4},{y:.4}"))
                 }
                 _ => bad(),
             }
@@ -343,7 +344,7 @@ mod tests {
         );
         assert_eq!(
             validate(get("overlay_custom"), "0.5,0.9", &models()).as_deref(),
-            Ok("0.50,0.90")
+            Ok("0.5000,0.9000")
         );
         assert!(validate(get("overlay_custom"), "1.5,0.9", &models()).is_err());
         assert_eq!(

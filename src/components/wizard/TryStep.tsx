@@ -5,7 +5,16 @@ import { Icon } from "@/components/ui/Icon";
 
 const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent);
 
-export function TryStep({ hotkey, onContinue }: { hotkey: string; onContinue: () => void }) {
+export function TryStep({
+  hotkey,
+  filesInstalled,
+  onContinue,
+}: {
+  hotkey: string;
+  /** Whether the speech model is downloaded; without it nothing can arrive. */
+  filesInstalled: boolean;
+  onContinue: () => void;
+}) {
   const [text, setText] = useState("");
   const [attempts, setAttempts] = useState(0);
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -44,7 +53,14 @@ export function TryStep({ hotkey, onContinue }: { hotkey: string; onContinue: ()
         placeholder="Your words appear here"
         className="mb-4 w-full resize-none rounded-[10px] border border-black/[0.12] bg-surface px-3 py-2 text-[14px] text-black/85 outline-none focus:border-[#0058bc]"
       />
-      {failedOnce && (
+      {!filesInstalled && (
+        <p className="mb-4 w-full rounded-lg border border-[#9a5a00]/20 bg-[#9a5a00]/[0.06] px-3 py-2 text-left text-[12px] text-[#7a4500]">
+          The speech model is not downloaded yet, so dictation cannot work.
+          Go back one step to download it, or do it later from the Speech
+          page.
+        </p>
+      )}
+      {filesInstalled && failedOnce && (
         <p className="mb-4 w-full rounded-lg border border-[#9a5a00]/20 bg-[#9a5a00]/[0.06] px-3 py-2 text-left text-[12px] text-[#7a4500]">
           Nothing arrived. Make sure the box has the cursor and try again.
           {isMac && " On macOS, LocalYapper also needs Accessibility access to paste."}

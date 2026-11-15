@@ -17,9 +17,12 @@ export function WizardChrome({
   onBack,
   children,
 }: WizardChromeProps) {
+  // Header, card and footer are stacked, never layered, and the card
+  // area scrolls: on a small window, or when a step is tall, every button
+  // can still be reached and nothing is hidden behind the header or footer.
   return (
-    <div className="relative h-full w-full overflow-hidden bg-gradient-to-b from-canvas to-sidebar">
-      <header className="absolute top-0 left-0 right-0 flex h-14 items-center justify-between px-6">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-gradient-to-b from-canvas to-sidebar">
+      <header className="flex h-12 shrink-0 items-center justify-between px-6">
         {canGoBack ? (
           <button
             type="button"
@@ -31,7 +34,7 @@ export function WizardChrome({
             Back
           </button>
         ) : (
-          <span className="h-8" aria-hidden="true" />
+          <span className="h-8 w-16" aria-hidden="true" />
         )}
 
         <span
@@ -44,13 +47,13 @@ export function WizardChrome({
         <span className="h-8 w-16" aria-hidden="true" />
       </header>
 
-      <main className="flex h-full w-full items-center justify-center px-6">
-        <div className="w-full max-w-[480px] rounded-[14px] bg-surface p-7 shadow-[0_8px_40px_rgba(0,0,0,0.10)]">
+      <main className="wizard-scroll flex min-h-0 flex-1 overflow-y-auto px-6 py-2">
+        <div className="m-auto w-full max-w-[480px] rounded-[14px] bg-surface p-6 shadow-[0_8px_40px_rgba(0,0,0,0.10)]">
           {children}
         </div>
       </main>
 
-      <footer className="absolute bottom-4 left-0 right-0 text-center text-[11px] font-medium text-black/[0.35]">
+      <footer className="shrink-0 px-6 py-2.5 text-center text-[11px] font-medium text-black/[0.35]">
         Everything happens on your device. No audio leaves your machine.
       </footer>
     </div>

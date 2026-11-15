@@ -18,8 +18,8 @@ pub struct AppState {
     pub paused: Arc<AtomicBool>,
     /// Most recent dictated text, for paste-last.
     pub last_injection: Arc<Mutex<Option<String>>>,
-    /// Signal flag to abort an in-progress model download.
-    pub download_cancel: Arc<AtomicBool>,
+    /// Model downloads in progress: one at a time, each cancellable.
+    pub downloads: crate::commands::models::Downloads,
     /// Global hotkey back end (shortcut plugin, or the Wayland portal).
     pub hotkeys: Arc<dyn HotkeyBackend>,
     /// Every setting, read from SQLite once at start and kept in step by

@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Icon } from "@/components/ui/Icon";
 import { setHotkeyProbe, updateHotkey } from "@/lib/commands/hotkeys";
 import { isMacPlatform as isMac } from "@/lib/hotkeyDefaults";
+import { eventToShortcut } from "@/lib/hotkeyCapture";
 
 function formatKey(key: string): string {
   if (isMac) {
@@ -29,24 +30,6 @@ function parseHotkeyParts(hotkey: string): string[] {
   return hotkey.split("+").map(formatKey);
 }
 
-function eventToShortcut(e: KeyboardEvent): string | null {
-  if (["Alt", "Control", "Shift", "Meta", "AltGraph"].includes(e.key)) {
-    return null;
-  }
-  const parts: string[] = [];
-  if (e.ctrlKey) parts.push("Ctrl");
-  if (e.altKey) parts.push("Alt");
-  if (e.shiftKey) parts.push("Shift");
-  if (e.metaKey) parts.push("Meta");
-
-  let keyName = e.key;
-  if (keyName === " ") keyName = "Space";
-  else if (keyName.length === 1) keyName = keyName.toUpperCase();
-
-  parts.push(keyName);
-  return parts.join("+");
-}
-
 export function HotkeyStep({
   hotkey,
   onHotkeyChange,
@@ -60,39 +43,53 @@ export function HotkeyStep({
   const [detected, setDetected] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const capturingRef = useRef(false);
+  capturingRef.current = isCapturing;
 
-  // Register the hotkey now and listen for it globally. While the probe
-  // is on, presses only report detection and start no dictation.
+  // Make sure the current hotkey is registered, so a key another app
+  // already holds is reported here and not discovered later.
+  const initialHotkey = useRef(hotkey);
   useEffect(() => {
     let cancelled = false;
-    setDetected(false);
-    updateHotkey("hotkey_record", hotkey)
-      .then(() => {
-        if (!cancelled) setRegisterError(null);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) setRegisterError(String(error));
-      });
+    updateHotkey("hotkey_record", initialHotkey.current).catch((error: unknown) => {
+      if (!cancelled) setRegisterError(String(error));
+    });
     return () => {
       cancelled = true;
     };
-  }, [hotkey]);
+  }, []);
 
+  // While the probe is on, presses of the record key only report that
+  // they were seen and start no dictation.
   useEffect(() => {
     void setHotkeyProbe(true);
-    const unlisten = listen("hotkey-detected", () => setDetected(true));
+    const unlisten = listen("hotkey-detected", () => {
+      if (!capturingRef.current) setDetected(true);
+    });
     return () => {
       void setHotkeyProbe(false);
       void unlisten.then((stop) => stop());
     };
   }, []);
 
+  // A new combo replaces the old one only once it is registered. When it
+  // cannot be (in use elsewhere, or already another LocalYapper hotkey)
+  // the previous key stays and the reason is shown.
   const handleCapture = useCallback(
     (shortcut: string) => {
-      onHotkeyChange(shortcut);
       setIsCapturing(false);
+      if (shortcut === hotkey) return;
+      setRegisterError(null);
+      updateHotkey("hotkey_record", shortcut)
+        .then(() => {
+          setDetected(false);
+          onHotkeyChange(shortcut);
+        })
+        .catch((error: unknown) => {
+          setRegisterError(String(error));
+        });
     },
-    [onHotkeyChange],
+    [hotkey, onHotkeyChange],
   );
 
   const handleCancel = useCallback(() => {
@@ -180,15 +177,21 @@ export function HotkeyStep({
         </button>
       </div>
 
+      {registerError && (
+        <p
+          role="alert"
+          className="mb-3 w-full rounded-lg border border-[#ba1a1a]/15 bg-[#ba1a1a]/[0.06] px-3 py-2 text-[12px] font-medium text-[#ba1a1a]"
+        >
+          {registerError}. Choose a different key.
+        </p>
+      )}
       <p
         role="status"
         className={`text-[12px] mb-4 ${detected ? "text-[#1a7f37]" : "text-black/50"}`}
       >
-        {registerError
-          ? registerError
-          : detected
-            ? "Hotkey detected. It works from any app."
-            : "Press your hotkey now to test it."}
+        {detected
+          ? "Hotkey detected. It works from any app."
+          : "Press your hotkey now to test it."}
       </p>
 
       <button
@@ -198,6 +201,16 @@ export function HotkeyStep({
       >
         Continue
       </button>
+      {/* Never a dead end: some desktops (Wayland without the shortcuts
+          portal) cannot deliver a global key at all. */}
+      {!detected && (
+        <button
+          onClick={onContinue}
+          className="mt-3 text-[12px] text-black/[0.45] hover:text-black/65"
+        >
+          Continue without testing
+        </button>
+      )}
     </div>
   );
 }

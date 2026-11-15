@@ -6,17 +6,6 @@ interface ModelStatusCardProps {
   fileStatus: SpeechModelFileStatus | null;
 }
 
-function formatModelName(name: string | undefined): string {
-  switch (name) {
-    case "parakeet-110m":
-      return "Parakeet 110M";
-    case "parakeet-0.6b":
-      return "Parakeet 0.6B";
-    default:
-      return "Local speech engine";
-  }
-}
-
 export function ModelStatusCard({ status, fileStatus }: ModelStatusCardProps) {
   const speechModelReady = status?.speech_model_loaded ?? false;
   const filesInstalled = fileStatus?.exists ?? false;
@@ -58,7 +47,7 @@ export function ModelStatusCard({ status, fileStatus }: ModelStatusCardProps) {
         </span>
       </div>
       <p className="text-[12px] text-black/[0.50]">
-        {formatModelName(fileStatus?.model_name)}
+        {fileStatus?.model_name || "Local speech engine"}
         {filesInstalled && fileStatus
           ? ` \u00b7 ${fileStatus.size_mb} MB on disk`
           : ""}

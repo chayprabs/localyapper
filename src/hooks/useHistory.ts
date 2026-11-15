@@ -36,20 +36,27 @@ export function useHistory(search = ""): HistoryData {
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const offsetRef = useRef(0);
+  // Each fetch gets a number; a reply to an older one (a slower search
+  // for text typed earlier) is dropped instead of replacing newer results.
+  const requestRef = useRef(0);
 
   const fetchInitial = useCallback(async () => {
-    setIsLoading(true);
+    const request = ++requestRef.current;
     try {
       const result = await getHistory(PAGE_SIZE, 0, search || null);
+      if (request !== requestRef.current) return;
       setEntries(result);
       setHasMore(result.length === PAGE_SIZE);
       offsetRef.current = result.length;
       setError(null);
     } catch (fetchError) {
+      if (request !== requestRef.current) return;
       setEntries([]);
       setHasMore(false);
       setError(toErrorMessage(fetchError, "Failed to load history"));
     }
+    // The spinner shows only until the first result: later refreshes (a
+    // new dictation, a search) swap the list in place.
     setIsLoading(false);
   }, [search]);
 
@@ -68,9 +75,15 @@ export function useHistory(search = ""): HistoryData {
   }, [fetchInitial]);
 
   const loadMore = useCallback(async () => {
+    const request = requestRef.current;
     try {
       const result = await getHistory(PAGE_SIZE, offsetRef.current, search || null);
-      setEntries((prev) => [...prev, ...result]);
+      // The list was reloaded meanwhile; this page no longer follows it.
+      if (request !== requestRef.current) return;
+      setEntries((prev) => {
+        const seen = new Set(prev.map((e) => e.id));
+        return [...prev, ...result.filter((e) => !seen.has(e.id))];
+      });
       setHasMore(result.length === PAGE_SIZE);
       offsetRef.current += result.length;
       setError(null);

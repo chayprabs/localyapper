@@ -2,6 +2,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { reservedHotkeyMessage } from "@/lib/hotkeyReservations";
+import { eventToShortcut } from "@/lib/hotkeyCapture";
 import { Icon } from "@/components/ui/Icon";
 
 // Platform detection for key symbol display
@@ -32,26 +33,6 @@ function formatKey(key: string): string {
 /** Parse a shortcut string into displayable badge tokens. */
 function parseHotkeyParts(hotkey: string): string[] {
   return hotkey.split("+").map(formatKey);
-}
-
-/** Convert a keyboard event into a Tauri-style shortcut string. */
-function eventToShortcut(e: KeyboardEvent): string | null {
-  if (["Alt", "Control", "Shift", "Meta", "AltGraph"].includes(e.key)) {
-    return null;
-  }
-
-  const parts: string[] = [];
-  if (e.ctrlKey) parts.push("Ctrl");
-  if (e.altKey) parts.push("Alt");
-  if (e.shiftKey) parts.push("Shift");
-  if (e.metaKey) parts.push("Meta");
-
-  let keyName = e.key;
-  if (keyName === " ") keyName = "Space";
-  else if (keyName.length === 1) keyName = keyName.toUpperCase();
-
-  parts.push(keyName);
-  return parts.join("+");
 }
 
 function KeyBadge({ label }: { label: string }) {
