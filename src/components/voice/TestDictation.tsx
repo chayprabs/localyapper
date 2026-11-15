@@ -5,7 +5,6 @@ import { listen } from "@tauri-apps/api/event";
 import { testDictation } from "@/lib/commands/recording";
 import { Button } from "@/components/ui/Button";
 import { errorText, Row } from "@/components/settings/controls";
-import { cn } from "@/lib/utils";
 
 interface Timings {
   capture_start_ms: number;
@@ -24,37 +23,30 @@ interface TestResult {
 }
 
 const STAGES: { key: keyof Timings; label: string; unit: string }[] = [
-  { key: "capture_start_ms", label: "Microphone start", unit: "ms" },
+  { key: "capture_start_ms", label: "Mic start", unit: "ms" },
   { key: "model_ready_ms", label: "Model ready", unit: "ms" },
   { key: "audio_ms", label: "Audio", unit: "ms" },
   { key: "segments", label: "Segments", unit: "" },
-  { key: "decode_ms", label: "Decoding", unit: "ms" },
-  { key: "tail_decode_ms", label: "Decoding after release", unit: "ms" },
-  { key: "release_to_text_ms", label: "Release to text", unit: "ms" },
+  { key: "decode_ms", label: "Decode", unit: "ms" },
+  { key: "tail_decode_ms", label: "Tail decode", unit: "ms" },
+  { key: "release_to_text_ms", label: "Release→text", unit: "ms" },
 ];
 
-const BARS = 40;
+const BARS = 24;
 const SILENCE: number[] = Array.from({ length: BARS }, () => 0);
 
 /** The last few input levels as a scrolling row of bars. */
-function Waveform({ levels, live }: { levels: number[]; live: boolean }) {
+function Waveform({ levels }: { levels: number[] }) {
   return (
-    <div
-      role="img"
-      aria-label="Input level"
-      className="mt-3 flex h-12 items-center justify-between rounded-2xl bg-ink/[0.04] px-4"
-    >
+    <span role="img" aria-label="Input level" className="flex h-5 animate-fade-in items-center gap-[2px]">
       {levels.map((level, i) => (
         <span
           key={i}
-          className={cn(
-            "w-[3px] rounded-full transition-[height,background-color] duration-100 ease-out",
-            live ? "bg-accent" : "bg-ink/15",
-          )}
-          style={{ height: `${Math.max(3, Math.min(1, Math.sqrt(Math.max(0, level))) * 32)}px` }}
+          className="w-[2px] bg-signal transition-[height] duration-100 ease-out"
+          style={{ height: `${Math.max(2, Math.min(1, Math.sqrt(Math.max(0, level))) * 20)}px` }}
         />
       ))}
-    </div>
+    </span>
   );
 }
 
@@ -112,40 +104,40 @@ export function TestDictation() {
 
   return (
     <Row
-      label="Test dictation"
+      label="Test"
       hint="Runs the real pipeline. The text shows here and is not pasted or saved."
       error={error}
       below={
-        <>
-          <Waveform levels={levels} live={recording} />
-          {result && (
-            <div className="mt-3 animate-rise-in">
-              {result.text === null ? (
-                <p className="text-[13px] text-ink/50">Nothing was recognised. The overlay shows the reason.</p>
-              ) : (
-                <p className="selectable text-[15px] leading-relaxed text-ink/90">{result.text || "(no words)"}</p>
-              )}
-              {result.timings && (
-                <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 border-t border-ink/[0.06] pt-3 text-[12px] sm:grid-cols-3">
-                  {STAGES.map((s) => (
-                    <div key={s.key} className="flex justify-between gap-2">
-                      <dt className="text-ink/45">{s.label}</dt>
-                      <dd className="tabular-nums text-ink/80">
-                        {result.timings?.[s.key]}
-                        {s.unit && ` ${s.unit}`}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-            </div>
-          )}
-        </>
+        result && (
+          <div className="animate-fade-in pb-1 pt-2">
+            {result.text === null ? (
+              <p className="text-[13px] text-ink/50">Nothing recognised.</p>
+            ) : (
+              <p className="selectable text-[13px] leading-5 text-ink/90">{result.text || "(no words)"}</p>
+            )}
+            {result.timings && (
+              <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-[11.5px] sm:grid-cols-3">
+                {STAGES.map((s) => (
+                  <div key={s.key} className="flex justify-between gap-2">
+                    <dt className="text-ink/40">{s.label}</dt>
+                    <dd className="text-ink/80">
+                      {result.timings?.[s.key]}
+                      {s.unit && ` ${s.unit}`}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+        )
       }
     >
-      <Button variant={recording ? "danger" : "primary"} onClick={toggle} disabled={waiting} className="min-w-[72px]">
-        {recording ? "Stop" : waiting ? "Working…" : "Start"}
-      </Button>
+      <span className="flex items-center gap-3">
+        {recording && <Waveform levels={levels} />}
+        <Button variant={recording ? "danger" : "outline"} onClick={toggle} disabled={waiting} className="min-w-[56px]">
+          {recording ? "Stop" : waiting ? "…" : "Start"}
+        </Button>
+      </span>
     </Row>
   );
 }

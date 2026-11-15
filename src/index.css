@@ -3,69 +3,29 @@
 @tailwind utilities;
 
 /* Theme tokens. "system" follows the OS; the theme setting puts data-theme
-   on <html> to force light or dark. Colours are RGB channels. */
+   on <html> to force light or dark. Colours are RGB channels. The interface
+   is ink on a flat canvas; "signal" is the only colour. */
 :root {
-  --ink: 18 18 24;
-  --canvas: 243 244 248;
-  --accent: 84 82 232;
-  --ok: 21 128 61;
-  --warn: 161 98 7;
-  --danger: 200 30 30;
-
-  /* Glass: a translucent fill, a bright edge and a soft drop shadow. */
-  --glass-fill: rgb(255 255 255 / 0.56);
-  --glass-edge: rgb(255 255 255 / 0.8);
-  --glass-sheen: rgb(255 255 255 / 0.9);
-  --glass-shadow: 0 0 0 0.5px rgb(18 18 24 / 0.06), 0 1px 2px rgb(18 18 24 / 0.04),
-    0 16px 32px -16px rgb(18 18 24 / 0.14);
-  --raised-fill: rgb(255 255 255 / 0.95);
-  --raised-shadow: 0 0 0 0.5px rgb(18 18 24 / 0.08), 0 1px 3px rgb(18 18 24 / 0.12);
-
-  /* Ambient colour behind the glass. */
-  --blob-a: rgb(99 102 241 / 0.2);
-  --blob-b: rgb(236 72 153 / 0.13);
-  --blob-c: rgb(34 211 238 / 0.16);
+  --ink: 20 20 19;
+  --canvas: 252 252 250;
+  --signal: 204 38 28;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ink: 244 244 250;
-    --canvas: 11 11 15;
-    --accent: 150 148 255;
-    --ok: 74 222 128;
-    --warn: 251 191 36;
-    --danger: 248 113 113;
-    --glass-fill: rgb(255 255 255 / 0.05);
-    --glass-edge: rgb(255 255 255 / 0.09);
-    --glass-sheen: rgb(255 255 255 / 0.08);
-    --glass-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 20px 40px -20px rgb(0 0 0 / 0.6);
-    --raised-fill: rgb(255 255 255 / 0.14);
-    --raised-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 1px 3px rgb(0 0 0 / 0.4);
-    --blob-a: rgb(99 102 241 / 0.3);
-    --blob-b: rgb(192 38 211 / 0.14);
-    --blob-c: rgb(14 165 233 / 0.16);
+    --ink: 236 236 232;
+    --canvas: 18 18 17;
+    --signal: 255 99 88;
     --logo-filter: invert(1);
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --ink: 244 244 250;
-  --canvas: 11 11 15;
-  --accent: 150 148 255;
-  --ok: 74 222 128;
-  --warn: 251 191 36;
-  --danger: 248 113 113;
-  --glass-fill: rgb(255 255 255 / 0.05);
-  --glass-edge: rgb(255 255 255 / 0.09);
-  --glass-sheen: rgb(255 255 255 / 0.08);
-  --glass-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 20px 40px -20px rgb(0 0 0 / 0.6);
-  --raised-fill: rgb(255 255 255 / 0.14);
-  --raised-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 1px 3px rgb(0 0 0 / 0.4);
-  --blob-a: rgb(99 102 241 / 0.3);
-  --blob-b: rgb(192 38 211 / 0.14);
-  --blob-c: rgb(14 165 233 / 0.16);
+  --ink: 236 236 232;
+  --canvas: 18 18 17;
+  --signal: 255 99 88;
   --logo-filter: invert(1);
   color-scheme: dark;
 }
@@ -80,46 +40,29 @@ body {
   margin: 0;
   overflow: hidden;
   background: rgb(var(--canvas));
-  color: rgb(var(--ink) / 0.88);
+  color: rgb(var(--ink) / 0.9);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
     "Segoe UI", Inter, Roboto, Ubuntu, sans-serif;
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
   cursor: default;
   user-select: none;
   -webkit-user-select: none;
 }
 
-/* Ambient light: three soft colour fields that drift slowly. Gradients
-   only (no blur filter), so it costs nothing to composite. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: -12%;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(42% 46% at 16% 10%, var(--blob-a), transparent 72%),
-    radial-gradient(38% 42% at 90% 16%, var(--blob-b), transparent 72%),
-    radial-gradient(52% 46% at 62% 104%, var(--blob-c), transparent 72%);
-  animation: drift 26s ease-in-out infinite alternate;
-  will-change: transform;
-}
-
 ::selection {
-  background: rgb(var(--accent) / 0.28);
+  background: rgb(var(--ink) / 0.16);
 }
 
 :focus-visible {
-  outline: 2px solid rgb(var(--accent) / 0.7);
+  outline: 1.5px solid rgb(var(--ink) / 0.7);
   outline-offset: 2px;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(var(--ink) / 0.16) transparent;
+  scrollbar-color: rgb(var(--ink) / 0.18) transparent;
 }
 *::-webkit-scrollbar {
   width: 10px;
@@ -128,7 +71,7 @@ body::before {
 *::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   border-radius: 999px;
-  background: rgb(var(--ink) / 0.16);
+  background: rgb(var(--ink) / 0.18);
   background-clip: content-box;
 }
 *::-webkit-scrollbar-track {
@@ -136,20 +79,6 @@ body::before {
 }
 
 @layer components {
-  .glass {
-    background: var(--glass-fill);
-    border: 1px solid var(--glass-edge);
-    box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
-    -webkit-backdrop-filter: blur(28px) saturate(170%);
-    backdrop-filter: blur(28px) saturate(170%);
-  }
-
-  /* The lifted chip inside a glass track: nav indicator, segments. */
-  .raised {
-    background: var(--raised-fill);
-    box-shadow: var(--raised-shadow);
-  }
-
   /* The logo is a dark glyph; it is inverted on dark backgrounds. */
   .logo {
     filter: var(--logo-filter, none);
@@ -161,39 +90,11 @@ body::before {
     user-select: text;
     -webkit-user-select: text;
   }
-
-  /* Soft fade where scrolling content meets the title bar. */
-  .fade-top {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 20px);
-    mask-image: linear-gradient(to bottom, transparent 0, #000 20px);
-  }
-
-  /* Children rise in one after another. */
-  .stagger > * {
-    animation: rise-in 460ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  .stagger > *:nth-child(2) { animation-delay: 50ms; }
-  .stagger > *:nth-child(3) { animation-delay: 100ms; }
-  .stagger > *:nth-child(4) { animation-delay: 150ms; }
-  .stagger > *:nth-child(5) { animation-delay: 200ms; }
-  .stagger > *:nth-child(n + 6) { animation-delay: 250ms; }
 }
 
-@keyframes rise-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.985); }
-  to { opacity: 1; transform: none; }
-}
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-@keyframes ring {
-  0% { transform: scale(0.72); opacity: 0.55; }
-  100% { transform: scale(1.75); opacity: 0; }
-}
-@keyframes drift {
-  from { transform: translate3d(-2%, -1%, 0) scale(1); }
-  to { transform: translate3d(2%, 2%, 0) scale(1.06); }
 }
 
 @media (prefers-reduced-motion: reduce) {

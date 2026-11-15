@@ -1,15 +1,18 @@
-// History page -- searchable list of past dictations, grouped by day
-import { useEffect, useMemo, useState } from "react";
-import { useSetAtom } from "jotai";
+// History page -- the main page: hotkey and status on top, then the
+// searchable list of past dictations grouped by day
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useHistory } from "@/hooks/useHistory";
-import { activePageAtom } from "@/stores/appStore";
+import { useHome } from "@/hooks/useHome";
+import { activePageAtom, pausedAtom } from "@/stores/appStore";
 import { exportHistory } from "@/lib/commands/history";
-import { formatLocalDay, formatLocalTime } from "@/lib/formatters";
+import { formatLocalDay, formatLocalTime, formatNumber } from "@/lib/formatters";
 import type { HistoryEntry } from "@/types/commands";
 import { Button, IconButton } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Icon } from "@/components/ui/Icon";
-import { Chip, errorText, Notice, Page, PageHeader, Panel, Spinner } from "@/components/settings/controls";
+import { Keys } from "@/components/ui/Keys";
+import { errorText, Notice, Page, Spinner } from "@/components/settings/controls";
 import { cn } from "@/lib/utils";
 
 /** Consecutive entries grouped by their local calendar day. */
@@ -40,63 +43,57 @@ function Entry({ entry, onDelete }: { entry: HistoryEntry; onDelete: (id: string
   }, [confirming]);
 
   return (
-    <li className="group flex gap-3 px-4 py-3">
-      <time className="w-[58px] shrink-0 pt-px text-[12px] tabular-nums leading-[21px] text-ink/40">
+    <li className="group flex gap-4 py-2.5">
+      <time className="w-[62px] shrink-0 font-mono text-[11.5px] leading-5 text-ink/40">
         {formatLocalTime(entry.created_at)}
       </time>
-      <div className="min-w-0 flex-1">
-        <p
-          onClick={() => setOpen((v) => !v)}
-          className={cn("selectable text-[13.5px] leading-[21px] text-ink/85", !open && "line-clamp-2")}
-        >
-          {entry.final_text}
-        </p>
-      </div>
+      <p
+        onClick={() => setOpen((v) => !v)}
+        className={cn("selectable min-w-0 flex-1 text-[13px] leading-5 text-ink/90", !open && "line-clamp-2")}
+      >
+        {entry.final_text}
+      </p>
       {/* The app name rests on the right; the actions take its place on hover. */}
-      <div className="relative flex min-w-[64px] shrink-0 items-start justify-end">
+      <div className="relative flex h-5 min-w-[56px] shrink-0 items-center justify-end">
         {entry.app_name && (
           <span
             className={cn(
-              "mt-px flex max-w-[110px] transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0",
+              "max-w-[110px] truncate text-[12px] text-ink/35 group-focus-within:opacity-0 group-hover:opacity-0",
               confirming && "opacity-0",
             )}
           >
-            <Chip>{entry.app_name}</Chip>
+            {entry.app_name}
           </span>
         )}
-      <div
-        className={cn(
-          "absolute -right-2 -top-1 flex transition-opacity duration-150",
-          !confirming && "opacity-0 focus-within:opacity-100 group-hover:opacity-100",
-        )}
-      >
-        {confirming ? (
-          <Button variant="danger" size="sm" className="mr-2 mt-1 animate-fade-in" onClick={() => onDelete(entry.id)}>
-            Delete
-          </Button>
-        ) : (
-          <>
-            <CopyButton text={entry.final_text} />
-            <IconButton label="Delete dictation" tone="danger" onClick={() => setConfirming(true)}>
-              <Icon name="delete" size={16} />
-            </IconButton>
-          </>
-        )}
-      </div>
+        <div
+          className={cn(
+            "absolute right-0 flex items-center",
+            !confirming && "opacity-0 focus-within:opacity-100 group-hover:opacity-100",
+          )}
+        >
+          {confirming ? (
+            <Button variant="danger" className="h-6 animate-fade-in px-2" onClick={() => onDelete(entry.id)}>
+              Delete
+            </Button>
+          ) : (
+            <>
+              <CopyButton text={entry.final_text} />
+              <IconButton label="Delete" tone="danger" className="-mr-1.5" onClick={() => setConfirming(true)}>
+                <Icon name="delete" size={14} />
+              </IconButton>
+            </>
+          )}
+        </div>
       </div>
     </li>
   );
 }
 
-function Empty({ title, children }: { title: string; children: React.ReactNode }) {
+function Figure({ value, unit }: { value: number; unit: string }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center pb-16 text-center">
-      <div className="glass mb-5 flex h-16 w-16 items-center justify-center rounded-full">
-        <Icon name="history" size={24} strokeWidth={1.5} className="text-ink/40" />
-      </div>
-      <p className="text-[17px] font-semibold tracking-[-0.01em] text-ink">{title}</p>
-      {children}
-    </div>
+    <span>
+      <span className="text-ink/90">{formatNumber(value)}</span> {unit}
+    </span>
   );
 }
 
@@ -104,6 +101,8 @@ export function HistoryPage() {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const { entries, isLoading, hasMore, error, loadMore, deleteEntry, clearAll } = useHistory(search);
+  const home = useHome();
+  const paused = useAtomValue(pausedAtom) === true;
   const setActivePage = useSetAtom(activePageAtom);
   const [confirmClear, setConfirmClear] = useState(false);
   const [exportNote, setExportNote] = useState<{ ok: boolean; text: string } | null>(null);
@@ -122,6 +121,14 @@ export function HistoryPage() {
     if (isEmpty) setConfirmClear(false);
   }, [isEmpty]);
 
+  if (isLoading || home.isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
   const handleExport = () => {
     setExportNote(null);
     exportHistory()
@@ -129,15 +136,74 @@ export function HistoryPage() {
       .catch((err: unknown) => setExportNote({ ok: false, text: errorText(err) }));
   };
 
+  const noModel = home.modelFileStatus !== null && !home.modelFileStatus.exists;
+  const status: ReactNode = paused ? (
+    "Paused"
+  ) : noModel ? (
+    <>
+      No speech model
+      <Button onClick={() => setActivePage("voice")}>Download</Button>
+    </>
+  ) : (
+    "Hold to dictate"
+  );
+  const notices = (
+    <>
+      {home.error && <Notice>{home.error}</Notice>}
+      {error && <Notice>{error}</Notice>}
+      {exportNote && <Notice tone={exportNote.ok ? "note" : "error"}>{exportNote.text}</Notice>}
+    </>
+  );
+
+  // Nothing dictated yet: the key, and what to do with it.
+  if (noHistory) {
+    return (
+      <div className="flex h-full animate-fade-in flex-col items-center justify-center gap-5 px-6 pb-10">
+        <Keys hotkey={home.recordHotkey} size="xl" />
+        <div className="flex items-center gap-3 text-[13px] text-ink/55">{status}</div>
+        {notices}
+      </div>
+    );
+  }
+
+  const stats = home.stats;
   return (
-    <Page className="min-h-full">
-      <PageHeader title="History">
+    <Page className="gap-0">
+      <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-6 gap-y-2">
+        <div className="flex items-center gap-3 text-[13px] text-ink/55">
+          <Keys hotkey={home.recordHotkey} size="lg" />
+          {status}
+        </div>
+        {stats && (
+          <div className="flex gap-4 font-mono text-[11.5px] text-ink/40">
+            <Figure value={stats.words_today} unit="today" />
+            <Figure value={stats.words_week} unit="week" />
+            <Figure value={stats.words_all_time} unit="total" />
+            <Figure value={Math.round(stats.avg_wpm)} unit="wpm" />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-7 flex h-9 items-center gap-4 border-b border-ink/15">
+        <label className="flex min-w-0 flex-1 cursor-text items-center gap-2 text-ink/35 focus-within:text-ink/70">
+          <Icon name="search" size={13} className="shrink-0" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search"
+            aria-label="Search dictations"
+            className="h-8 min-w-0 flex-1 bg-transparent text-[13px] text-ink/90 outline-none placeholder:text-ink/35 [&::-webkit-search-cancel-button]:hidden"
+          />
+        </label>
         {confirmClear ? (
-          <div className="flex animate-fade-in items-center gap-2">
-            <span className="text-[13px] text-ink/55">Delete all history?</span>
-            <Button onClick={() => setConfirmClear(false)}>Cancel</Button>
+          <span className="flex animate-fade-in items-center gap-3">
+            <Button variant="ghost" onClick={() => setConfirmClear(false)}>
+              Cancel
+            </Button>
             <Button
               variant="danger"
+              className="h-6 px-2"
               onClick={() => {
                 setConfirmClear(false);
                 void clearAll();
@@ -145,71 +211,38 @@ export function HistoryPage() {
             >
               Delete all
             </Button>
-          </div>
+          </span>
         ) : (
-          !noHistory && (
-            <div className="flex items-center gap-2">
-              <label className="glass flex h-8 w-[200px] cursor-text items-center gap-2 rounded-full px-3 text-ink/40 transition-[width] duration-300 ease-out focus-within:w-[260px] focus-within:text-ink/70">
-                <Icon name="search" size={14} className="shrink-0" />
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search"
-                  aria-label="Search dictations"
-                  className="min-w-0 flex-1 bg-transparent text-[13px] text-ink/90 outline-none placeholder:text-ink/35 [&::-webkit-search-cancel-button]:hidden"
-                />
-              </label>
-              <IconButton label="Export as text" onClick={handleExport}>
-                <Icon name="export" size={16} />
-              </IconButton>
-              <IconButton label="Delete all history" tone="danger" onClick={() => setConfirmClear(true)}>
-                <Icon name="delete" size={16} />
-              </IconButton>
-            </div>
-          )
+          <span className="flex items-center gap-3">
+            <Button variant="ghost" onClick={handleExport}>
+              Export
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmClear(true)}>
+              Clear
+            </Button>
+          </span>
         )}
-      </PageHeader>
+      </div>
 
-      {error && <Notice>{error}</Notice>}
-      {exportNote && <Notice tone={exportNote.ok ? "info" : "danger"}>{exportNote.text}</Notice>}
+      <div className="mt-2 empty:hidden">{notices}</div>
 
-      {isLoading ? (
-        <div className="flex flex-1 items-center justify-center pb-16">
-          <Spinner size={22} />
-        </div>
-      ) : noHistory ? (
-        <Empty title="Nothing here yet">
-          <p className="mt-2 max-w-[340px] text-[13px] leading-relaxed text-ink/50">
-            What you dictate is kept here, on this computer only.
-          </p>
-          <Button className="mt-5" onClick={() => setActivePage("dictation")}>
-            Set up your hotkey
-          </Button>
-        </Empty>
-      ) : isEmpty ? (
-        <Empty title="No matches">
-          <p className="mt-2 max-w-[300px] break-words text-[13px] leading-relaxed text-ink/50">
-            Nothing you dictated contains “{search}”.
-          </p>
-        </Empty>
+      {isEmpty ? (
+        <p className="mt-6 text-[13px] text-ink/45">No matches.</p>
       ) : (
         <>
           {groups.map((group) => (
-            <section key={group.day}>
-              <h2 className="mb-2 px-4 text-[12px] font-medium text-ink/45">{group.day}</h2>
-              <Panel>
-                <ul className="divide-y divide-ink/[0.06]">
-                  {group.items.map((entry) => (
-                    <Entry key={entry.id} entry={entry} onDelete={(id) => void deleteEntry(id)} />
-                  ))}
-                </ul>
-              </Panel>
+            <section key={group.day} className="mt-6">
+              <h2 className="pb-1 text-[12px] text-ink/45">{group.day}</h2>
+              <ul className="divide-y divide-ink/[0.08]">
+                {group.items.map((entry) => (
+                  <Entry key={entry.id} entry={entry} onDelete={(id) => void deleteEntry(id)} />
+                ))}
+              </ul>
             </section>
           ))}
           {hasMore && (
-            <div className="flex justify-center">
-              <Button onClick={loadMore}>Show more</Button>
+            <div className="mt-6">
+              <Button onClick={loadMore}>More</Button>
             </div>
           )}
         </>

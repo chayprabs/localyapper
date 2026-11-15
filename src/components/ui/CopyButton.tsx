@@ -1,4 +1,4 @@
-// Copy-to-clipboard icon button; the icon turns into a check for a moment.
+// Copy-to-clipboard icon button; the icon becomes a check for a moment.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/Button";
@@ -23,25 +23,8 @@ export function CopyButton({ text, label = "Copy", className }: { text: string; 
   }, [text]);
 
   return (
-    <IconButton label={copied ? "Copied" : label} onClick={handleCopy} className={cn(copied && "text-ok", className)}>
-      <span className="relative h-4 w-4">
-        <span
-          className={cn(
-            "absolute inset-0 transition-[opacity,transform] duration-200 ease-out",
-            copied ? "scale-50 opacity-0" : "scale-100 opacity-100",
-          )}
-        >
-          <Icon name="content_copy" size={16} />
-        </span>
-        <span
-          className={cn(
-            "absolute inset-0 transition-[opacity,transform] duration-200 ease-spring",
-            copied ? "scale-100 opacity-100" : "scale-50 opacity-0",
-          )}
-        >
-          <Icon name="check" size={16} strokeWidth={2.25} />
-        </span>
-      </span>
+    <IconButton label={copied ? "Copied" : label} onClick={handleCopy} className={cn(copied && "text-ink", className)}>
+      <Icon name={copied ? "check" : "content_copy"} size={14} strokeWidth={copied ? 2.25 : 1.75} />
     </IconButton>
   );
 }

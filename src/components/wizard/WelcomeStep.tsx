@@ -1,7 +1,7 @@
-// Wizard welcome step -- product introduction with Get started action
+// Wizard welcome step -- product introduction with Start action
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/settings/controls";
-import { Step, TextButton } from "./Step";
+import { Actions, Step } from "./Step";
 
 export function WelcomeStep({
   onGetStarted,
@@ -13,15 +13,15 @@ export function WelcomeStep({
   error: string | null;
 }) {
   return (
-    <Step
-      icon="mic"
-      title="Welcome to LocalYapper"
-      text="Press a key, speak, let go. Your words appear wherever your cursor is. Everything happens on this computer."
-    >
-      <Button variant="primary" size="lg" className="w-full" onClick={onGetStarted}>
-        Get started
-      </Button>
-      <TextButton onClick={onSkip}>Skip setup</TextButton>
+    <Step title="LocalYapper" text="Hold a key, speak, let go. The text is pasted where your cursor is. Offline.">
+      <Actions>
+        <Button variant="primary" size="lg" onClick={onGetStarted}>
+          Set up
+        </Button>
+        <Button variant="ghost" size="lg" onClick={onSkip}>
+          Skip
+        </Button>
+      </Actions>
       {error && <Notice>{error}</Notice>}
     </Step>
   );

@@ -2,10 +2,10 @@
 import { atom } from "jotai";
 
 /** Main pages, in navigation order. */
-export type PageId = "home" | "history" | "dictation" | "voice" | "general";
+export type PageId = "history" | "dictation" | "voice" | "general";
 
 /** The page shown in the main window. */
-export const activePageAtom = atom<PageId>("home");
+export const activePageAtom = atom<PageId>("history");
 
 /**
  * Tri-state atom mirroring the backend `state.paused` flag.

@@ -11,7 +11,8 @@ import {
 } from "@/lib/commands/models";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { Chip, errorText, Row, Section } from "@/components/settings/controls";
+import { errorText, Notice, Row, Section } from "@/components/settings/controls";
+import { cn } from "@/lib/utils";
 
 interface Progress {
   id: string;
@@ -74,67 +75,78 @@ export function Models() {
 
   return (
     <Section
-      title="Speech model"
+      title="Model"
       action={
-        <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => void run("auto", () => selectModel("auto"))}>
-          Pick for this computer
+        <Button
+          variant="ghost"
+          className="h-6"
+          title="Choose the best model for this computer"
+          disabled={busy !== null}
+          onClick={() => void run("auto", () => selectModel("auto"))}
+        >
+          Auto
         </Button>
       }
     >
       {models.map((m) => {
         const working = busy === m.id;
         const percent = working && progress?.id === m.id ? progress.percent : null;
-        const state = m.state === "installed" ? "Downloaded" : m.state === "partial" ? "Partly downloaded" : null;
         return (
           <Row
             key={m.id}
             label={
-              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="flex items-center gap-2">
+                {/* Solid dot: the model in use. */}
+                <span
+                  title={m.active ? "In use" : undefined}
+                  className={cn("h-1.5 w-1.5 rounded-full", m.active ? "bg-ink" : "border border-ink/30")}
+                />
                 {m.name}
-                {m.active && <Chip tone="accent">In use</Chip>}
-                {m.recommended && <Chip>Recommended</Chip>}
               </span>
             }
-            hint={[formatSize(m.size_bytes), languagesLabel(m.languages), m.license, state].filter(Boolean).join(" · ")}
+            hint={`${m.license}${m.recommended ? ". Recommended for this computer." : ""}`}
+            detail={
+              <span className="font-mono text-[11.5px]">
+                {formatSize(m.size_bytes)} · {languagesLabel(m.languages)}
+                {m.state === "partial" && " · partial"}
+              </span>
+            }
             below={
               percent !== null && (
-                <div className="mt-2.5 flex animate-fade-in items-center gap-3">
-                  <div className="h-1 flex-1 overflow-hidden rounded-full bg-ink/[0.08]" aria-label="Download progress">
+                <div className="flex animate-fade-in items-center gap-3 pb-1 pt-1.5">
+                  <div className="h-px flex-1 bg-ink/15" aria-label="Download progress">
                     <div
-                      className="h-full rounded-full bg-accent transition-[width] duration-300 ease-out"
+                      className="-mt-px h-[3px] bg-ink transition-[width] duration-300 ease-out"
                       style={{ width: `${percent.toFixed(1)}%` }}
                     />
                   </div>
-                  <span className="w-9 text-right text-[12px] tabular-nums text-ink/50">{Math.floor(percent)}%</span>
+                  <span className="w-9 text-right font-mono text-[11.5px] text-ink/60">{Math.floor(percent)}%</span>
                 </div>
               )
             }
           >
             <span className="flex items-center gap-1">
               {working ? (
-                <Button size="sm" onClick={() => void cancelModelDownload()}>
-                  Cancel
-                </Button>
+                <Button onClick={() => void cancelModelDownload()}>Cancel</Button>
               ) : m.state === "installed" ? (
                 <>
                   {!m.active && (
-                    <Button size="sm" disabled={busy !== null} onClick={() => void run(m.id, () => selectModel(m.id))}>
+                    <Button disabled={busy !== null} onClick={() => void run(m.id, () => selectModel(m.id))}>
                       Use
                     </Button>
                   )}
                   <IconButton
                     label={`Delete ${m.name}`}
                     tone="danger"
+                    className="-mr-1.5"
                     disabled={busy !== null}
                     onClick={() => void run(m.id, () => deleteModel(m.id))}
                   >
-                    <Icon name="delete" size={16} />
+                    <Icon name="delete" size={14} />
                   </IconButton>
                 </>
               ) : (
                 <Button
-                  size="sm"
-                  variant={models.some((x) => x.state === "installed") ? "soft" : "primary"}
                   disabled={busy !== null}
                   onClick={() =>
                     void run(m.id, async () => {
@@ -151,9 +163,9 @@ export function Models() {
         );
       })}
       {error && (
-        <p role="alert" className="px-4 py-3 text-[12px] font-medium text-danger">
-          {error}
-        </p>
+        <div className="py-2">
+          <Notice>{error}</Notice>
+        </div>
       )}
     </Section>
   );

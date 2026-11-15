@@ -1,4 +1,4 @@
-// Switch toggle.
+// Switch toggle: hollow when off, solid ink when on.
 import { cn } from "@/lib/utils";
 
 interface SwitchProps {
@@ -22,17 +22,16 @@ export function Switch({ checked, onChange, disabled = false, ariaLabel = "Toggl
         if (!disabled) onChange(!checked);
       }}
       className={cn(
-        "group relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition-colors duration-200",
-        checked ? "bg-accent" : "bg-ink/[0.16]",
-        disabled && "opacity-50",
+        "relative inline-flex h-[18px] w-[30px] shrink-0 items-center rounded-full border transition-colors duration-150",
+        checked ? "border-ink bg-ink" : "border-ink/30 bg-transparent",
+        disabled && "opacity-40",
         className,
       )}
     >
       <span
         className={cn(
-          "inline-block h-[18px] w-[18px] rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.3)]",
-          "transition-[transform,width] duration-300 ease-spring group-active:w-[22px]",
-          checked ? "translate-x-[18px] group-active:translate-x-[14px]" : "translate-x-[2px]",
+          "inline-block h-3 w-3 rounded-full transition-transform duration-150 ease-out",
+          checked ? "translate-x-[14px] bg-canvas" : "translate-x-[2px] bg-ink/45",
         )}
       />
     </button>

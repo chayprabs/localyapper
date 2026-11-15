@@ -2,23 +2,16 @@
 import { useState, type ReactNode } from "react";
 import type { PermissionsStatus } from "@/types/commands";
 import { Button } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
 import { Keys } from "@/components/ui/Keys";
 import { Switch } from "@/components/ui/Switch";
 import { Notice } from "@/components/settings/controls";
 import { Step } from "./Step";
 
-function SummaryRow({ ok, label, children }: { ok: boolean; label: string; children: ReactNode }) {
+function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-11 items-center gap-3 px-4 py-2">
-      <Icon
-        name={ok ? "check" : "warning"}
-        size={15}
-        strokeWidth={2.25}
-        className={ok ? "shrink-0 text-ok" : "shrink-0 text-warn"}
-      />
-      <span className="flex-1 text-[13px] font-medium text-ink/90">{label}</span>
-      <span className="text-right text-[12.5px] text-ink/50">{children}</span>
+    <div className="flex h-10 items-center justify-between gap-4">
+      <span className="text-[13px] text-ink/90">{label}</span>
+      <span className="text-[12.5px] text-ink/55">{children}</span>
     </div>
   );
 }
@@ -36,30 +29,23 @@ export function ReadyStep({ hotkey, permissions, filesInstalled, onFinish, error
   const micGranted = permissions?.microphone === true;
 
   return (
-    <Step
-      icon="check_circle"
-      tone="ok"
-      title="You're ready to dictate"
-      text="Hold your hotkey in any app and speak. The words appear the moment you let go."
-    >
-      <div className="w-full divide-y divide-ink/[0.06] rounded-2xl bg-ink/[0.04] text-left">
-        <SummaryRow ok label="Hotkey">
+    <Step title="Ready">
+      <div className="w-full divide-y divide-ink/[0.08] border-y border-ink/15">
+        <SummaryRow label="Hotkey">
           <Keys hotkey={hotkey} />
         </SummaryRow>
-        <SummaryRow ok={micGranted} label="Microphone">
-          {micGranted ? "Ready" : "Not found yet"}
+        <SummaryRow label="Microphone">
+          {micGranted ? "Ready" : <span className="text-signal">Not found</span>}
         </SummaryRow>
-        <SummaryRow ok={filesInstalled} label="Speech model">
-          {filesInstalled ? "Installed" : "Get it later under Voice"}
+        <SummaryRow label="Speech model">
+          {filesInstalled ? "Installed" : <span className="text-signal">Missing, get it under Voice</span>}
         </SummaryRow>
-        <label className="flex min-h-11 cursor-pointer items-center gap-3 px-4 py-2">
-          <span className="flex-1 pl-[27px] text-[13px] font-medium text-ink/90">Launch when I sign in</span>
-          <Switch ariaLabel="Launch LocalYapper when I sign in" checked={launchAtLogin} onChange={setLaunchAtLogin} />
-        </label>
+        <SummaryRow label="Launch at login">
+          <Switch ariaLabel="Launch at login" checked={launchAtLogin} onChange={setLaunchAtLogin} />
+        </SummaryRow>
       </div>
-
-      <Button variant="primary" size="lg" className="w-full" onClick={() => onFinish(launchAtLogin)}>
-        Start yapping
+      <Button variant="primary" size="lg" onClick={() => onFinish(launchAtLogin)}>
+        Done
       </Button>
       {error && <Notice>{error}</Notice>}
     </Step>

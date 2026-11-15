@@ -4,7 +4,6 @@ import { listen } from "@tauri-apps/api/event";
 import { setHotkeyProbe, updateHotkey } from "@/lib/commands/hotkeys";
 import { useHotkeyCapture } from "@/hooks/useHotkeyCapture";
 import { Button } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
 import { Keys } from "@/components/ui/Keys";
 import { cn } from "@/lib/utils";
 import { Step } from "./Step";
@@ -60,44 +59,29 @@ export function HotkeyStep({
   useHotkeyCapture(capturing, fieldRef, handleCapture, handleCancel);
 
   return (
-    <Step icon="keyboard" title="Choose your hotkey" text="Hold it to record, let go to paste. Click the key to change it.">
+    <Step title="Hotkey" text="Click the key to change it. Press it to test.">
       <button
         ref={fieldRef}
         type="button"
         aria-label={`Record hotkey: ${hotkey}. Click to change.`}
         onClick={() => setCapturing(true)}
-        className={cn(
-          "flex h-16 min-w-[168px] items-center justify-center rounded-3xl px-6 transition-[background-color,box-shadow] duration-200",
-          capturing
-            ? "bg-accent/[0.1] shadow-[0_0_0_1.5px_rgb(var(--accent)/0.6)]"
-            : detected
-              ? "bg-ok/10 shadow-[0_0_0_1.5px_rgb(var(--ok)/0.45)]"
-              : "bg-ink/[0.05] hover:bg-ink/[0.08]",
-        )}
+        className="flex h-16 items-center rounded-lg"
       >
         {capturing ? (
-          <span className="animate-fade-in text-[13px] font-medium text-accent">Press keys</span>
+          <span className="flex h-16 animate-fade-in items-center rounded-lg border border-ink px-5 font-mono text-[14px] text-ink">
+            Press keys
+          </span>
         ) : (
-          <Keys hotkey={hotkey} size="lg" />
+          <Keys hotkey={hotkey} size="xl" />
         )}
       </button>
 
-      <p
-        role="status"
-        className={cn(
-          "flex min-h-5 items-center gap-1.5 text-[12.5px]",
-          registerError ? "text-danger" : detected ? "text-ok" : "text-ink/50",
-        )}
-      >
-        {detected && !registerError && <Icon name="check" size={14} strokeWidth={2.25} />}
-        {registerError
-          ? registerError
-          : detected
-            ? "Detected. It works from any app."
-            : "Press your hotkey now to test it."}
+      <p role="status" className={cn("flex h-5 items-center gap-2.5 text-[13px]", registerError ? "text-signal" : "text-ink/90")}>
+        {!registerError && <span className={cn("h-1.5 w-1.5 rounded-full", detected ? "bg-ink" : "border border-ink/30")} />}
+        {registerError ? registerError : detected ? "Detected" : "Not pressed yet"}
       </p>
 
-      <Button variant="primary" size="lg" className="w-full" onClick={onContinue} disabled={!detected}>
+      <Button variant="primary" size="lg" onClick={onContinue} disabled={!detected}>
         Continue
       </Button>
     </Step>

@@ -4,7 +4,6 @@ import { listInputDevices } from "@/lib/commands/system";
 import {
   errorText,
   Page,
-  PageHeader,
   Row,
   Section,
   Select,
@@ -27,8 +26,8 @@ function DeviceSetting() {
   const missing = value !== null && value !== "default" && !devices.includes(value);
   return (
     <Row
-      label="Microphone"
-      hint={missing ? "The chosen microphone is not connected; the system default is used." : undefined}
+      label="Input"
+      detail={missing ? "Not connected, using the default" : undefined}
       error={error ?? listError}
     >
       <Select label="Microphone" value={value ?? "default"} disabled={value === null} onChange={save}>
@@ -47,9 +46,7 @@ function DeviceSetting() {
 export function VoicePage() {
   return (
     <Page>
-      <PageHeader title="Voice" subtitle="Speech is recognised on this computer. Audio is never written to disk." />
-
-      <Section title="Input">
+      <Section title="Microphone">
         <DeviceSetting />
         <ToggleSetting k="sound_cues" label="Sound cues" hint="A short sound when recording starts and stops." />
         <TestDictation />
@@ -60,13 +57,13 @@ export function VoicePage() {
       <Section title="Memory">
         <SelectSetting
           k="idle_unload_seconds"
-          label="Free memory when idle"
+          label="Unload model after"
           hint="The model is unloaded after this long without dictation."
           options={[
-            { value: "30", label: "After 30 seconds" },
-            { value: "120", label: "After 2 minutes" },
-            { value: "300", label: "After 5 minutes" },
-            { value: "900", label: "After 15 minutes" },
+            { value: "30", label: "30 seconds" },
+            { value: "120", label: "2 minutes" },
+            { value: "300", label: "5 minutes" },
+            { value: "900", label: "15 minutes" },
             { value: "0", label: "Never" },
           ]}
         />

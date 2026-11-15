@@ -52,40 +52,24 @@ export function useSetting(key: string): SettingState {
   return { value, error, save };
 }
 
-/** A page: a centred column whose blocks rise in one after another. */
+/** A page: one centred column. */
 export function Page({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("stagger mx-auto flex w-full max-w-[680px] flex-col gap-6 px-6 pb-10 pt-5", className)}>
+    <div className={cn("mx-auto flex w-full max-w-[620px] animate-fade-in flex-col gap-9 px-6 pb-12 pt-7", className)}>
       {children}
     </div>
   );
 }
 
-export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
-  return (
-    <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-      <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold leading-9 tracking-[-0.02em] text-ink">{title}</h1>
-        {subtitle && <p className="text-[13px] text-ink/50">{subtitle}</p>}
-      </div>
-      {children}
-    </header>
-  );
-}
-
-/** A glass panel. */
-export function Panel({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("glass rounded-[20px]", className)}>{children}</div>;
-}
-
+/** A titled list of rows, separated by hairlines. */
 export function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section>
-      <div className="mb-2 flex min-h-7 items-center justify-between gap-3 px-4">
-        <h2 className="text-[12px] font-medium text-ink/45">{title}</h2>
+      <div className="flex h-7 items-center justify-between gap-3 border-b border-ink/15">
+        <h2 className="text-[12px] text-ink/45">{title}</h2>
         {action}
       </div>
-      <Panel className="divide-y divide-ink/[0.06]">{children}</Panel>
+      <div className="divide-y divide-ink/[0.08]">{children}</div>
     </section>
   );
 }
@@ -93,60 +77,48 @@ export function Section({ title, action, children }: { title: string; action?: R
 export function Row({
   label,
   hint,
+  detail,
   error,
   children,
   below,
 }: {
   label: ReactNode;
-  hint?: ReactNode;
+  /** Shown as a tooltip only. */
+  hint?: string;
+  /** Secondary text beside the label. */
+  detail?: ReactNode;
   error?: string | null;
   children?: ReactNode;
   /** Full-width content under the label line. */
   below?: ReactNode;
 }) {
   return (
-    <div className="px-4 py-3">
-      <div className="flex min-h-8 items-center justify-between gap-4">
-        <div className="min-w-0">
-          <div className="text-[13px] font-medium text-ink/90">{label}</div>
-          {hint && <div className="mt-0.5 break-words text-[12px] leading-snug text-ink/45">{hint}</div>}
+    <div className="py-2" title={hint}>
+      <div className="flex min-h-7 items-center justify-between gap-4">
+        <div className="flex min-w-0 items-baseline gap-2.5">
+          <span className="shrink-0 text-[13px] text-ink/90">{label}</span>
+          {detail && <span className="min-w-0 truncate text-[12px] text-ink/40">{detail}</span>}
         </div>
         {children && <div className="shrink-0">{children}</div>}
       </div>
       {below}
-      {error && (
-        <p role="alert" className="mt-1.5 text-[12px] font-medium text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Notice>{error}</Notice>}
     </div>
   );
 }
 
-/** An inline message: an error, a warning or a neutral note. */
-export function Notice({
-  tone = "danger",
-  children,
-  action,
-}: {
-  tone?: "danger" | "warn" | "info";
-  children: ReactNode;
-  action?: ReactNode;
-}) {
+/** An inline message. Errors are in the signal colour; notes are plain. */
+export function Notice({ tone = "error", children }: { tone?: "error" | "note"; children: ReactNode }) {
   return (
-    <div
-      role={tone === "danger" ? "alert" : "status"}
+    <p
+      role={tone === "error" ? "alert" : "status"}
       className={cn(
-        "flex animate-rise-in items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-[12px] font-medium",
-        tone === "danger" && "bg-danger/[0.08] text-danger",
-        tone === "warn" && "bg-warn/10 text-warn",
-        tone === "info" && "bg-ink/[0.05] text-ink/60",
+        "selectable animate-fade-in break-words text-[12px] leading-snug",
+        tone === "error" ? "text-signal" : "text-ink/55",
       )}
     >
-      {tone !== "info" && <Icon name={tone === "danger" ? "error" : "warning"} size={15} className="shrink-0" />}
-      <span className="selectable min-w-0 flex-1 break-words text-left">{children}</span>
-      {action}
-    </div>
+      {children}
+    </p>
   );
 }
 
@@ -164,7 +136,7 @@ export function ToggleSetting({ k, label, hint }: { k: string; label: string; hi
   );
 }
 
-/** A native select drawn as a pill. */
+/** A native select with a plain outline. */
 export function Select({
   label,
   value,
@@ -183,8 +155,8 @@ export function Select({
       <select
         aria-label={label}
         className={
-          "h-8 max-w-[250px] cursor-pointer appearance-none truncate rounded-full bg-ink/[0.06] pl-3.5 pr-8 " +
-          "text-[13px] text-ink/85 transition-colors hover:bg-ink/[0.1] disabled:opacity-50"
+          "h-7 max-w-[240px] cursor-pointer appearance-none truncate rounded-md border border-ink/20 bg-canvas pl-2.5 pr-7 " +
+          "text-[12.5px] text-ink/90 transition-colors hover:border-ink/50 disabled:opacity-40"
         }
         value={value}
         disabled={disabled}
@@ -194,8 +166,8 @@ export function Select({
       </select>
       <Icon
         name="expand_more"
-        size={14}
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink/45"
+        size={13}
+        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-ink/45"
       />
     </span>
   );
@@ -223,7 +195,7 @@ export function SelectSetting({ k, label, hint, options }: { k: string; label: s
   );
 }
 
-/** A few options side by side; the chosen one is lifted. */
+/** A few options side by side; the chosen one is filled. */
 export function Segmented({
   label,
   value,
@@ -236,7 +208,7 @@ export function Segmented({
   onChange: (value: string) => void;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-full bg-ink/[0.06] p-[3px]">
+    <div role="radiogroup" aria-label={label} className="inline-flex divide-x divide-ink/20 overflow-hidden rounded-md border border-ink/20">
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -248,8 +220,8 @@ export function Segmented({
             disabled={value === null}
             onClick={() => onChange(o.value)}
             className={cn(
-              "h-[26px] rounded-full px-3 text-[12px] font-medium transition-[color,background-color,box-shadow] duration-200",
-              on ? "raised text-ink" : "text-ink/50 hover:text-ink/80",
+              "h-[26px] px-2.5 text-[12.5px] transition-colors duration-100 focus-visible:-outline-offset-2",
+              on ? "bg-ink text-canvas" : "text-ink/55 hover:text-ink",
             )}
           >
             {o.label}
@@ -295,13 +267,13 @@ export function NumberSetting({
   };
   return (
     <Row label={label} hint={hint} error={error}>
-      <label className="flex h-8 cursor-text items-center gap-1.5 rounded-full bg-ink/[0.06] pl-3 pr-3.5 text-[13px] text-ink/45 transition-colors focus-within:bg-ink/[0.1] hover:bg-ink/[0.1]">
+      <label className="flex h-7 cursor-text items-center gap-1.5 rounded-md border border-ink/20 px-2.5 font-mono text-[12px] text-ink/45 transition-colors focus-within:border-ink/60 hover:border-ink/50">
         <input
           aria-label={label}
           type="number"
           min={min}
           max={max}
-          className="w-14 appearance-none bg-transparent text-right tabular-nums text-ink/90 outline-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+          className="w-12 appearance-none bg-transparent text-right text-ink/90 outline-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
           value={draft}
           disabled={value === null}
           onChange={(e) => setDraft(e.target.value)}
@@ -316,23 +288,6 @@ export function NumberSetting({
   );
 }
 
-/** A small label with a status dot or plain text. */
-export function Chip({ tone = "neutral", children }: { tone?: "neutral" | "accent" | "ok" | "warn"; children: ReactNode }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex h-5 max-w-full items-center truncate rounded-full px-2 text-[11px] font-medium",
-        tone === "neutral" && "bg-ink/[0.06] text-ink/55",
-        tone === "accent" && "bg-accent/[0.12] text-accent",
-        tone === "ok" && "bg-ok/[0.12] text-ok",
-        tone === "warn" && "bg-warn/[0.12] text-warn",
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-export function Spinner({ size = 20 }: { size?: number }) {
-  return <Icon name="progress_activity" size={size} className="animate-spin text-ink/30" />;
+export function Spinner({ size = 16 }: { size?: number }) {
+  return <Icon name="progress_activity" size={size} className="animate-spin text-ink/35" />;
 }

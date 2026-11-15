@@ -7,7 +7,6 @@ import { CopyButton } from "@/components/ui/CopyButton";
 import {
   errorText,
   Page,
-  PageHeader,
   Row,
   Section,
   SegmentedSetting,
@@ -26,8 +25,8 @@ const NOTICES = [
 
 function PathRow({ label, path }: { label: string; path: string }) {
   return (
-    <Row label={label} hint={<span className="selectable break-all font-mono text-[11px]">{path}</span>}>
-      <CopyButton text={path} label="Copy path" className="-mr-2" />
+    <Row label={label} detail={<span className="selectable font-mono text-[11.5px]">{path}</span>}>
+      <CopyButton text={path} label="Copy path" className="-mr-1.5" />
     </Row>
   );
 }
@@ -60,45 +59,48 @@ function About() {
     setConfirmReset(false);
     setReset(null);
     resetAllSettings()
-      .then(() => setReset({ ok: true, text: "Settings are back to their defaults." }))
+      .then(() => setReset({ ok: true, text: "Done" }))
       .catch((err: unknown) => setReset({ ok: false, text: errorText(err) }));
   };
 
   return (
     <Section title="About">
-      <Row label="LocalYapper" hint={info ? `Version ${info.version}` : undefined} error={error}>
+      <Row label="Version" detail={info && <span className="font-mono text-[11.5px]">{info.version}</span>} error={error}>
         <span className="flex gap-2">
           <Button onClick={() => openReleases().catch((err: unknown) => setError(errorText(err)))}>Releases</Button>
-          <Button onClick={copyDiagnostics} className="min-w-[124px]">
+          <Button onClick={copyDiagnostics} className="min-w-[116px]" title="OS, CPU, memory, model and timings. Never dictated text.">
             {copied ? "Copied" : "Copy diagnostics"}
           </Button>
         </span>
       </Row>
-      {info && <PathRow label="Data folder" path={info.data_dir} />}
-      {info && <PathRow label="Log folder" path={info.log_dir} />}
+      {info && <PathRow label="Data" path={info.data_dir} />}
+      {info && <PathRow label="Logs" path={info.log_dir} />}
       <Row
-        label="Reset all settings"
-        hint={reset?.ok ? reset.text : "Hotkeys, audio, output and overlay go back to their defaults."}
+        label="Reset settings"
+        hint="Hotkeys, audio, output and overlay go back to their defaults."
+        detail={reset?.ok ? reset.text : undefined}
         error={reset && !reset.ok ? reset.text : null}
       >
         {confirmReset ? (
-          <span className="flex animate-fade-in gap-2">
-            <Button onClick={() => setConfirmReset(false)}>Cancel</Button>
+          <span className="flex animate-fade-in items-center gap-3">
+            <Button variant="ghost" onClick={() => setConfirmReset(false)}>
+              Cancel
+            </Button>
             <Button variant="danger" onClick={resetAll}>
               Reset
             </Button>
           </span>
         ) : (
-          <Button onClick={() => setConfirmReset(true)}>Reset…</Button>
+          <Button onClick={() => setConfirmReset(true)}>Reset</Button>
         )}
       </Row>
-      <details className="group px-4 py-3">
-        <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between text-[13px] font-medium text-ink/90 [&::-webkit-details-marker]:hidden">
-          Notices
-          <span className="text-[12px] font-normal text-ink/45 group-open:hidden">Show</span>
-          <span className="hidden text-[12px] font-normal text-ink/45 group-open:inline">Hide</span>
+      <details className="group py-2">
+        <summary className="flex min-h-7 cursor-pointer list-none items-center justify-between text-[13px] text-ink/90 [&::-webkit-details-marker]:hidden">
+          Licences
+          <span className="text-[12px] text-ink/45 group-open:hidden">Show</span>
+          <span className="hidden text-[12px] text-ink/45 group-open:inline">Hide</span>
         </summary>
-        <ul className="mt-1 animate-fade-in space-y-1 pb-1 text-[12px] text-ink/50">
+        <ul className="animate-fade-in space-y-1 pb-1 pt-1 text-[12px] text-ink/50">
           {NOTICES.map((n) => (
             <li key={n}>{n}</li>
           ))}
@@ -111,12 +113,11 @@ function About() {
 export function GeneralPage() {
   return (
     <Page>
-      <PageHeader title="General" />
       <Section title="App">
         <ToggleSetting k="auto_start" label="Launch at login" hint="Start in the tray when you sign in." />
         <SegmentedSetting
           k="theme"
-          label="Appearance"
+          label="Theme"
           options={[
             { value: "system", label: "Auto" },
             { value: "light", label: "Light" },
@@ -124,11 +125,11 @@ export function GeneralPage() {
           ]}
         />
       </Section>
-      <Section title="Privacy">
-        <ToggleSetting k="history_enabled" label="Keep a history" hint="Dictated text is stored on this computer only." />
+      <Section title="History">
+        <ToggleSetting k="history_enabled" label="Keep history" hint="Dictated text is stored on this computer only." />
         <SelectSetting
           k="history_retention_days"
-          label="Keep history for"
+          label="Keep for"
           options={[
             { value: "0", label: "Forever" },
             { value: "90", label: "90 days" },

@@ -37,7 +37,7 @@ export function App() {
 
   return (
     <div className="flex h-full w-full flex-col">
-      <TitleBar showNav={setupComplete === true} />
+      <TitleBar showTabs={setupComplete === true} />
       <div className="min-h-0 flex-1">
         {setupComplete === null ? (
           <Loading />

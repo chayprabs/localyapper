@@ -6,8 +6,7 @@ import { reservedHotkeyMessage } from "@/lib/hotkeyReservations";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Keys } from "@/components/ui/Keys";
-import { Row, Section } from "@/components/settings/controls";
-import { cn } from "@/lib/utils";
+import { Notice, Row, Section } from "@/components/settings/controls";
 
 /** The shortcut as key caps; click it and press a new combination. */
 function KeyField({
@@ -32,15 +31,13 @@ function KeyField({
     <button
       ref={ref}
       type="button"
+      title="Click, then press the new keys. Esc cancels."
       aria-label={`${label} shortcut: ${value}. Click to change.`}
       onClick={editing ? undefined : onStartEdit}
-      className={cn(
-        "flex h-9 min-w-[120px] items-center justify-end gap-1 rounded-full px-1.5 transition-[background-color,box-shadow] duration-200",
-        editing ? "bg-accent/[0.1] shadow-[0_0_0_1.5px_rgb(var(--accent)/0.6)]" : "hover:bg-ink/[0.06]",
-      )}
+      className="flex h-7 items-center justify-end rounded-md"
     >
       {editing ? (
-        <span className="w-full animate-fade-in px-2 text-center text-[12px] font-medium text-accent">
+        <span className="flex h-5 animate-fade-in items-center rounded-[4px] border border-ink px-1.5 font-mono text-[11px] text-ink">
           Press keys
         </span>
       ) : (
@@ -63,23 +60,23 @@ export function HotkeysSection() {
   );
 
   const action = confirmReset ? (
-    <span className="flex animate-fade-in items-center gap-1.5">
-      <Button size="sm" variant="ghost" onClick={() => setConfirmReset(false)}>
+    <span className="flex animate-fade-in items-center gap-3">
+      <Button variant="ghost" className="h-6" onClick={() => setConfirmReset(false)}>
         Cancel
       </Button>
       <Button
-        size="sm"
         variant="danger"
+        className="h-6 px-2"
         onClick={() => {
           void resetToDefaults();
           setConfirmReset(false);
         }}
       >
-        Reset hotkeys
+        Reset
       </Button>
     </span>
   ) : (
-    <Button size="sm" variant="ghost" onClick={() => setConfirmReset(true)}>
+    <Button variant="ghost" className="h-6" onClick={() => setConfirmReset(true)}>
       Reset
     </Button>
   );
@@ -88,16 +85,15 @@ export function HotkeysSection() {
     <Section title="Hotkeys" action={action}>
       {entries.map((entry) => {
         const reserved = reservedHotkeyMessage(entry.value);
-        const editing = editingKey === entry.key;
         return (
           <Row
             key={entry.key}
             label={entry.label}
-            hint={editing ? "Press the new combination, or Esc to keep the current one." : entry.description}
+            hint={entry.description}
             below={
               reserved && (
-                <p className="mt-1.5 flex items-center gap-1.5 text-[12px] font-medium text-warn">
-                  <Icon name="warning" size={13} className="shrink-0" />
+                <p className="flex items-center gap-1.5 pb-1 text-[12px] text-ink/60">
+                  <Icon name="warning" size={12} className="shrink-0" />
                   {reserved}
                 </p>
               )
@@ -107,7 +103,7 @@ export function HotkeysSection() {
               <KeyField
                 label={entry.label}
                 value={entry.value}
-                editing={editing}
+                editing={editingKey === entry.key}
                 onStartEdit={() => startEditing(entry.key)}
                 onCapture={(shortcut) => handleCapture(entry.key, shortcut)}
                 onCancel={stopEditing}
@@ -117,9 +113,9 @@ export function HotkeysSection() {
         );
       })}
       {error && (
-        <p role="alert" className="px-4 py-3 text-[12px] font-medium text-danger">
-          {error}
-        </p>
+        <div className="py-2">
+          <Notice>{error}</Notice>
+        </div>
       )}
     </Section>
   );

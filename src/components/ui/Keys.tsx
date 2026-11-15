@@ -2,16 +2,19 @@
 import { hotkeyParts } from "@/lib/hotkeyFormat";
 import { cn } from "@/lib/utils";
 
-export function Keys({ hotkey, size = "sm" }: { hotkey: string; size?: "sm" | "lg" }) {
+const SIZES = {
+  sm: "h-5 min-w-5 rounded-[4px] px-1.5 text-[11px]",
+  lg: "h-8 min-w-8 rounded-[5px] px-2.5 text-[14px]",
+  xl: "h-16 min-w-16 rounded-lg px-5 text-[26px]",
+};
+
+export function Keys({ hotkey, size = "sm" }: { hotkey: string; size?: keyof typeof SIZES }) {
   return (
-    <span className="inline-flex items-center gap-1 align-middle">
+    <span className={cn("inline-flex items-center align-middle", size === "xl" ? "gap-2" : "gap-1")}>
       {hotkeyParts(hotkey).map((part, i) => (
         <kbd
           key={i}
-          className={cn(
-            "raised inline-flex items-center justify-center rounded-[7px] font-mono font-medium text-ink/85",
-            size === "lg" ? "h-9 min-w-9 px-2.5 text-[15px]" : "h-6 min-w-6 px-1.5 text-[11px]",
-          )}
+          className={cn("inline-flex items-center justify-center border border-ink/25 font-mono text-ink/90", SIZES[size])}
         >
           {part}
         </kbd>

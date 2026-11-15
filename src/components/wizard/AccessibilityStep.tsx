@@ -8,7 +8,7 @@ import {
   openAccessibilitySettings,
   requestAccessibilityPermission,
 } from "@/lib/commands/system";
-import { Step, TextButton } from "./Step";
+import { Actions, Step } from "./Step";
 
 export function AccessibilityStep({ onContinue }: { onContinue: () => void }) {
   const [granted, setGranted] = useState(false);
@@ -36,18 +36,21 @@ export function AccessibilityStep({ onContinue }: { onContinue: () => void }) {
 
   return (
     <Step
-      icon="keyboard"
-      title="Allow typing into other apps"
-      text="LocalYapper pastes your words into the app you are using. macOS needs Accessibility access for that: turn on LocalYapper in System Settings, Privacy & Security, Accessibility."
+      title="Accessibility"
+      text="macOS needs this to paste into other apps. Turn on LocalYapper in System Settings, Privacy & Security, Accessibility."
     >
-      <p role="status" className="flex items-center gap-2 text-[12.5px] text-ink/50">
-        {!granted && <Spinner size={14} />}
-        {granted ? "Access granted." : "Waiting for access"}
+      <p role="status" className="flex h-5 items-center gap-2.5 text-[13px] text-ink/90">
+        {!granted && <Spinner size={13} />}
+        {granted ? "Granted" : "Waiting"}
       </p>
-      <Button variant="primary" size="lg" className="w-full" onClick={() => void openAccessibilitySettings()}>
-        Open System Settings
-      </Button>
-      <TextButton onClick={onContinue}>Skip for now (text will be copied instead of pasted)</TextButton>
+      <Actions>
+        <Button variant="primary" size="lg" onClick={() => void openAccessibilitySettings()}>
+          Open System Settings
+        </Button>
+        <Button variant="ghost" size="lg" title="Text will be copied instead of pasted." onClick={onContinue}>
+          Skip
+        </Button>
+      </Actions>
     </Step>
   );
 }

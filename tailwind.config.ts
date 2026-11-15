@@ -26,19 +26,11 @@ export default {
         // "ink" is the text colour: near-black in light, near-white in dark.
         ink: token("ink"),
         canvas: token("canvas"),
-        accent: token("accent"),
-        ok: token("ok"),
-        warn: token("warn"),
-        danger: token("danger"),
-      },
-      transitionTimingFunction: {
-        out: "cubic-bezier(0.2, 0.8, 0.2, 1)",
-        spring: "cubic-bezier(0.3, 1.4, 0.6, 1)",
+        // The only colour: recording, errors and destructive actions.
+        signal: token("signal"),
       },
       animation: {
-        "rise-in": "rise-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
-        "fade-in": "fade-in 240ms ease-out both",
-        ring: "ring 3.2s cubic-bezier(0.2, 0.6, 0.3, 1) infinite",
+        "fade-in": "fade-in 140ms ease-out both",
       },
     },
   },

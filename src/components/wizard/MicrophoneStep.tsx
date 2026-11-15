@@ -2,10 +2,9 @@
 // wizard hook asks the OS for access when this step opens.
 import type { PermissionsStatus } from "@/types/commands";
 import { Button } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
 import { Spinner } from "@/components/settings/controls";
 import { cn } from "@/lib/utils";
-import { Step, TextButton } from "./Step";
+import { Actions, Step } from "./Step";
 
 interface MicrophoneStepProps {
   permissions: PermissionsStatus | null;
@@ -20,54 +19,28 @@ export function MicrophoneStep({ permissions, loading, refresh, openSettings, on
   const denied = permissions != null && permissions.microphone === false;
 
   return (
-    <Step
-      icon={denied ? "mic_off" : "mic"}
-      title="Allow the microphone"
-      text="LocalYapper listens only while you hold the hotkey. Audio stays in memory on this computer."
-    >
-      <div
-        role="status"
-        className={cn(
-          "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors duration-300",
-          granted ? "bg-ok/10" : denied ? "bg-danger/[0.08]" : "bg-ink/[0.05]",
-        )}
-      >
+    <Step title="Microphone" text="Used only while you hold the hotkey.">
+      <p role="status" className="flex h-5 items-center gap-2.5 text-[13px] text-ink/90">
         {loading ? (
-          <Spinner size={18} />
+          <Spinner size={13} />
         ) : (
-          <Icon
-            name={granted ? "check_circle" : denied ? "error" : "mic"}
-            size={18}
-            className={granted ? "text-ok" : denied ? "text-danger" : "text-ink/40"}
-          />
+          <span className={cn("h-1.5 w-1.5 rounded-full", granted ? "bg-ink" : denied ? "bg-signal" : "border border-ink/30")} />
         )}
-        <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-medium text-ink/90">
-            {loading
-              ? "Checking the microphone"
-              : granted
-                ? "Microphone ready"
-                : denied
-                  ? "No microphone available"
-                  : "Microphone not checked yet"}
-          </p>
-          <p className="mt-0.5 text-[12px] leading-snug text-ink/50">
-            {granted
-              ? "Your default input device will be used."
-              : "Allow LocalYapper in system settings, or plug in a microphone."}
-          </p>
-        </div>
+        {loading ? "Checking" : granted ? "Ready" : denied ? "No microphone available" : "Not checked"}
+      </p>
+      <Actions>
+        <Button variant="primary" size="lg" onClick={onContinue} disabled={loading}>
+          {denied ? "Continue anyway" : "Continue"}
+        </Button>
         {denied && (
-          <Button size="sm" onClick={openSettings}>
+          <Button size="lg" onClick={openSettings}>
             Open settings
           </Button>
         )}
-      </div>
-
-      <Button variant="primary" size="lg" className="w-full" onClick={onContinue} disabled={loading}>
-        {denied ? "Continue anyway" : "Continue"}
-      </Button>
-      <TextButton onClick={refresh}>Check again</TextButton>
+        <Button variant="ghost" size="lg" onClick={refresh}>
+          Check again
+        </Button>
+      </Actions>
     </Step>
   );
 }

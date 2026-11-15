@@ -6,7 +6,6 @@ import { activePageAtom } from "@/stores/appStore";
 import { Spinner } from "@/components/settings/controls";
 
 const pages = {
-  home: lazy(() => import("@/components/home/HomePage").then((m) => ({ default: m.HomePage }))),
   history: lazy(() => import("@/components/history/HistoryPage").then((m) => ({ default: m.HistoryPage }))),
   dictation: lazy(() => import("@/components/dictation/DictationPage").then((m) => ({ default: m.DictationPage }))),
   voice: lazy(() => import("@/components/voice/VoicePage").then((m) => ({ default: m.VoicePage }))),
@@ -16,7 +15,7 @@ const pages = {
 export function Loading() {
   return (
     <div className="flex h-full w-full items-center justify-center">
-      <Spinner size={22} />
+      <Spinner />
     </div>
   );
 }
@@ -26,8 +25,8 @@ export function Pages() {
   const PageComponent = pages[activePage];
 
   return (
-    // Keyed by page so the scroll position resets and the page animates in.
-    <main key={activePage} className="fade-top h-full overflow-y-auto overflow-x-hidden">
+    // Keyed by page so the scroll position resets.
+    <main key={activePage} className="h-full overflow-y-auto overflow-x-hidden">
       <Suspense fallback={<Loading />}>
         <PageComponent />
       </Suspense>

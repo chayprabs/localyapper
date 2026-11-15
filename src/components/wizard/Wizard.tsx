@@ -1,5 +1,5 @@
-// First-launch wizard -- one step at a time in a glass card, with a back
-// button and progress dots
+// First-launch wizard -- one step at a time, with a back button and a
+// step counter
 import { useCallback } from "react";
 import { useSetAtom } from "jotai";
 import { setupCompleteAtom } from "@/stores/wizardStore";
@@ -14,7 +14,6 @@ import { WelcomeStep } from "./WelcomeStep";
 import { IconButton } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Loading } from "@/components/shell/Pages";
-import { cn } from "@/lib/utils";
 
 export function Wizard() {
   const setSetupComplete = useSetAtom(setupCompleteAtom);
@@ -89,37 +88,21 @@ export function Wizard() {
   }
 
   return (
-    <div className="flex h-full flex-col items-center overflow-y-auto px-6 pb-6">
-      <main className="glass relative my-auto w-full max-w-[440px] rounded-[28px] px-8 pb-8 pt-7">
-        <div className="mb-6 flex h-8 items-center justify-center">
+    <div className="flex h-full flex-col overflow-y-auto px-6">
+      <main className="m-auto w-full max-w-[380px] py-8">
+        <div className="mb-8 flex h-7 items-center gap-2 font-mono text-[11.5px] text-ink/40">
           {wizard.canGoBack && (
-            <IconButton label="Back" onClick={wizard.goBack} className="absolute left-5 animate-fade-in">
-              <Icon name="arrow_back" size={16} />
+            <IconButton label="Back" onClick={wizard.goBack} className="-ml-2 animate-fade-in">
+              <Icon name="arrow_back" size={14} />
             </IconButton>
           )}
-          <div
-            role="progressbar"
-            aria-label="Setup progress"
-            aria-valuemin={1}
-            aria-valuemax={wizard.stepCount}
-            aria-valuenow={wizard.stepIndex + 1}
-            className="flex items-center gap-1.5"
-          >
-            {Array.from({ length: wizard.stepCount }, (_, i) => (
-              <span
-                key={i}
-                className={cn(
-                  "h-1.5 rounded-full transition-[width,background-color] duration-300 ease-out",
-                  i === wizard.stepIndex ? "w-5 bg-ink/70" : i < wizard.stepIndex ? "w-1.5 bg-ink/35" : "w-1.5 bg-ink/[0.12]",
-                )}
-              />
-            ))}
-          </div>
+          <span aria-label={`Step ${wizard.stepIndex + 1} of ${wizard.stepCount}`}>
+            {wizard.stepIndex + 1}/{wizard.stepCount}
+          </span>
         </div>
-        {/* Keyed by step so each one animates in. */}
+        {/* Keyed by step so each one fades in. */}
         <div key={wizard.step}>{renderStep()}</div>
       </main>
-      <p className="mt-4 shrink-0 text-[11.5px] text-ink/35">Everything happens on this computer. No audio leaves it.</p>
     </div>
   );
 }

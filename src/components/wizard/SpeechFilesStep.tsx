@@ -55,14 +55,8 @@ export function SpeechFilesStep({
 
   if (filesInstalled && !downloading) {
     return (
-      <Step
-        key="ready"
-        icon="check_circle"
-        tone="ok"
-        title="Speech model ready"
-        text="The Parakeet model is on this computer. Dictation works offline from here on."
-      >
-        <Button variant="primary" size="lg" className="w-full" onClick={onContinue}>
+      <Step key="ready" title="Speech model" text="Installed.">
+        <Button variant="primary" size="lg" onClick={onContinue}>
           Continue
         </Button>
       </Step>
@@ -76,31 +70,23 @@ export function SpeechFilesStep({
     const speedMbps = downloadProgress?.speed_mbps ?? 0;
 
     return (
-      <Step
-        key="downloading"
-        icon="download"
-        title="Downloading the speech model"
-        text="This happens once. You can keep using your computer."
-      >
-        <div className="w-full">
-          <div className="text-[34px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-ink">
+      <Step key="downloading" title="Speech model">
+        <div className="w-full font-mono">
+          <div className="text-[40px] leading-none tracking-[-0.03em] text-ink">
             {percent.toFixed(0)}
-            <span className="ml-0.5 text-[18px] text-ink/40">%</span>
+            <span className="text-ink/35">%</span>
           </div>
-          <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-ink/[0.08]">
-            <div
-              className="h-full rounded-full bg-accent transition-[width] duration-300 ease-out"
-              style={{ width: `${percent}%` }}
-            />
+          <div className="mt-5 h-px w-full bg-ink/15">
+            <div className="-mt-px h-[3px] bg-ink transition-[width] duration-300 ease-out" style={{ width: `${percent}%` }} />
           </div>
-          <div className="mt-2.5 flex justify-between text-[12px] tabular-nums text-ink/45">
+          <div className="mt-3 flex justify-between text-[11.5px] text-ink/45">
             <span>
-              {downloadedMb.toFixed(0)} of {totalMb.toFixed(0)} MB
+              {downloadedMb.toFixed(0)} / {totalMb.toFixed(0)} MB
             </span>
-            <span>{speedMbps > 0 ? `${speedMbps.toFixed(1)} MB/s` : "Starting"}</span>
+            <span>{speedMbps > 0 ? `${speedMbps.toFixed(1)} MB/s` : ""}</span>
           </div>
         </div>
-        <Button size="lg" className="w-full" onClick={() => void onCancel()}>
+        <Button size="lg" onClick={() => void onCancel()}>
           Cancel
         </Button>
       </Step>
@@ -108,14 +94,9 @@ export function SpeechFilesStep({
   }
 
   return (
-    <Step
-      key="start"
-      icon="download"
-      title="Get the speech model"
-      text="Parakeet, about 458 MB, runs entirely on this computer. After this one download, dictation works offline."
-    >
+    <Step key="start" title="Speech model" text="Parakeet, 458 MB. One download, then it runs offline.">
       {downloadError && <Notice>{downloadError}</Notice>}
-      <Button variant="primary" size="lg" className="w-full" onClick={() => void onStartDownload()}>
+      <Button variant="primary" size="lg" onClick={() => void onStartDownload()}>
         {downloadError ? "Try again" : "Download"}
       </Button>
     </Step>
