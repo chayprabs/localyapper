@@ -69,7 +69,7 @@ fn vad_model_path(app: &tauri::AppHandle) -> Option<PathBuf> {
 /// exist. The main window is destroyed on user close to free its WebView
 /// process; this helper recreates it on demand from the tray and the
 /// open-app hotkey.
-/// Logging (plan P7.2): the log folder keeps the current file and one
+/// Logging: the log folder keeps the current file and one
 /// rotated file of at most 1 MB each, plus stderr. `info`, or `debug`
 /// with LOCALYAPPER_DEBUG=1. Transcripts and clipboard text are never
 /// logged.
@@ -175,7 +175,7 @@ macro_rules! app_commands {
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
     let cli_action = controller::CliAction::from_args(&args);
-    // Launched at login (P6.2): never build the settings window.
+    // Launched at login: never build the settings window.
     let at_login = args.iter().any(|a| a == AUTOSTART_ARG);
 
     // Registered first: a second launch hands its arguments to this
@@ -222,7 +222,7 @@ pub fn run() {
             #[cfg(feature = "test-hooks")]
             test_hooks::apply_test_settings(&conn);
             if migration.from_version < 2 && !migration.fresh {
-                // Schema version 2 (P5.3): an upgraded install keeps
+                // Schema version 2: an upgraded install keeps
                 // whatever launch-at-login state the OS has now.
                 use tauri_plugin_autostart::ManagerExt;
                 let on = app.autolaunch().is_enabled().unwrap_or(false);
@@ -298,8 +298,8 @@ pub fn run() {
                 log::error!("Failed to setup system tray: {e}");
             }
 
-            // The settings window is not created at start (P6.1): only the
-            // first-run wizard needs it, and never at login (P6.2). The
+            // The settings window is not created at start: only the
+            // first-run wizard needs it, and never at login. The
             // tray, the open-app hotkey or a second launch build it.
             let setup_complete = app
                 .state::<AppState>()

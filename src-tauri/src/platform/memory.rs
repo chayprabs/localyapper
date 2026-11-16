@@ -135,7 +135,7 @@ pub fn physical_cores() -> usize {
     }
 }
 
-/// Recogniser threads: `min(4, physical cores)` (plan P1.12).
+/// Recogniser threads: `min(4, physical cores)`.
 pub fn stt_threads() -> i32 {
     physical_cores().clamp(1, 4) as i32
 }

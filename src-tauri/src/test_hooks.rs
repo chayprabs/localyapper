@@ -100,7 +100,7 @@ fn handle_line(line: &str, app: &AppHandle, ctl: &ControllerHandle) -> serde_jso
             json!({"ok": true})
         }
         "destroy_overlay" => {
-            // What the overlay idle timer does (P6.3), without the wait.
+            // What the overlay idle timer does, without the wait.
             ctl.send(Msg::ReleaseOverlay);
             json!({"ok": true})
         }

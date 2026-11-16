@@ -1,8 +1,7 @@
 # Test fixtures
 
 The `clip*.wav` files and their `clip*.txt` transcripts are built from the
-LibriSpeech ASR corpus, test-clean subset, by `scripts/make-fixtures.py`
-(run in CI by `.github/workflows/fixtures.yml`).
+LibriSpeech ASR corpus, test-clean subset.
 
 LibriSpeech: V. Panayotov, G. Chen, D. Povey and S. Khudanpur,
 "Librispeech: an ASR corpus based on public domain audio books", ICASSP 2015.

@@ -1,4 +1,4 @@
-// Default record hotkey per OS (plan P2.2): F8, or Alt+Space on macOS.
+// Default record hotkey per OS: F8, or Alt+Space on macOS.
 export const isMacPlatform =
   typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent);
 

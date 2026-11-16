@@ -34,7 +34,7 @@ CANDIDATES = {
         "want": ["model.int8.onnx", "model.onnx", "tokens.txt"],
     },
     # The fp32 build the app shipped with. Kept so the bench can compare it
-    # with int8 and so existing installs are recognised (plan P4.6).
+    # with int8 and so existing installs are recognised.
     "parakeet-110m-fp32": {
         "name": "Parakeet 110M (fp32, legacy)",
         "family": "nemo_ctc",

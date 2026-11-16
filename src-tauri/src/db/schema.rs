@@ -15,7 +15,7 @@ pub struct Migration {
     pub fresh: bool,
 }
 
-/// Creates the tables and migrates with `PRAGMA user_version` (plan P5.3).
+/// Creates the tables and migrates with `PRAGMA user_version`.
 ///
 /// - Version 1 is the schema the app shipped with before the rebuild,
 ///   including its old clean-ups of removed features.

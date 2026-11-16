@@ -1,4 +1,4 @@
-//! Typed settings (plan P5.1, P5.2).
+//! Typed settings.
 //!
 //! Values live in SQLite and in a cache behind an `RwLock` so hot paths
 //! never query the database. Every write goes through `apply`: the key

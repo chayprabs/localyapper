@@ -98,17 +98,9 @@ The command line can drive a running instance:
 | `parakeet-0.6b-v3` | 671 MB | 25 European languages | Most accurate, needs more RAM |
 | `moonshine-tiny-en` | 124 MB | English | Chosen automatically under 6 GB RAM |
 
-Accuracy and speed for each model are measured in CI on recorded
-speech: see [docs/MODEL_BENCHMARK.md](docs/MODEL_BENCHMARK.md). The model
-is loaded on the first dictation and unloaded after a period without
-dictation (2 minutes by default, set on the Voice page).
-
-## Memory and speed
-
-Measured on the GitHub Actions runners, not estimated: see
-[docs/PERFORMANCE.md](docs/PERFORMANCE.md) for private memory per state
-(idle, model loaded, settings open) on Windows, macOS and Linux, and the
-smoke-suite timings for each runner.
+The model is loaded on the first dictation and unloaded after a period
+without dictation (2 minutes by default, set on the Voice page), and its
+memory is returned to the system.
 
 ## Privacy
 
@@ -120,8 +112,37 @@ smoke-suite timings for each runner.
 
 ## Building from source
 
-See [docs/BUILD.md](docs/BUILD.md). The architecture is described in
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+You need Rust stable, Node.js 20 or newer, Python 3 and the
+[Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your
+system. On Debian or Ubuntu:
+
+```bash
+sudo apt-get install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+  librsvg2-dev libssl-dev libasound2-dev libxdo-dev
+```
+
+Run it in development, or build the installers for your system:
+
+```bash
+npm ci
+npm run tauri dev
+python3 scripts/gen-notices.py && npm run tauri build
+```
+
+The first build downloads the prebuilt sherpa-onnx library from its GitHub
+releases. Checks run in CI on every push:
+
+```bash
+npm run lint && npx tsc --noEmit
+cargo fmt --manifest-path src-tauri/Cargo.toml --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+Tests that need a speech model (`tests/pipeline.rs`, and the smoke suite
+in `tests/smoke.rs`, which drives the real app) read it from
+`LOCALYAPPER_TEST_MODEL_DIR`; `scripts/fetch-models.py` downloads and
+verifies one. Set `LOCALYAPPER_DEBUG=1` for debug logging.
 
 ## Licence
 

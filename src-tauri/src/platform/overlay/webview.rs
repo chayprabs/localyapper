@@ -1,4 +1,4 @@
-//! WebView overlay (plan P3, Appendix F).
+//! WebView overlay.
 //!
 //! Rust builds, positions, shows and hides the window; the page renders
 //! what it is sent. The window never takes focus: it is built with

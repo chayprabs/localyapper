@@ -23,6 +23,6 @@ pub struct AppState {
     /// Global hotkey back end (shortcut plugin, or the Wayland portal).
     pub hotkeys: Arc<dyn HotkeyBackend>,
     /// Every setting, read from SQLite once at start and kept in step by
-    /// `set_setting`, so hot paths never query the database (P5.1).
+    /// `set_setting`, so hot paths never query the database.
     pub settings: Arc<crate::settings::SettingsCache>,
 }

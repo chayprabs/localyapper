@@ -72,28 +72,20 @@ src-tauri/resources/models/
 *.keystore
 
 # Local agent and assistant state — only the per-tool state directories are
-# ignored. AGENTS.md and CLAUDE.md are tracked as contributor/agent
-# contracts so all collaborators (human or AI) see the same direction.
+# ignored. CLAUDE.md is tracked so every collaborator sees the same rules.
 .claude/
 .codex/
 .agents/
 
-# Internal planning docs
-docs/PROGRESS.md
-docs/**/PROGRESS.md
-docs/**/progress.md
+# Planning and design notes stay out of the repository
+docs/
 PRD*.md
 prd*.md
 SOURCE*.md
 source*.md
-docs/**/PRD*.md
-docs/**/*PRD*.md
-docs/**/prd*.md
-docs/**/*prd*.md
-docs/**/SOURCE*.md
-docs/**/*SOURCE*.md
-docs/**/source*.md
-docs/**/*source*.md
+*PLAN*.md
+*_REPORT.md
+DESIGN*.md
 
 # Cloud provider local state
 .cloud/
@@ -128,5 +120,5 @@ playwright-report/
 test-results/
 *.log
 
-# The bundled VAD model is committed on purpose (plan P1.15).
+# The bundled VAD model is committed on purpose.
 !src-tauri/resources/silero_vad.onnx

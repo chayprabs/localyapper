@@ -1,4 +1,4 @@
-//! Resumable, verified downloader (plan P4.2).
+//! Resumable, verified downloader.
 //!
 //! Each file streams into `<file>.part`. An existing part resumes with a
 //! `Range` request: `206` appends, `200` means the server ignored the

@@ -2,7 +2,7 @@
 
 pub mod convert;
 pub mod level;
-// Appendix B of docs/REBUILD_PLAN.md, kept byte-for-byte.
+// Hand-formatted; kept out of rustfmt.
 #[rustfmt::skip]
 pub mod rolling;
 pub mod segmenter;

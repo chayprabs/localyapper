@@ -3,7 +3,7 @@
 //! One tokio task with an unbounded inbox. Every unit (hotkeys, the audio
 //! thread, segmenters, the STT worker, timers, IPC) sends it a `Msg`. It
 //! feeds session events to `Session::handle` and executes the returned
-//! `Effect`s in order (plan section 4.3).
+//! `Effect`s in order.
 
 use crate::core::audio::segmenter::{self, EnergyDetector, Flags, SileroDetector, SpeechDetector};
 use crate::core::session::{self, Cue, Effect, Event, Session, SessionId, TimerKind};
@@ -925,8 +925,8 @@ impl Controller {
     }
 
     fn schedule_evict(&mut self) {
-        // The overlay window is released after a longer idle period
-        // (plan P6.3); one timer per finished dictation, none while idle.
+        // The overlay window is released after a longer idle period;
+        // one timer per finished dictation, none while idle.
         self.overlay_generation += 1;
         let overlay_generation = self.overlay_generation;
         let overlay_handle = self.handle.clone();

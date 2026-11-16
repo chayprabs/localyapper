@@ -24,7 +24,7 @@ pub const POST: u64 = RATE * 15 / 100;
 /// The no-speech safety net sends at most this much audio (15 s).
 pub const SAFETY_NET_MAX: u64 = RATE * 15;
 
-/// VAD parameters (plan P1.6).
+/// VAD parameters.
 pub const VAD_THRESHOLD: f32 = 0.4;
 pub const VAD_MIN_SILENCE_S: f32 = 0.35;
 pub const VAD_MIN_SPEECH_S: f32 = 0.15;
@@ -349,7 +349,7 @@ pub fn run_segmenter(
             vad.flush();
             cut.emit_ready(vad, &rolling);
             let mut safety_net = false;
-            // P1.7: the VAD found nothing in audible audio. Send the tail.
+            // The VAD found nothing in audible audio. Send the tail.
             let overall_rms = if total_16k > 0 {
                 (sum_sq / total_16k as f64).sqrt()
             } else {

@@ -333,7 +333,7 @@ mod diagnostics_tests {
     }
 }
 
-/// Where releases are published (plan P7.4: no auto-updater).
+/// Where releases are published (there is no auto-updater).
 pub const RELEASES_URL: &str = "https://github.com/chayprabs/localyapper/releases";
 
 /// Open the releases page in the default browser.

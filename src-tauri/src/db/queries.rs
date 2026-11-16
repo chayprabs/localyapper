@@ -96,7 +96,7 @@ pub fn prune_history(conn: &Connection, days: i64) -> Result<usize, LocalYapperE
 }
 
 /// Returns word statistics. `day_start` and `week_start` are the
-/// local day and week boundaries as UTC timestamps (plan P5.9), so
+/// local day and week boundaries as UTC timestamps, so
 /// "today" follows the user's clock, not UTC.
 pub fn get_stats(
     conn: &Connection,

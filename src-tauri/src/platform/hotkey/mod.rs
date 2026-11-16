@@ -6,7 +6,7 @@
 
 #[cfg(target_os = "linux")]
 pub mod portal;
-// Appendix C of docs/REBUILD_PLAN.md, kept byte-for-byte.
+// Hand-formatted; kept out of rustfmt.
 #[rustfmt::skip]
 pub mod repeat_filter;
 pub mod shortcut;
@@ -59,7 +59,7 @@ impl HotkeyId {
     }
 }
 
-/// Default combo per action and OS (plan P2.2).
+/// Default combo per action and OS.
 pub fn default_combo(id: HotkeyId) -> &'static str {
     match id {
         HotkeyId::Record => {
@@ -135,7 +135,7 @@ pub fn check_combo(combo: &str) -> Result<(), String> {
 }
 
 /// Register record, paste-last and open-app from settings through the
-/// app's back end. While paused only open-app stays registered (P2.4).
+/// app's back end. While paused only open-app stays registered.
 /// The cancel key belongs to the controller and is not touched here.
 pub fn apply_settings(app: &tauri::AppHandle) -> Result<(), String> {
     use tauri::Manager;

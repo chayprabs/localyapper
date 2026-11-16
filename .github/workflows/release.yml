@@ -1,10 +1,10 @@
 name: Release
 
-# Plan P7.6. Builds the installers for every target.
+# Builds the installers for every target.
 # - A tag (v*) first runs the full CI (tests on three OSes and the model
 #   integration test on Linux), then builds and attaches the installers to
-#   a published release whose notes come from docs/RELEASE_NOTES_<tag>.md.
-# - Run by hand on main with a release_tag input (e.g. v2.0.0), it does
+#   a published release whose notes come from .github/release-notes/<tag>.md.
+# - Run by hand on main with a release_tag input (e.g. v2.1.0), it does
 #   the same as a tag push and creates that tag on the commit it built.
 # - On a branch (when packaging inputs change) or on demand without a tag
 #   it only builds the installers and uploads them as workflow artifacts,
@@ -24,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag to create from main, e.g. v2.0.0 (empty: build only)"
+        description: "Release tag to create from main, e.g. v2.1.0 (empty: build only)"
         required: false
         default: ""
 
@@ -89,9 +89,9 @@ jobs:
         run: |
           case "$RELEASE_TAG" in
             v[0-9]*) ;;
-            *) echo "::error::release tag '$RELEASE_TAG' must look like v2.0.0"; exit 1 ;;
+            *) echo "::error::release tag '$RELEASE_TAG' must look like v2.1.0"; exit 1 ;;
           esac
-          f="docs/RELEASE_NOTES_${RELEASE_TAG}.md"
+          f=".github/release-notes/${RELEASE_TAG}.md"
           if [ ! -f "$f" ]; then
             echo "::error::$f is missing; every release tag needs its own notes file"
             exit 1

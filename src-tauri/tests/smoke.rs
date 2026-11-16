@@ -1,11 +1,10 @@
-//! CI smoke suite (plan section 8A). Needs a desktop session: run with
+//! CI smoke suite. Needs a desktop session: run with
 //! `cargo test --features test-hooks --test smoke -- --test-threads=1`
 //! (under `xvfb-run` on Linux). Every wait has a timeout of 20 s or less.
 //!
 //! Tests that send synthetic keys on macOS first check the Accessibility
 //! grant; without it macOS drops the events, so they print
-//! `SKIP: no Accessibility grant on runner` and pass, and
-//! docs/BUILD_REPORT.md lists them.
+//! `SKIP: no Accessibility grant on runner` and pass.
 #![cfg(feature = "test-hooks")]
 
 use localyapper_lib::platform::inject::{self, InjectOptions, PasteMethod};
@@ -881,7 +880,7 @@ fn window_labels(app: &mut App) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// P6.1, P6.2: after setup, and always at login, only the overlay exists.
+/// After setup, and always at login, only the overlay exists.
 #[test]
 fn settings_window_not_created_at_start() {
     let (wav, _) = fixture("clip01_16k");
@@ -923,7 +922,7 @@ fn settings_window_not_created_at_start() {
     }
 }
 
-/// P6.3: after the overlay is released the app keeps running with no
+/// After the overlay is released the app keeps running with no
 /// window at all, and the next press recreates the overlay and shows it.
 /// On macOS the overlay panel is kept alive instead (see release()).
 #[test]

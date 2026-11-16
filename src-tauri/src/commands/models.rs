@@ -413,7 +413,7 @@ pub async fn get_model_state(
     })
 }
 
-/// Upgrade path for installs made before the catalog (P4.6): the old
+/// Upgrade path for installs made before the catalog: the old
 /// `parakeet-tdt-ctc-110m` folder becomes `parakeet-110m` when its files
 /// match the manifest, and is hash-checked once in the background.
 pub(crate) fn migrate_legacy_install(models_dir: &std::path::Path) {

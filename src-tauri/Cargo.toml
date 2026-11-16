@@ -1,6 +1,6 @@
 [package]
 name = "localyapper"
-version = "2.0.0"
+version = "2.1.0"
 description = "Local-first voice dictation desktop app"
 authors = ["Chaitanya"]
 license = "MIT"
@@ -58,10 +58,10 @@ enigo = "0.2"
 # pattern. The system allocator on Windows in particular tends to hold on
 # to freed ONNX scratch space, which would defeat the idle-unload work.
 ringbuf = "0.4"
-# Model download verification (plan P4.2).
+# Model download verification.
 sha2 = "0.10"
 mimalloc = { version = "0.1", default-features = false }
-# mi_collect() after model eviction (plan P1.13).
+# mi_collect() after model eviction.
 libmimalloc-sys = { version = "0.1", features = ["extended"] }
 
 [target.'cfg(windows)'.dependencies]
@@ -100,7 +100,7 @@ objc2 = "0.6"
 objc2-app-kit = "0.3"
 block2 = "0.6"
 objc2-foundation = "0.3"
-# Non-activating NSPanel for the overlay (plan P3.3).
+# Non-activating NSPanel for the overlay.
 tauri-nspanel = "2.1"
 
 # Release profile tuned for a small, fast binary. Panics are aborts because

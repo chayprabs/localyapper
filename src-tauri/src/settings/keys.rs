@@ -1,5 +1,5 @@
 //! Every setting the app knows: type, default, validator and the hook
-//! that applies a change (plan section 10). `set_setting` rejects any key
+//! that applies a change. `set_setting` rejects any key
 //! not listed here and any value its validator refuses.
 
 use crate::platform::hotkey::{default_combo, HotkeyId};
@@ -218,7 +218,7 @@ fn valid_combo(v: &str) -> bool {
         .iter()
         .all(|m| MODIFIERS.contains(&m.to_lowercase().as_str()));
     // The main key must not itself be a modifier (bare modifiers are out
-    // of scope, plan section 15).
+    // of scope).
     mods_ok && !MODIFIERS.contains(&last.to_lowercase().as_str())
 }
 

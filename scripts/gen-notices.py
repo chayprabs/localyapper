@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write THIRD_PARTY_NOTICES.md (plan P7.8).
+"""Write THIRD_PARTY_NOTICES.md.
 
 Usage: python3 scripts/gen-notices.py [OUT]
 

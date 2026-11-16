@@ -2,7 +2,7 @@
 
 pub mod audio;
 pub mod download;
-// Appendix A of docs/REBUILD_PLAN.md, kept byte-for-byte.
+// Hand-formatted; kept out of rustfmt.
 #[rustfmt::skip]
 pub mod session;
 pub mod stt;
