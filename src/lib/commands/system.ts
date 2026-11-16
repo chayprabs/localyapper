@@ -50,6 +50,11 @@ export async function diagnostics(): Promise<string> {
   return invoke<string>("diagnostics");
 }
 
+/** Copy the diagnostics to the clipboard (done by the backend). */
+export async function copyDiagnostics(): Promise<void> {
+  return invoke<void>("copy_diagnostics");
+}
+
 /** Open the GitHub releases page in the browser (no auto-updater). */
 export async function openReleases(): Promise<void> {
   return invoke<void>("open_releases");

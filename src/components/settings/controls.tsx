@@ -1,6 +1,6 @@
 // Setting controls -- each one loads its key, saves on change and shows the
 // backend's error inline. The backend validates every value.
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getSetting, setSetting } from "@/lib/commands/settings";
 import { Switch } from "@/components/ui/Switch";
@@ -36,17 +36,25 @@ export function useSetting(key: string): SettingState {
     };
   }, [key]);
 
+  // Each save gets a number. A failed save puts back what the backend
+  // holds, and only if no newer save has started since.
+  const saveRef = useRef(0);
   const save = useCallback(
     (next: string) => {
-      const previous = value;
+      const request = ++saveRef.current;
       setValue(next);
       setError(null);
       setSetting(key, next).catch((err: unknown) => {
-        setValue(previous);
+        if (request !== saveRef.current) return;
         setError(errorText(err));
+        getSetting(key)
+          .then((v) => {
+            if (request === saveRef.current) setValue(v);
+          })
+          .catch(() => undefined);
       });
     },
-    [key, value],
+    [key],
   );
 
   return { value, error, save };

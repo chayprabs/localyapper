@@ -48,6 +48,8 @@ function Slider({
         onChange={(e) => onInput(Number(e.target.value))}
         onPointerUp={(e) => onCommit(Number((e.target as HTMLInputElement).value))}
         onKeyUp={(e) => onCommit(Number((e.target as HTMLInputElement).value))}
+        // A drag released outside the slider may send no pointerup to it.
+        onBlur={(e) => onCommit(Number(e.target.value))}
       />
       <span className="w-9 shrink-0 text-right font-mono text-ink/80">{value}%</span>
     </label>

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use tauri::AppHandle;
 
-use crate::commands::settings::set_setting_now;
+use crate::commands::settings::{set_hotkeys_now, set_setting_now};
 use crate::state::AppState;
 
 const HOTKEY_KEYS: &[&str] = &[
@@ -25,15 +25,18 @@ pub async fn update_hotkey(app: AppHandle, key: String, value: String) -> Result
 /// Put every hotkey back to its default for this OS.
 #[tauri::command]
 pub async fn reset_hotkeys(app: AppHandle) -> Result<HashMap<String, String>, String> {
-    // Clear first so defaults never collide with the old combos.
-    let mut out = HashMap::new();
+    // All four together, so a default never collides with another
+    // hotkey's current combo on the way.
+    let mut defaults = Vec::with_capacity(HOTKEY_KEYS.len());
     for key in HOTKEY_KEYS {
         let spec = crate::settings::keys::find(key).ok_or("unknown hotkey")?;
-        let value = crate::settings::keys::default_of(spec);
-        set_setting_now(&app, key, &value)?;
-        out.insert((*key).to_string(), value);
+        defaults.push((*key, crate::settings::keys::default_of(spec)));
     }
-    Ok(out)
+    set_hotkeys_now(&app, &defaults)?;
+    Ok(defaults
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect::<HashMap<_, _>>())
 }
 
 /// While enabled, record-key presses emit `hotkey-detected` and start no

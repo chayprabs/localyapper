@@ -168,6 +168,11 @@ async fn run(shared: Arc<Shared>, ctl: ControllerHandle) {
         // Coalesce the burst of register() calls at start-up.
         shared.rebind.notified().await;
         tokio::time::sleep(Duration::from_millis(200)).await;
+        // Several register() calls leave a stored permit behind; without
+        // draining it the session just bound would be torn down and bound
+        // again at once (a second confirmation prompt on some desktops).
+        // Everything those calls asked for is read below.
+        let _ = futures_util::FutureExt::now_or_never(shared.rebind.notified());
         let wanted: Vec<(HotkeyId, String)> = shared
             .wanted
             .lock()

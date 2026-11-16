@@ -40,16 +40,15 @@ impl Effects for AppEffects<'_> {
 
     fn reload_hotkeys(&self) -> Result<(), String> {
         crate::platform::hotkey::apply_settings(self.app)?;
-        // The cancel key is registered only while recording; check now that
-        // the combo can be registered at all.
-        let state = self.app.state::<AppState>();
-        let cancel = state.settings.get_or_default("hotkey_cancel");
-        state
-            .hotkeys
-            .register(crate::platform::hotkey::HotkeyId::Cancel, &cancel)?;
-        state
-            .hotkeys
-            .unregister(crate::platform::hotkey::HotkeyId::Cancel)
+        // The cancel key belongs to the controller, which registers it only
+        // while recording; registering it here as a test would take it away
+        // from a recording in progress. Check that it parses instead.
+        let cancel = self
+            .app
+            .state::<AppState>()
+            .settings
+            .get_or_default("hotkey_cancel");
+        crate::platform::hotkey::check_combo(&cancel)
     }
 
     fn set_autostart(&self, enabled: bool) -> Result<(), String> {
@@ -68,10 +67,12 @@ impl Effects for AppEffects<'_> {
     }
 
     fn speech_changed(&self) {
-        let models = self.app.state::<AppState>().models.clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            models.evict_blocking();
-        });
+        // Through the controller and the worker queue, so a dictation in
+        // progress keeps its model; the old one is unloaded once idle.
+        self.app
+            .state::<AppState>()
+            .controller
+            .send(crate::controller::Msg::SpeechModelChanged);
         let _ = self.app.emit("models-changed", ());
     }
 
@@ -125,6 +126,15 @@ pub(crate) fn set_setting_now(app: &AppHandle, key: &str, value: &str) -> Result
     settings::apply(&mut store, &AppEffects { app }, key, value, &model_ids())
 }
 
+/// Validate, store and apply several hotkeys as one change.
+pub(crate) fn set_hotkeys_now(app: &AppHandle, changes: &[(&str, String)]) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let mut store = DbStore {
+        state: state.inner(),
+    };
+    settings::apply_hotkeys(&mut store, &AppEffects { app }, changes, &model_ids())
+}
+
 /// Gets a single setting value by key (its default when unset).
 #[tauri::command]
 pub async fn get_setting(state: tauri::State<'_, AppState>, key: String) -> Result<String, String> {
@@ -163,7 +173,20 @@ pub async fn get_all_settings(
 #[tauri::command]
 pub async fn reset_all_settings(app: AppHandle) -> Result<(), String> {
     let mut errors = Vec::new();
-    for key in keys::KEYS.iter().filter(|k| k.hook != keys::Hook::Store) {
+    // The hotkeys go back together, so a default never collides with
+    // another hotkey's current combo on the way.
+    let hotkeys: Vec<(&str, String)> = keys::KEYS
+        .iter()
+        .filter(|k| k.hook == keys::Hook::Hotkeys)
+        .map(|k| (k.name, keys::default_of(k)))
+        .collect();
+    if let Err(e) = set_hotkeys_now(&app, &hotkeys) {
+        errors.push(format!("hotkeys: {e}"));
+    }
+    for key in keys::KEYS
+        .iter()
+        .filter(|k| k.hook != keys::Hook::Store && k.hook != keys::Hook::Hotkeys)
+    {
         if let Err(e) = set_setting_now(&app, key.name, &keys::default_of(key)) {
             errors.push(format!("{}: {e}", key.name));
         }

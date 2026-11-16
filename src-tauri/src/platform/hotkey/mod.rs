@@ -125,6 +125,15 @@ pub fn create_backend(app: &tauri::AppHandle, ctl: &ControllerHandle) -> Arc<dyn
     ))
 }
 
+/// Whether the global-shortcut back end can parse `combo`, without
+/// registering it.
+pub fn check_combo(combo: &str) -> Result<(), String> {
+    use std::str::FromStr;
+    tauri_plugin_global_shortcut::Shortcut::from_str(&shortcut::plugin_combo(combo))
+        .map(|_| ())
+        .map_err(|e| format!("'{combo}' is not a usable shortcut: {e}"))
+}
+
 /// Register record, paste-last and open-app from settings through the
 /// app's back end. While paused only open-app stays registered (P2.4).
 /// The cancel key belongs to the controller and is not touched here.

@@ -258,7 +258,9 @@ export function HistoryPage() {
       ) : (
         <>
           {groups.map((group) => (
-            <section key={group.day} className="mt-6">
+            // Two groups can share a heading (a day's entries split by a
+            // search), so the first entry names the group.
+            <section key={group.items[0]?.id ?? group.day} className="mt-6">
               <h2 className="pb-1 text-[12px] text-ink/45">{group.day}</h2>
               <ul className="divide-y divide-ink/[0.08]">
                 {group.items.map((entry) => (

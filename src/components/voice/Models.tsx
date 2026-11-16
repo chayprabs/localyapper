@@ -1,11 +1,12 @@
 // The speech model catalog: size, languages, state and actions
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import {
   cancelModelDownload,
   deleteModel,
   downloadModel,
   listModels,
+  modelDownloadCurrent,
   selectModel,
   type ModelInfo,
 } from "@/lib/commands/models";
@@ -30,11 +31,22 @@ function languagesLabel(languages: string[]): string {
   return `${languages.length} languages`;
 }
 
+/** An action this page started on one model. */
+interface Busy {
+  id: string;
+  /** A download or repair, which Cancel can stop. */
+  download: boolean;
+}
+
 export function Models() {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [progress, setProgress] = useState<Progress | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Busy | null>(null);
+  // A download that was already running when the page opened (started
+  // here before switching pages, or by the wizard).
+  const [background, setBackground] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const cancelRequested = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -44,34 +56,62 @@ export function Models() {
     }
   }, []);
 
+  const syncBackground = useCallback(async () => {
+    try {
+      const id = await modelDownloadCurrent();
+      setBackground(id);
+      if (id === null) setProgress(null);
+    } catch {
+      // Leave the current view; the next event corrects it.
+    }
+  }, []);
+
   useEffect(() => {
     void refresh();
+    void syncBackground();
     const unlisten = [
-      listen<Progress>("model-download-progress", (e) => setProgress(e.payload)),
-      listen("models-changed", () => void refresh()),
+      listen<Progress>("model-download-progress", (e) => {
+        setProgress(e.payload);
+        if (e.payload.percent < 100) setBackground((b) => b ?? e.payload.id);
+      }),
+      listen("models-changed", () => {
+        void refresh();
+        void syncBackground();
+      }),
       listen("model-state", () => void refresh()),
     ];
     return () => {
       for (const u of unlisten) void u.then((f) => f());
     };
-  }, [refresh]);
+  }, [refresh, syncBackground]);
 
   const run = useCallback(
-    async (id: string, action: () => Promise<void>) => {
+    async (id: string, download: boolean, action: () => Promise<void>) => {
       setError(null);
-      setBusy(id);
+      cancelRequested.current = false;
+      setBusy({ id, download });
       try {
         await action();
       } catch (e) {
-        setError(errorText(e));
+        // A download the user cancelled is not an error.
+        if (!cancelRequested.current) setError(errorText(e));
       } finally {
+        cancelRequested.current = false;
         setBusy(null);
         setProgress(null);
         void refresh();
+        void syncBackground();
       }
     },
-    [refresh],
+    [refresh, syncBackground],
   );
+
+  const cancel = useCallback(() => {
+    cancelRequested.current = true;
+    void cancelModelDownload();
+  }, []);
+
+  const anyBusy = busy !== null || background !== null;
 
   return (
     <Section
@@ -81,16 +121,17 @@ export function Models() {
           variant="ghost"
           className="h-6"
           title="Choose the best model for this computer"
-          disabled={busy !== null}
-          onClick={() => void run("auto", () => selectModel("auto"))}
+          disabled={anyBusy}
+          onClick={() => void run("auto", false, () => selectModel("auto"))}
         >
           Auto
         </Button>
       }
     >
       {models.map((m) => {
-        const working = busy === m.id;
-        const percent = working && progress?.id === m.id ? progress.percent : null;
+        const downloading = (busy?.id === m.id && busy.download) || background === m.id;
+        const working = downloading || busy?.id === m.id;
+        const percent = downloading && progress?.id === m.id ? progress.percent : null;
         return (
           <Row
             key={m.id}
@@ -127,8 +168,8 @@ export function Models() {
             }
           >
             <span className="flex items-center gap-1">
-              {working && m.state !== "installed" ? (
-                <Button onClick={() => void cancelModelDownload()}>Cancel</Button>
+              {downloading ? (
+                <Button onClick={cancel}>Cancel</Button>
               ) : working ? (
                 <span className="flex h-7 items-center gap-2 px-1 text-[12.5px] text-ink/50">
                   <Spinner size={12} />
@@ -137,7 +178,7 @@ export function Models() {
               ) : m.state === "installed" ? (
                 <>
                   {!m.active && (
-                    <Button disabled={busy !== null} onClick={() => void run(m.id, () => selectModel(m.id))}>
+                    <Button disabled={anyBusy} onClick={() => void run(m.id, false, () => selectModel(m.id))}>
                       Use
                     </Button>
                   )}
@@ -146,8 +187,8 @@ export function Models() {
                   <Button
                     variant="ghost"
                     title="Check the downloaded files and repair them if needed"
-                    disabled={busy !== null}
-                    onClick={() => void run(m.id, () => downloadModel(m.id))}
+                    disabled={anyBusy}
+                    onClick={() => void run(m.id, true, () => downloadModel(m.id))}
                   >
                     Check
                   </Button>
@@ -155,17 +196,17 @@ export function Models() {
                     label={`Delete ${m.name}`}
                     tone="danger"
                     className="-mr-1.5"
-                    disabled={busy !== null}
-                    onClick={() => void run(m.id, () => deleteModel(m.id))}
+                    disabled={anyBusy}
+                    onClick={() => void run(m.id, false, () => deleteModel(m.id))}
                   >
                     <Icon name="delete" size={14} />
                   </IconButton>
                 </>
               ) : (
                 <Button
-                  disabled={busy !== null}
+                  disabled={anyBusy}
                   onClick={() =>
-                    void run(m.id, async () => {
+                    void run(m.id, true, async () => {
                       await downloadModel(m.id);
                       if (!models.some((x) => x.state === "installed")) await selectModel(m.id);
                     })

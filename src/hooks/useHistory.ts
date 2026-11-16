@@ -38,6 +38,7 @@ export function useHistory(search = ""): HistoryData {
   // Each fetch gets a number; a reply to an older one (a slower search
   // for text typed earlier) is dropped instead of replacing newer results.
   const requestRef = useRef(0);
+  const loadingMoreRef = useRef(false);
 
   // Only the first load reports isLoading; later fetches (a new search, a
   // finished dictation) swap the entries in place so the page keeps its
@@ -75,6 +76,10 @@ export function useHistory(search = ""): HistoryData {
   }, [fetchInitial]);
 
   const loadMore = useCallback(async () => {
+    // A second click while a page loads would fetch the same offset and
+    // then advance past a page nobody saw.
+    if (loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
     const request = requestRef.current;
     try {
       const result = await getHistory(PAGE_SIZE, offsetRef.current, search || null);
@@ -90,6 +95,8 @@ export function useHistory(search = ""): HistoryData {
     } catch (loadError) {
       setHasMore(false);
       setError(toErrorMessage(loadError, "Failed to load more history"));
+    } finally {
+      loadingMoreRef.current = false;
     }
   }, [search]);
 

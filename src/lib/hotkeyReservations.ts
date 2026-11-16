@@ -69,19 +69,25 @@ function detectOs(): OsHotkeys["os"] {
   return "linux";
 }
 
+const MODIFIER_ORDER: readonly string[] = ["ctrl", "alt", "shift", "meta"];
+
+// Lower case, one name per key, and modifiers in a fixed order: capture
+// writes "Shift+Meta+3" where the list says "Meta+Shift+3".
 function normalize(combo: string): string {
-  return combo
+  const parts = combo
     .split("+")
     .map((part) => {
       const p = part.trim().toLowerCase();
-      if (p === "cmd" || p === "command") return "meta";
+      if (p === "cmd" || p === "command" || p === "super" || p === "win") return "meta";
       if (p === "control") return "ctrl";
       if (p === "option") return "alt";
       if (p === "delete") return "del";
       return p;
     })
-    .filter((part) => part.length > 0)
-    .join("+");
+    .filter((part) => part.length > 0);
+  const modifiers = MODIFIER_ORDER.filter((m) => parts.includes(m));
+  const keys = parts.filter((p) => !MODIFIER_ORDER.includes(p));
+  return [...modifiers, ...keys].join("+");
 }
 
 /**

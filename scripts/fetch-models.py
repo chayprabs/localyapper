@@ -7,8 +7,14 @@ Usage: fetch-models.py <models.json> <out_dir> [model_id ...]
 import hashlib
 import json
 import os
+import socket
 import sys
+import time
 import urllib.request
+
+# A stalled connection fails instead of holding a CI runner for hours.
+socket.setdefaulttimeout(120)
+ATTEMPTS = 4
 
 
 def sha256(path):
@@ -31,7 +37,15 @@ for model_id in wanted:
         if os.path.exists(path) and os.path.getsize(path) == f["size"] and sha256(path) == f["sha256"]:
             continue
         print(f"downloading {model_id}/{f['name']} ({f['size'] / 1e6:.1f} MB)", flush=True)
-        urllib.request.urlretrieve(f["url"], path + ".part")
+        for attempt in range(1, ATTEMPTS + 1):
+            try:
+                urllib.request.urlretrieve(f["url"], path + ".part")
+                break
+            except OSError as e:
+                if attempt == ATTEMPTS:
+                    sys.exit(f"could not download {model_id}/{f['name']}: {e}")
+                print(f"  attempt {attempt} failed ({e}); retrying", flush=True)
+                time.sleep(5 * attempt)
         if os.path.getsize(path + ".part") != f["size"] or sha256(path + ".part") != f["sha256"]:
             sys.exit(f"checksum mismatch for {model_id}/{f['name']}")
         os.replace(path + ".part", path)

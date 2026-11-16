@@ -24,8 +24,14 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 const STALL_TIMEOUT: Duration = Duration::from_secs(30);
 /// How often a wait checks the cancel flag.
 const CANCEL_POLL: Duration = Duration::from_millis(250);
-/// Extra attempts after a connection problem, each resuming the part.
+/// Extra attempts in a row after a connection problem that made no
+/// progress, each resuming the part.
 const NETWORK_RETRIES: u32 = 3;
+/// Attempts for one file in all, however much each one fetched, so a
+/// connection that keeps dropping still ends in an error.
+const MAX_ATTEMPTS: u32 = 20;
+/// Hash this many 64 KiB chunks between checks of the cancel flag.
+const HASH_YIELD_CHUNKS: u32 = 16;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileSpec {
@@ -109,6 +115,53 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+/// Hash a file that is already on disk. Reading hundreds of megabytes
+/// takes seconds, so the cancel flag is checked and other tasks get to
+/// run every megabyte.
+async fn hash_on_disk(path: &Path, cancel: &AtomicBool) -> Result<Sha256, DownloadError> {
+    let mut r = std::fs::File::open(path).map_err(io)?;
+    let mut h = Sha256::new();
+    let mut buf = vec![0u8; 1 << 16];
+    let mut chunks = 0u32;
+    loop {
+        let n = r.read(&mut buf).map_err(io)?;
+        if n == 0 {
+            return Ok(h);
+        }
+        h.update(&buf[..n]);
+        chunks = chunks.wrapping_add(1);
+        if chunks.is_multiple_of(HASH_YIELD_CHUNKS) {
+            if cancel.load(Ordering::Acquire) {
+                return Err(DownloadError::Cancelled);
+            }
+            tokio::task::yield_now().await;
+        }
+    }
+}
+
+/// Length of a part file, 0 when there is none.
+fn part_len(dest: &Path) -> u64 {
+    std::fs::metadata(part_path(dest))
+        .map(|m| m.len())
+        .unwrap_or(0)
+}
+
+/// The first byte a `206` reply carries, from `Content-Range: bytes a-b/n`.
+fn content_range_start(resp: &reqwest::Response) -> Option<u64> {
+    let v = resp
+        .headers()
+        .get(reqwest::header::CONTENT_RANGE)?
+        .to_str()
+        .ok()?;
+    v.trim()
+        .strip_prefix("bytes ")?
+        .split('-')
+        .next()?
+        .trim()
+        .parse()
+        .ok()
+}
+
 /// Free bytes on the volume holding `dir`, if the OS reports it.
 pub fn free_space(dir: &Path) -> Option<u64> {
     #[cfg(unix)]
@@ -147,6 +200,8 @@ impl Downloader {
         let client = reqwest::Client::builder()
             .user_agent(concat!("LocalYapper/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(CONNECT_TIMEOUT)
+            // Model files come over HTTPS only, redirects included.
+            .https_only(true)
             .build()
             .map_err(|e| e.to_string())?;
         Ok(Self { client })
@@ -190,6 +245,14 @@ impl Downloader {
                 }
             }
         }
+        // Say first how much is already on disk, so a reader working out
+        // the speed does not count resumed bytes as freshly fetched.
+        progress(Progress {
+            file_index: 0,
+            files: files.len(),
+            downloaded: have,
+            total,
+        });
         let mut done_before = 0u64;
         for (i, f) in files.iter().enumerate() {
             let base = done_before;
@@ -201,10 +264,23 @@ impl Downloader {
                     total,
                 })
             };
-            let mut attempt = 0;
+            let mut attempt = 0u32;
+            let mut attempts = 0u32;
+            let mut part_before = part_len(&f.dest);
             loop {
                 match self.fetch_one(f, cancel, &report).await {
-                    Err(DownloadError::Network(e)) if attempt < NETWORK_RETRIES => {
+                    Err(DownloadError::Network(e)) => {
+                        attempts += 1;
+                        // An attempt that got further earns a fresh set of
+                        // retries; one that got nowhere uses one up.
+                        let part_now = part_len(&f.dest);
+                        if part_now > part_before {
+                            attempt = 0;
+                        }
+                        part_before = part_now;
+                        if attempt >= NETWORK_RETRIES || attempts >= MAX_ATTEMPTS {
+                            return Err(DownloadError::Network(e));
+                        }
                         attempt += 1;
                         log::warn!(
                             "download: {e}; retry {attempt} of {NETWORK_RETRIES} resumes the part"
@@ -233,7 +309,7 @@ impl Downloader {
             .unwrap_or_default();
         // A finished file with the right size and hash needs nothing.
         if std::fs::metadata(&f.dest).is_ok_and(|m| m.len() == f.size)
-            && sha256_file(&f.dest).map_err(io)? == f.sha256
+            && hex(&hash_on_disk(&f.dest, cancel).await?.finalize()) == f.sha256
         {
             return Ok(());
         }
@@ -245,18 +321,11 @@ impl Downloader {
                 std::fs::remove_file(&part).map_err(io)?;
                 have = 0;
             }
-            let mut hasher = Sha256::new();
-            if have > 0 {
-                let mut r = std::fs::File::open(&part).map_err(io)?;
-                let mut buf = vec![0u8; 1 << 16];
-                loop {
-                    let n = r.read(&mut buf).map_err(io)?;
-                    if n == 0 {
-                        break;
-                    }
-                    hasher.update(&buf[..n]);
-                }
-            }
+            let mut hasher = if have > 0 {
+                hash_on_disk(&part, cancel).await?
+            } else {
+                Sha256::new()
+            };
             let mut req = self.client.get(&f.url);
             if have > 0 {
                 req = req.header(reqwest::header::RANGE, format!("bytes={have}-"));
@@ -265,6 +334,17 @@ impl Downloader {
                 .await?
                 .map_err(|e| DownloadError::Network(describe(&e)))?;
             let status = resp.status();
+            if status == reqwest::StatusCode::PARTIAL_CONTENT
+                && have > 0
+                && content_range_start(&resp).is_some_and(|start| start != have)
+            {
+                // The reply does not continue where the part ends; appending
+                // it would only fail the checksum. Start this file again.
+                log::warn!("download: {name}: the server resumed at the wrong offset");
+                drop(resp);
+                std::fs::remove_file(&part).map_err(io)?;
+                continue;
+            }
             let mut out = if status == reqwest::StatusCode::PARTIAL_CONTENT && have > 0 {
                 std::fs::OpenOptions::new()
                     .append(true)
@@ -283,6 +363,9 @@ impl Downloader {
                 have = 0;
                 hasher = Sha256::new();
                 std::fs::File::create(&part).map_err(io)?
+            } else if status.is_server_error() || status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+                // Busy or briefly broken servers are worth another try.
+                return Err(DownloadError::Network(format!("{name}: HTTP {status}")));
             } else {
                 return Err(DownloadError::Http(format!("{name}: HTTP {status}")));
             };
@@ -409,6 +492,10 @@ mod tests {
         DropOnce,
         /// Send the headers and half the body, then go quiet.
         Stall,
+        /// Answer a Range request with 206 but start the body at byte 0.
+        WrongOffset,
+        /// Answer the first request with 503, then honour Range.
+        BusyOnce,
     }
 
     struct Server {
@@ -446,6 +533,12 @@ mod tests {
                         *b ^= 0xFF;
                     }
                 }
+                if mode == Mode::BusyOnce && served == 1 {
+                    let _ = out.write_all(
+                        b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                    );
+                    continue;
+                }
                 if mode == Mode::Stall || (mode == Mode::DropOnce && served == 1) {
                     let start = range.unwrap_or(0) as usize;
                     let half = start + (data.len() - start) / 2;
@@ -473,11 +566,25 @@ mod tests {
                             .as_bytes()
                             .to_vec()
                     }
-                    (Mode::Ranges | Mode::DropOnce, Some(r)) => {
+                    (Mode::WrongOffset, Some(_)) => {
+                        let mut v = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes 0-{}/{}\r\nConnection: close\r\n\r\n",
+                            data.len(),
+                            data.len() - 1,
+                            data.len()
+                        )
+                        .into_bytes();
+                        v.extend_from_slice(&data);
+                        v
+                    }
+                    (Mode::Ranges | Mode::DropOnce | Mode::BusyOnce, Some(r)) => {
                         let slice = &data[r as usize..];
                         let mut v = format!(
-                            "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                            slice.len()
+                            "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {}-{}/{}\r\nConnection: close\r\n\r\n",
+                            slice.len(),
+                            r,
+                            data.len() - 1,
+                            data.len()
                         )
                         .into_bytes();
                         v.extend_from_slice(slice);
@@ -657,6 +764,43 @@ mod tests {
         run(&f, &AtomicBool::new(false)).expect("resume after cancel");
         assert_eq!(std::fs::read(&f.dest).expect("read"), data);
         let _ = server;
+    }
+
+    #[test]
+    fn a_206_at_the_wrong_offset_restarts_the_file() {
+        let data = body();
+        let server = serve(data.clone(), Mode::WrongOffset);
+        let f = spec(&server.url, &data, tmp("offset"));
+        std::fs::write(part_path(&f.dest), &data[..80_000]).expect("part");
+        run(&f, &AtomicBool::new(false)).expect("restarted");
+        assert_eq!(std::fs::read(&f.dest).expect("read"), data);
+        assert_eq!(
+            server
+                .requests
+                .lock()
+                .map(|r| r.clone())
+                .unwrap_or_default(),
+            vec!["from 80000".to_string(), "full".to_string()]
+        );
+    }
+
+    #[test]
+    fn a_busy_server_is_retried() {
+        let data = body();
+        let server = serve(data.clone(), Mode::BusyOnce);
+        let f = spec(&server.url, &data, tmp("busy"));
+        run(&f, &AtomicBool::new(false)).expect("retried after 503");
+        assert_eq!(std::fs::read(&f.dest).expect("read"), data);
+    }
+
+    #[test]
+    fn the_first_report_counts_what_is_on_disk() {
+        let data = body();
+        let server = serve(data.clone(), Mode::Ranges);
+        let f = spec(&server.url, &data, tmp("first-report"));
+        std::fs::write(part_path(&f.dest), &data[..60_000]).expect("part");
+        let progress = run(&f, &AtomicBool::new(false)).expect("download");
+        assert_eq!(progress.first().map(|p| p.downloaded), Some(60_000));
     }
 
     #[test]

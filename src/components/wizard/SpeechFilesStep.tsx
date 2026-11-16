@@ -74,6 +74,8 @@ export function SpeechFilesStep({
     const downloadedMb = downloadProgress?.downloaded_mb ?? 0;
     const totalMb = downloadProgress?.total_mb ?? modelSizeMb ?? 0;
     const speedMbps = downloadProgress?.speed_mbps ?? 0;
+    // Every byte is in and verified; the speech engine is starting.
+    const finishing = percent >= 100 && !cancelling;
 
     return (
       <Step key="downloading" title="Speech model">
@@ -87,13 +89,13 @@ export function SpeechFilesStep({
           </div>
           <div className="mt-3 flex justify-between text-[11.5px] text-ink/45">
             <span>{totalMb > 0 ? `${downloadedMb.toFixed(0)} / ${totalMb.toFixed(0)} MB` : "Checking what is already here"}</span>
-            <span>{cancelling ? "Stopping" : speedMbps > 0 ? `${speedMbps.toFixed(1)} MB/s` : ""}</span>
+            <span>{cancelling ? "Stopping" : finishing ? "Starting" : speedMbps > 0 ? `${speedMbps.toFixed(1)} MB/s` : ""}</span>
           </div>
         </div>
         {/* Stays on screen until the download has really stopped, so a new
             one never starts while the old one still writes. */}
-        <Button size="lg" disabled={cancelling} onClick={() => void onCancel()}>
-          {cancelling ? "Cancelling" : "Cancel"}
+        <Button size="lg" disabled={cancelling || finishing} onClick={() => void onCancel()}>
+          {cancelling ? "Cancelling" : finishing ? "Starting" : "Cancel"}
         </Button>
       </Step>
     );

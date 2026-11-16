@@ -16,6 +16,7 @@ function KeyField({
   onStartEdit,
   onCapture,
   onCancel,
+  captureEscape,
 }: {
   label: string;
   value: string;
@@ -23,15 +24,21 @@ function KeyField({
   onStartEdit: () => void;
   onCapture: (shortcut: string) => void;
   onCancel: () => void;
+  /** Escape is a choice here, not a way out; clicking elsewhere cancels. */
+  captureEscape: boolean;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
-  useHotkeyCapture(editing, ref, onCapture, onCancel);
+  useHotkeyCapture(editing, ref, onCapture, onCancel, captureEscape);
 
   return (
     <button
       ref={ref}
       type="button"
-      title="Click, then press the new keys. Esc cancels."
+      title={
+        captureEscape
+          ? "Click, then press the new keys. Click elsewhere to cancel."
+          : "Click, then press the new keys. Esc cancels."
+      }
       aria-label={`${label} shortcut: ${value}. Click to change.`}
       onClick={editing ? undefined : onStartEdit}
       className="flex h-7 items-center justify-end rounded-md"
@@ -107,6 +114,7 @@ export function HotkeysSection() {
                 onStartEdit={() => startEditing(entry.key)}
                 onCapture={(shortcut) => handleCapture(entry.key, shortcut)}
                 onCancel={stopEditing}
+                captureEscape={entry.key === "hotkey_cancel"}
               />
             )}
           </Row>

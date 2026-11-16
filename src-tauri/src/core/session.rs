@@ -96,6 +96,10 @@ pub enum Event {
     CaptureFailed { id: SessionId, message: String },
     ModelFailed { message: String },
     InjectDone { id: SessionId, result: Result<(), String> },
+    /// The paste for `id` has not returned for a long time (a clipboard
+    /// owner that hangs). The session gives up on it; the text stays
+    /// available to copy.
+    InjectTimeout { id: SessionId },
     SetPaused(bool),
     ConfigChanged(Config),
 }
@@ -157,6 +161,14 @@ impl Session {
         self.state == State::Idle
     }
 
+    pub fn is_paused(&self) -> bool {
+        self.paused
+    }
+
+    pub fn is_injecting(&self) -> bool {
+        matches!(self.state, State::Injecting { .. })
+    }
+
     pub fn is_recording(&self) -> bool {
         matches!(self.state, State::Recording { .. })
     }
@@ -209,6 +221,20 @@ impl Session {
             Event::ModelFailed { message } => {
                 if matches!(self.state, State::Recording { .. } | State::Finishing { .. }) {
                     self.abort(&mut fx, View::Error { message, text: None });
+                }
+            }
+            Event::InjectTimeout { id } => {
+                if let State::Injecting { id: cur, text } = &self.state {
+                    if *cur == id {
+                        let text = text.clone();
+                        self.state = State::Idle;
+                        fx.push(Effect::Tray(Tray::Idle));
+                        fx.push(Effect::Overlay(View::Error {
+                            message: "Pasting did not finish.".into(),
+                            text: Some(text),
+                        }));
+                        fx.push(Effect::ScheduleEvict);
+                    }
                 }
             }
             Event::InjectDone { id, result } => {
@@ -651,6 +677,32 @@ mod tests {
         assert!(x.is_idle());
         // A model failure while idle is not shown.
         assert!(x.handle(Event::ModelFailed { message: "x".into() }).is_empty());
+    }
+
+    #[test]
+    fn a_paste_that_never_returns_is_given_up_with_the_text() {
+        let mut x = s(ActivationMode::Hold);
+        x.handle(Event::RecordDown { at_ms: 0 });
+        x.handle(Event::RecordUp { at_ms: 900 });
+        complete(&mut x, 1, &["stuck"]);
+        assert!(x.is_injecting());
+        // A timeout for another session changes nothing.
+        assert!(x.handle(Event::InjectTimeout { id: 9 }).is_empty());
+        let fx = x.handle(Event::InjectTimeout { id: 1 });
+        assert!(has(
+            &fx,
+            &Effect::Overlay(View::Error {
+                message: "Pasting did not finish.".into(),
+                text: Some("stuck".into())
+            })
+        ));
+        assert!(x.is_idle());
+        // The paste returning late is ignored, and a new dictation starts.
+        assert!(x
+            .handle(Event::InjectDone { id: 1, result: Ok(()) })
+            .is_empty());
+        let fx = x.handle(Event::RecordDown { at_ms: 5_000 });
+        assert!(has(&fx, &Effect::StartCapture { id: 2 }));
     }
 
     #[test]

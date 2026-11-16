@@ -15,6 +15,11 @@ export async function modelDownloadActive(): Promise<boolean> {
   return invoke<boolean>("model_download_active");
 }
 
+/** The id of the model being downloaded right now, if any. */
+export async function modelDownloadCurrent(): Promise<string | null> {
+  return invoke<string | null>("model_download_current");
+}
+
 /** Reload speech model assets from disk into AppState. */
 export async function reloadModels(): Promise<void> {
   return invoke<void>("reload_models");

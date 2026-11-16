@@ -75,6 +75,9 @@ pub enum Msg {
     SetPaused(bool),
     /// Settings changed in the database: re-read them.
     ReloadSettings,
+    /// The speech model setting changed: unload the old model, once no
+    /// dictation needs it.
+    SpeechModelChanged,
     /// The Voice page's test: start (true) or stop (false) a dictation
     /// whose text is reported to the settings window instead of pasted.
     TestDictation(bool),
@@ -308,6 +311,9 @@ pub struct Controller {
     /// The cancel combo registered now, if any. Never re-read from
     /// settings while registered, so unregister always matches.
     cancel_registered: Option<String>,
+    /// The speech model changed during a dictation; unload the old one
+    /// when it ends.
+    pending_model_change: bool,
     evict_generation: u64,
     overlay_generation: u64,
     rss_before_evict: Option<u64>,
@@ -385,6 +391,7 @@ pub fn start(parts: ControllerParts) -> Result<Started, String> {
         timing: Timing::default(),
         target_app: ForegroundApp::default(),
         cancel_registered: None,
+        pending_model_change: false,
         evict_generation: 0,
         overlay_generation: 0,
         rss_before_evict: None,
@@ -440,10 +447,9 @@ impl Controller {
                     self.timing.capture_started = Some(Instant::now());
                 }
                 if used_fallback {
-                    let _ = self.app.emit(
-                        "audio-device-warning",
-                        format!("The selected microphone was not found. Using {device}."),
-                    );
+                    // The Voice page shows the same thing next to the
+                    // microphone setting ("Not connected, using the default").
+                    log::warn!("audio: the selected microphone was not found; using {device}");
                 }
             }
             Msg::EvictTimer { generation } => {
@@ -469,10 +475,14 @@ impl Controller {
                         "controller: session {id} made no progress for {} s after release; giving up",
                         FINISH_STALL.as_secs()
                     );
-                    self.feed(Event::CaptureFailed {
-                        id,
-                        message: "Transcription did not finish. Please try again.".into(),
-                    });
+                    if self.session.is_injecting() {
+                        self.feed(Event::InjectTimeout { id });
+                    } else {
+                        self.feed(Event::CaptureFailed {
+                            id,
+                            message: "Transcription did not finish. Please try again.".into(),
+                        });
+                    }
                 } else {
                     self.watch_finish(id);
                 }
@@ -495,9 +505,14 @@ impl Controller {
                     text: Some(text), ..
                 }) = &self.last_view
                 {
-                    if let Err(e) = inject::set_clipboard_text(text) {
-                        log::warn!("overlay copy: {e}");
-                    }
+                    // Off the controller task: the clipboard lock can be
+                    // held by a paste that is slow to return.
+                    let text = text.clone();
+                    tauri::async_runtime::spawn_blocking(move || {
+                        if let Err(e) = inject::set_clipboard_text(&text) {
+                            log::warn!("overlay copy: {e}");
+                        }
+                    });
                 }
                 self.overlay.hide();
             }
@@ -524,6 +539,14 @@ impl Controller {
                 let _ = self.app.emit("paused-state-changed", p);
             }
             Msg::ReloadSettings => self.reload_settings(),
+            Msg::SpeechModelChanged => {
+                if self.session.is_idle() {
+                    self.worker.evict();
+                } else {
+                    // The dictation finishes on the model it started with.
+                    self.pending_model_change = true;
+                }
+            }
             Msg::TestDictation(true) if self.session.is_idle() => {
                 self.test.store(true, Ordering::SeqCst);
                 self.test_text = None;
@@ -554,7 +577,15 @@ impl Controller {
                     last_view: self.last_view.clone(),
                     last_timings: self.last_timings.clone(),
                     dictations: self.dictations,
-                    overlay_rect: self.overlay.rect(),
+                    // Only the test channel reads it, and finding it waits
+                    // for the main thread, which must never stall this task
+                    // in the app (the overlay asks for its view while the
+                    // main thread is still building it).
+                    overlay_rect: if cfg!(feature = "test-hooks") {
+                        self.overlay.rect()
+                    } else {
+                        None
+                    },
                     record_downs: self.record_downs,
                     record_ups: self.record_ups,
                     tests: self.tests,
@@ -614,6 +645,22 @@ impl Controller {
                     pressed: Some(Instant::now()),
                     ..Timing::default()
                 };
+                // With no model to transcribe with (none downloaded yet, or
+                // deleted), say so instead of starting a recording that
+                // would be aborted halfway through its own start.
+                if !self.session.is_paused() {
+                    if let Err(message) = (self.resolve_model)(&self.app) {
+                        self.execute(Effect::Overlay(session::View::Error {
+                            message,
+                            text: None,
+                        }));
+                        self.execute(Effect::ScheduleEvict);
+                        if self.test.swap(false, Ordering::SeqCst) {
+                            self.finish_test();
+                        }
+                        return;
+                    }
+                }
             }
             Event::CaptureEnded {
                 id,
@@ -631,6 +678,10 @@ impl Controller {
         let effects = self.session.handle(ev);
         for fx in effects {
             self.execute(fx);
+        }
+        if self.pending_model_change && self.session.is_idle() {
+            self.pending_model_change = false;
+            self.worker.evict();
         }
         if self.session.is_idle() && self.test.swap(false, Ordering::SeqCst) {
             self.finish_test();
@@ -780,7 +831,12 @@ impl Controller {
                 }
                 self.worker.load(spec);
             }
-            Err(message) => self.feed(Event::ModelFailed { message }),
+            // Never re-enter `feed` from an effect: the rest of this
+            // event's effects would then run on an aborted session. Queued,
+            // the failure is handled after them.
+            Err(message) => self
+                .handle
+                .send(Msg::Session(Event::ModelFailed { message })),
         }
     }
 

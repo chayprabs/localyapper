@@ -1,10 +1,9 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for LocalYapper",
+  "description": "Settings window: its own title bar and window buttons",
   "windows": [
-    "main",
-    "overlay"
+    "main"
   ],
   "permissions": [
     "core:default",
@@ -14,12 +13,6 @@
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
-    "core:window:allow-outer-position",
-    "core:window:allow-set-position",
-    "core:window:allow-start-dragging",
-    "global-shortcut:allow-register",
-    "global-shortcut:allow-unregister",
-    "autostart:allow-enable",
-    "autostart:allow-disable"
+    "core:window:allow-start-dragging"
   ]
 }

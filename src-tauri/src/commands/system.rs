@@ -299,6 +299,19 @@ pub async fn diagnostics(
     ))
 }
 
+/// Put the diagnostics on the clipboard. Done here because WebKit refuses
+/// a page's clipboard write that follows an awaited call.
+#[tauri::command]
+pub async fn copy_diagnostics(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let text = diagnostics(app, state).await?;
+    tokio::task::spawn_blocking(move || crate::platform::inject::set_clipboard_text(&text))
+        .await
+        .map_err(|e| format!("Could not copy: {e}"))?
+}
+
 #[cfg(test)]
 mod diagnostics_tests {
     use super::*;

@@ -28,14 +28,18 @@ export function AccessibilityStep({
 
   useEffect(() => {
     let cancelled = false;
-    void requestAccessibilityPermission().then((ok) => {
-      if (!cancelled && ok) setGranted(true);
-    });
+    void requestAccessibilityPermission()
+      .then((ok) => {
+        if (!cancelled && ok) setGranted(true);
+      })
+      .catch(() => undefined);
     // Poll once a second so the step advances as soon as access is given.
     const timer = window.setInterval(() => {
-      void checkPermissions().then((p) => {
-        if (!cancelled && p.accessibility) setGranted(true);
-      });
+      void checkPermissions()
+        .then((p) => {
+          if (!cancelled && p.accessibility) setGranted(true);
+        })
+        .catch(() => undefined);
     }, 1000);
     return () => {
       cancelled = true;

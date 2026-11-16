@@ -10,7 +10,7 @@ use crate::core::audio::convert::{downmix_into, ToF32};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::traits::{Producer, Split};
 use ringbuf::{HeapCons, HeapProd, HeapRb};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -307,6 +307,11 @@ fn find_device(host: &cpal::Host, name: &str) -> Result<(cpal::Device, bool), St
 /// Frames converted per inner step of the callback.
 const CHUNK: usize = 1024;
 
+/// Recoverable stream errors in a row, with no audio between them, that
+/// end a recording. ALSA reports an overrun ("poll() returned POLLERR")
+/// as an error and carries on; one of those must not abort a dictation.
+const STREAM_ERRORS_FATAL: u32 = 8;
+
 fn build<T>(
     dev: &cpal::Device,
     config: &cpal::StreamConfig,
@@ -318,9 +323,12 @@ fn build<T>(
 where
     T: cpal::SizedSample + ToF32,
 {
+    let errors_in_a_row = Arc::new(AtomicU32::new(0));
+    let errors_seen = errors_in_a_row.clone();
     dev.build_input_stream(
         config,
         move |data: &[T], _: &cpal::InputCallbackInfo| {
+            errors_in_a_row.store(0, Ordering::Relaxed);
             let mut buf = [0.0f32; CHUNK];
             for chunk in data.chunks(CHUNK * channels) {
                 let n = downmix_into(chunk, channels, &mut buf);
@@ -330,7 +338,19 @@ where
                 }
             }
         },
-        move |err| on_error(err.to_string()),
+        move |err| match err {
+            // The microphone was unplugged: nothing more will arrive.
+            cpal::StreamError::DeviceNotAvailable => on_error(err.to_string()),
+            cpal::StreamError::BackendSpecific { .. } => {
+                let n = errors_seen.fetch_add(1, Ordering::Relaxed) + 1;
+                if n == 1 {
+                    log::warn!("audio: stream error, continuing: {err}");
+                }
+                if n == STREAM_ERRORS_FATAL {
+                    on_error(err.to_string());
+                }
+            }
+        },
         None,
     )
 }

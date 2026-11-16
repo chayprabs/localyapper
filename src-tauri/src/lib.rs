@@ -132,6 +132,7 @@ macro_rules! app_commands {
             commands::models::download_speech_model,
             commands::models::cancel_model_download,
             commands::models::model_download_active,
+            commands::models::model_download_current,
             commands::models::reload_models,
             commands::models::check_models_status,
             commands::models::list_models,
@@ -158,6 +159,7 @@ macro_rules! app_commands {
             commands::system::list_input_devices,
             commands::system::about_info,
             commands::system::diagnostics,
+            commands::system::copy_diagnostics,
             commands::system::open_releases,
             commands::system::request_microphone_permission,
             commands::system::request_accessibility_permission,
@@ -181,11 +183,14 @@ pub fn run() {
     #[allow(unused_mut)]
     let mut builder =
         tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // A second launch can arrive while this one is still starting,
+            // before the app state exists; `state()` would panic then.
+            let Some(state) = app.try_state::<AppState>() else {
+                log::info!("second launch ignored: still starting");
+                return;
+            };
             match controller::CliAction::from_args(&args) {
-                Some(action) => app
-                    .state::<AppState>()
-                    .controller
-                    .send(controller::Msg::Cli(action)),
+                Some(action) => state.controller.send(controller::Msg::Cli(action)),
                 None => show_or_create_main_window(app),
             }
         }));

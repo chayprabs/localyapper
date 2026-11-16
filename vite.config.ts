@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 const host = process.env.TAURI_DEV_HOST;
+// Set by the Tauri CLI for `tauri dev` and `tauri build --debug`.
+const debug = process.env.TAURI_ENV_DEBUG === "true";
 
 export default defineConfig({
   plugins: [react()],
@@ -27,18 +29,24 @@ export default defineConfig({
       ignored: ["**/src-tauri/**"],
     },
   },
-  envPrefix: ["VITE_", "TAURI_"],
+  // Tauri 2 names its variables TAURI_ENV_*. Nothing broader is exposed,
+  // so a TAURI_SIGNING_* secret in CI can never reach the bundle.
+  envPrefix: ["VITE_", "TAURI_ENV_"],
   esbuild: {
-    // Strip dev-only diagnostics from production bundles. Keep them in
-    // TAURI_DEBUG builds so console.error/warn remain visible.
-    drop: process.env.TAURI_DEBUG ? [] : ["console", "debugger"],
+    // Strip dev-only diagnostics from release bundles. Keep them in
+    // debug builds (`tauri dev`, `tauri build --debug`) so console
+    // output remains visible.
+    drop: debug ? [] : ["console", "debugger"],
   },
   build: {
-    target:
-      process.env.TAURI_PLATFORM === "windows" ? "chrome105" : "safari13",
-    minify: !process.env.TAURI_DEBUG ? "esbuild" : false,
-    sourcemap: !!process.env.TAURI_DEBUG,
+    target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
+    minify: debug ? false : "esbuild",
+    sourcemap: debug,
     cssCodeSplit: true,
+    // Assets stay files: the CSP allows images from 'self' only, so a
+    // small image inlined as a data: URI (the title bar logo) would be
+    // blocked.
+    assetsInlineLimit: 0,
     rollupOptions: {
       input: {
         // Settings + wizard live behind index.html

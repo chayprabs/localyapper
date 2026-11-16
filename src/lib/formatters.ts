@@ -20,6 +20,13 @@ const dayFormatter = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
 });
 
+const dayWithYearFormatter = new Intl.DateTimeFormat(undefined, {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
+
 /** Local calendar day of a stored timestamp: "Today", "Yesterday" or a date. */
 export function formatLocalDay(stored: string, now: Date = new Date()): string {
   const d = parseStoredDate(stored);
@@ -27,7 +34,8 @@ export function formatLocalDay(stored: string, now: Date = new Date()): string {
   const days = Math.round((startOf(now) - startOf(d)) / 86_400_000);
   if (days === 0) return "Today";
   if (days === 1) return "Yesterday";
-  return dayFormatter.format(d);
+  // An entry from another year says which.
+  return (d.getFullYear() === now.getFullYear() ? dayFormatter : dayWithYearFormatter).format(d);
 }
 
 /** Local time of day of a stored timestamp. */

@@ -21,6 +21,20 @@ use crate::state::AppState;
 pub struct Downloads {
     running: tokio::sync::Mutex<()>,
     flags: Mutex<Vec<Arc<AtomicBool>>>,
+    /// The model whose download holds the turn, for a page that opens
+    /// while it runs.
+    current: Mutex<Option<String>>,
+}
+
+/// Clears [`Downloads::current`] when the download that set it ends.
+struct CurrentDownload<'a>(&'a Downloads);
+
+impl Drop for CurrentDownload<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut c) = self.0.current.lock() {
+            *c = None;
+        }
+    }
 }
 
 impl Downloads {
@@ -50,6 +64,18 @@ impl Downloads {
     /// Whether a download is running or waiting.
     pub fn active(&self) -> bool {
         self.flags.lock().map(|f| !f.is_empty()).unwrap_or(false)
+    }
+
+    /// The model being downloaded right now, if any.
+    pub fn current(&self) -> Option<String> {
+        self.current.lock().ok().and_then(|c| c.clone())
+    }
+
+    fn set_current(&self, id: &str) -> CurrentDownload<'_> {
+        if let Ok(mut c) = self.current.lock() {
+            *c = Some(id.to_string());
+        }
+        CurrentDownload(self)
     }
 
     /// Wait for the running download, if any, unless cancelled first.
@@ -188,6 +214,7 @@ async fn download_model_inner(
         .ok_or_else(|| format!("Unknown speech model: {id}"))?;
     let dir = catalog::model_dir(&crate::models_dir(app_handle)?, id);
     let _turn = state.downloads.turn(cancel).await?;
+    let _current = state.downloads.set_current(id);
     std::fs::create_dir_all(&dir)
         .map_err(|e| format!("Could not create {}: {e}", dir.display()))?;
     let files: Vec<FileSpec> = entry
@@ -260,12 +287,13 @@ async fn download_model_inner(
             return Ok(());
         }
         log::warn!("models: {id} failed its checksum; downloading it again");
+        // Without its marker the model cannot be loaded again while its
+        // files are replaced, and the list shows it as partly downloaded.
+        let _ = std::fs::remove_file(dir.join(catalog::VERIFIED_MARKER));
+        let _ = app_handle.emit("models-changed", ());
         // A loaded model keeps its files open, and on Windows an open
         // file cannot be replaced.
-        if state.models.loaded_id().as_deref() == Some(id) {
-            let models = state.models.clone();
-            let _ = tokio::task::spawn_blocking(move || models.evict_blocking()).await;
-        }
+        evict_model(state, id).await;
     }
     let _ = std::fs::remove_file(dir.join(catalog::VERIFIED_MARKER));
 
@@ -304,6 +332,22 @@ pub async fn model_download_active(state: tauri::State<'_, AppState>) -> Result<
     Ok(state.downloads.active())
 }
 
+/// The model being downloaded, if any (the Voice page asks when it opens).
+#[tauri::command]
+pub async fn model_download_current(
+    state: tauri::State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    Ok(state.downloads.current())
+}
+
+/// Unload `id` if it is loaded, waiting for a load in progress to finish
+/// first so its files are never removed underneath it.
+async fn evict_model(state: &AppState, id: &str) {
+    let models = state.models.clone();
+    let id = id.to_string();
+    let _ = tokio::task::spawn_blocking(move || models.evict_if_blocking(&id)).await;
+}
+
 /// Make `id` (or `auto`) the dictation model. The old model is evicted.
 #[tauri::command]
 pub async fn use_model(
@@ -337,13 +381,11 @@ pub async fn delete_model(
     let Ok(_turn) = state.downloads.running.try_lock() else {
         return Err("A download is in progress. Cancel it before deleting a model.".into());
     };
-    if state.models.loaded_id().as_deref() == Some(id.as_str()) {
-        let models = state.models.clone();
-        tokio::task::spawn_blocking(move || models.evict_blocking())
-            .await
-            .map_err(|e| e.to_string())?;
-    }
     let dir = catalog::model_dir(&crate::models_dir(&app_handle)?, &id);
+    // Removing the marker first means the model cannot be loaded again
+    // between the eviction and the delete.
+    let _ = std::fs::remove_file(dir.join(catalog::VERIFIED_MARKER));
+    evict_model(state.inner(), &id).await;
     if dir.is_dir() {
         std::fs::remove_dir_all(&dir).map_err(|e| format!("Could not delete {id}: {e}"))?;
     }

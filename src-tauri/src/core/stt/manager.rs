@@ -98,6 +98,17 @@ impl ModelManager {
         let _guard = self.load_lock.blocking_lock();
         self.evict_locked()
     }
+
+    /// Drop the recogniser if it is `id`. A load in progress finishes
+    /// first, so a model that was still loading is caught too.
+    pub fn evict_if_blocking(&self, id: &str) -> bool {
+        let _guard = self.load_lock.blocking_lock();
+        if self.loaded_id().as_deref() == Some(id) {
+            self.evict_locked()
+        } else {
+            false
+        }
+    }
 }
 
 /// What the worker reports back.

@@ -51,6 +51,8 @@ function errorToMessage(error: unknown, fallback: string): string {
 
 export function useWizard(onComplete: () => void) {
   const [step, setStepState] = useState<WizardStep>("welcome");
+  // The step as last set, read by setStep without waiting for a render.
+  const stepRef = useRef<WizardStep>("welcome");
   const [hydrated, setHydrated] = useState(false);
   // Whether the current step was reached by going back. Steps that move
   // on by themselves must not do so then, or Back could never pass them.
@@ -85,6 +87,7 @@ export function useWizard(onComplete: () => void) {
 
         const persisted = settings["setup_step"];
         if (isWizardStep(persisted) && persisted !== "done") {
+          stepRef.current = persisted;
           setStepState(persisted);
         }
 
@@ -94,10 +97,10 @@ export function useWizard(onComplete: () => void) {
         }
       } catch (error) {
         console.error("Failed to load wizard settings:", error);
-      } finally {
-        if (!cancelled) setHydrated(true);
       }
 
+      // Known before the first step shows, so a wizard resumed at the
+      // speech model never offers a download it does not need.
       try {
         const status = await checkSpeechModelFileExists();
         if (!cancelled) {
@@ -106,6 +109,8 @@ export function useWizard(onComplete: () => void) {
         }
       } catch (error) {
         console.error("Failed to check speech model files:", error);
+      } finally {
+        if (!cancelled) setHydrated(true);
       }
     })();
 
@@ -125,11 +130,10 @@ export function useWizard(onComplete: () => void) {
 
   const setStep = useCallback(
     (next: WizardStep) => {
-      setStepState((current) => {
-        if (current === next) return current;
-        void persistStep(next);
-        return next;
-      });
+      if (stepRef.current === next) return;
+      stepRef.current = next;
+      setStepState(next);
+      void persistStep(next);
     },
     [persistStep],
   );
@@ -202,6 +206,12 @@ export function useWizard(onComplete: () => void) {
       window.clearInterval(timer);
     };
   }, [step, refreshPermissions, readPermissions]);
+
+  // The summary shows the microphone status. A wizard resumed past the
+  // microphone step has not read it yet.
+  useEffect(() => {
+    if (step === "done") void readPermissions();
+  }, [step, readPermissions]);
 
   const requestOpenMicSettings = useCallback(async () => {
     try {

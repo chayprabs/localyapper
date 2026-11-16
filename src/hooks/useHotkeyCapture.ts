@@ -1,5 +1,7 @@
 // While active, the next key combination is captured as a shortcut. Escape
-// or a click outside `containerRef` cancels.
+// or a click outside `containerRef` cancels. With `captureEscape` (the
+// cancel key, whose default is Escape) Escape is captured like any other
+// key and only a click outside cancels.
 import { useEffect, type RefObject } from "react";
 import { eventToShortcut } from "@/lib/hotkeyCapture";
 
@@ -8,6 +10,7 @@ export function useHotkeyCapture(
   containerRef: RefObject<HTMLElement | null>,
   onCapture: (shortcut: string) => void,
   onCancel: () => void,
+  captureEscape = false,
 ): void {
   useEffect(() => {
     if (!active) return;
@@ -17,7 +20,7 @@ export function useHotkeyCapture(
       e.stopPropagation();
       // A key still held from opening the field (Enter, Space) is not a choice.
       if (e.repeat) return;
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !captureEscape) {
         onCancel();
         return;
       }
@@ -37,5 +40,5 @@ export function useHotkeyCapture(
       window.removeEventListener("keydown", handleKeyDown, true);
       document.removeEventListener("mousedown", handleMouseDown);
     };
-  }, [active, containerRef, onCapture, onCancel]);
+  }, [active, containerRef, onCapture, onCancel, captureEscape]);
 }

@@ -89,6 +89,85 @@ fn ensure_unique_hotkey(store: &dyn Store, key: &str, value: &str) -> Result<(),
     Ok(())
 }
 
+/// Validate, store and apply several hotkeys as one change (Reset).
+/// Setting them one at a time could fail halfway: a default can equal
+/// another key's current combo ("F8 is already used by paste last")
+/// although the defaults never collide with each other. Here uniqueness
+/// is checked against the new values, the hotkeys are registered once,
+/// and on failure every one of them goes back to what it was.
+pub fn apply_hotkeys(
+    store: &mut dyn Store,
+    effects: &dyn Effects,
+    changes: &[(&str, String)],
+    models: &[String],
+) -> Result<(), String> {
+    let mut next: Vec<(&str, String)> = Vec::with_capacity(changes.len());
+    for (key, value) in changes {
+        let spec: &Key = keys::find(key).ok_or_else(|| format!("Unknown setting {key:?}"))?;
+        if spec.hook != Hook::Hotkeys {
+            return Err(format!("{key} is not a hotkey"));
+        }
+        next.push((key, keys::validate(spec, value, models)?));
+    }
+    // Every hotkey as it will be once the change is made.
+    let combined: Vec<(&str, String)> = HOTKEY_KEYS
+        .iter()
+        .map(|k| {
+            let value = next
+                .iter()
+                .find(|(key, _)| key == k)
+                .map(|(_, v)| v.clone())
+                .or_else(|| store.read(k))
+                .or_else(|| keys::find(k).map(keys::default_of))
+                .unwrap_or_default();
+            (*k, value)
+        })
+        .collect();
+    for (i, (key, value)) in combined.iter().enumerate() {
+        if let Some((other, _)) = combined[i + 1..]
+            .iter()
+            .find(|(_, v)| !value.is_empty() && v.eq_ignore_ascii_case(value))
+        {
+            let label = |k: &str| k.trim_start_matches("hotkey_").replace('_', " ");
+            return Err(format!(
+                "{value} would be used by both {} and {}",
+                label(key),
+                label(other)
+            ));
+        }
+    }
+    let previous: Vec<(&str, Option<String>)> =
+        next.iter().map(|(k, _)| (*k, store.read(k))).collect();
+    let roll_back = |store: &mut dyn Store| -> Result<(), String> {
+        for (key, old) in &previous {
+            let old = old
+                .clone()
+                .or_else(|| keys::find(key).map(keys::default_of))
+                .unwrap_or_default();
+            store.write(key, &old)?;
+        }
+        Ok(())
+    };
+    for (key, value) in &next {
+        if let Err(e) = store.write(key, value) {
+            roll_back(store)?;
+            return Err(e);
+        }
+    }
+    if let Err(e) = effects.reload_hotkeys() {
+        roll_back(store)?;
+        if let Err(e2) = effects.reload_hotkeys() {
+            log::error!("settings: could not restore hotkeys: {e2}");
+        }
+        return Err(e);
+    }
+    effects.reload_controller();
+    for (key, value) in &next {
+        effects.changed(key, value);
+    }
+    Ok(())
+}
+
 /// Validate, store and apply one setting. Returns the stored value.
 pub fn apply(
     store: &mut dyn Store,
@@ -477,6 +556,71 @@ mod tests {
                 .count(),
             2
         );
+    }
+
+    fn defaults() -> Vec<(&'static str, String)> {
+        HOTKEY_KEYS
+            .iter()
+            .map(|k| (*k, keys::find(k).map(keys::default_of).unwrap_or_default()))
+            .collect()
+    }
+
+    #[test]
+    fn hook_reset_hotkeys_even_when_defaults_collide_with_current_combos() {
+        let mut store = MapStore::default();
+        let d = defaults();
+        let record_default = d[0].1.clone();
+        // Record moved away and paste-last took record's default: setting
+        // record back first would collide.
+        store.0.insert("hotkey_record".into(), "F9".into());
+        store
+            .0
+            .insert("hotkey_paste_last".into(), record_default.clone());
+        let rec = Recorder::default();
+        apply_hotkeys(&mut store, &rec, &d, &models()).expect("reset");
+        for (k, v) in &d {
+            assert_eq!(store.read(k).as_deref(), Some(v.as_str()), "{k}");
+            assert!(rec.saw(&format!("changed:{k}={v}")), "{k}");
+        }
+        assert!(rec.saw("controller"));
+        assert_eq!(
+            rec.calls
+                .borrow()
+                .iter()
+                .filter(|c| *c == "hotkeys")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn a_hotkey_reset_that_fails_to_register_puts_everything_back() {
+        let mut store = MapStore::default();
+        store.0.insert("hotkey_record".into(), "F9".into());
+        store.0.insert("hotkey_cancel".into(), "F10".into());
+        let rec = Recorder::default();
+        *rec.fail_hotkeys.borrow_mut() = true;
+        assert!(apply_hotkeys(&mut store, &rec, &defaults(), &models()).is_err());
+        assert_eq!(store.read("hotkey_record").as_deref(), Some("F9"));
+        assert_eq!(store.read("hotkey_cancel").as_deref(), Some("F10"));
+        assert!(!rec.calls.borrow().iter().any(|c| c.starts_with("changed:")));
+    }
+
+    #[test]
+    fn hotkeys_set_together_must_still_differ() {
+        let mut store = MapStore::default();
+        let rec = Recorder::default();
+        let err = apply_hotkeys(
+            &mut store,
+            &rec,
+            &[
+                ("hotkey_record", "F9".into()),
+                ("hotkey_cancel", "f9".into()),
+            ],
+            &models(),
+        );
+        assert!(err.is_err_and(|e| e.contains("record") && e.contains("cancel")));
+        assert!(store.0.is_empty());
     }
 
     #[test]

@@ -184,8 +184,32 @@ pub enum PasteError {
 enum Saved {
     Text(String),
     Image(arboard::ImageData<'static>),
-    Empty,
+    /// Neither text nor an image. That may be an empty clipboard, or a
+    /// format arboard cannot read (files copied in a file manager, a
+    /// spreadsheet range), so it is never cleared: the dictated text
+    /// stays rather than destroying what the user copied.
+    Unreadable,
 }
+
+/// The clipboard as it was before the dictated text replaced it, until
+/// it is put back. A second injection inside the restore delay finds the
+/// clipboard holding the first one's text; it keeps this original instead
+/// of saving that text, and only the newest injection restores.
+struct PendingRestore {
+    saved: Saved,
+    dictated: String,
+}
+
+struct RestoreSlot {
+    generation: u64,
+    pending: Option<PendingRestore>,
+}
+
+/// Locked before `CLIPBOARD`, never after it.
+static RESTORE: Mutex<RestoreSlot> = Mutex::new(RestoreSlot {
+    generation: 0,
+    pending: None,
+});
 
 /// One long-lived clipboard handle. On Linux the owning process serves
 /// the selection, so the handle must outlive the paste.
@@ -225,9 +249,24 @@ pub fn clipboard_text() -> Option<String> {
     with_clipboard(|cb| cb.get_text().map_err(|e| e.to_string())).ok()
 }
 
-/// Put text on the clipboard (tests, the overlay's copy button).
+/// Put text on the clipboard (tests, the overlay's copy button). A copy
+/// the user asked for is never undone by a pending restore.
 pub fn set_clipboard_text(text: &str) -> Result<(), String> {
+    let mut slot = RESTORE
+        .lock()
+        .map_err(|_| "clipboard lock poisoned".to_string())?;
+    slot.pending = None;
+    slot.generation = slot.generation.wrapping_add(1);
     with_clipboard(|cb| cb.set_text(text.to_owned()).map_err(|e| e.to_string()))
+}
+
+/// The text was left on the clipboard on purpose: nothing is restored.
+fn forget_restore(generation: u64) {
+    if let Ok(mut slot) = RESTORE.lock() {
+        if slot.generation == generation {
+            slot.pending = None;
+        }
+    }
 }
 
 /// Put an image on the clipboard (tests).
@@ -245,17 +284,57 @@ fn save_clipboard() -> Option<Saved> {
         if let Ok(t) = cb.get_text() {
             return Ok(Some(Saved::Text(t)));
         }
-        Ok(Some(cb.get_image().map_or(Saved::Empty, Saved::Image)))
+        Ok(Some(cb.get_image().map_or(Saved::Unreadable, Saved::Image)))
     })
     .ok()
     .flatten()
 }
 
-fn restore_later(saved: Saved, dictated: String, delay_ms: u64) {
+/// Save the clipboard and put `text` on it, as one step against other
+/// injections. Returns the generation that owns the restore, if any.
+fn save_and_set(text: &str, save: bool) -> Result<Option<u64>, String> {
+    let mut slot = RESTORE
+        .lock()
+        .map_err(|_| "clipboard lock poisoned".to_string())?;
+    let saved = if save {
+        match slot.pending.take() {
+            // The clipboard still holds the previous dictation: what was
+            // there before it is the real original.
+            Some(p) if clipboard_text().as_deref() == Some(p.dictated.as_str()) => Some(p.saved),
+            _ => save_clipboard(),
+        }
+    } else {
+        // A newer injection that does not restore leaves the clipboard
+        // as it sets it; an older restore must not undo that.
+        slot.pending = None;
+        None
+    };
+    slot.generation = slot.generation.wrapping_add(1);
+    with_clipboard(|cb| set_text_excluded(cb, text))?;
+    Ok(saved.map(|saved| {
+        slot.pending = Some(PendingRestore {
+            saved,
+            dictated: text.to_owned(),
+        });
+        slot.generation
+    }))
+}
+
+fn restore_later(generation: u64, delay_ms: u64) {
     let spawned = std::thread::Builder::new()
         .name("clipboard-restore".into())
         .spawn(move || {
             std::thread::sleep(Duration::from_millis(delay_ms));
+            let Ok(mut slot) = RESTORE.lock() else {
+                return;
+            };
+            // A newer injection owns the restore now.
+            if slot.generation != generation {
+                return;
+            }
+            let Some(PendingRestore { saved, dictated }) = slot.pending.take() else {
+                return;
+            };
             let result = with_clipboard(|cb| {
                 // The user may have copied something else meanwhile.
                 if cb.get_text().ok().as_deref() != Some(dictated.as_str()) {
@@ -264,7 +343,7 @@ fn restore_later(saved: Saved, dictated: String, delay_ms: u64) {
                 match saved {
                     Saved::Text(t) => cb.set_text(t),
                     Saved::Image(i) => cb.set_image(i),
-                    Saved::Empty => cb.clear(),
+                    Saved::Unreadable => Ok(()),
                 }
                 .map_err(|e| e.to_string())
             });
@@ -297,14 +376,13 @@ pub fn inject(text: &str, opts: &InjectOptions) -> Result<Outcome, String> {
         return Ok(Outcome::Typed);
     }
 
-    let saved = if opts.restore_clipboard && opts.method != PasteMethod::ClipboardOnly {
-        save_clipboard()
-    } else {
-        None
-    };
-    with_clipboard(|cb| set_text_excluded(cb, text))?;
+    let restore = opts.restore_clipboard && opts.method != PasteMethod::ClipboardOnly;
+    let saved = save_and_set(text, restore)?;
 
     let Some(chord) = chord_for(opts.method, &opts.target_process) else {
+        if let Some(generation) = saved {
+            forget_restore(generation);
+        }
         return Ok(Outcome::CopiedOnly { reason: None });
     };
     std::thread::sleep(Duration::from_millis(20));
@@ -313,19 +391,22 @@ pub fn inject(text: &str, opts: &InjectOptions) -> Result<Outcome, String> {
         Err(PasteError::Unavailable(reason)) => {
             // No way to send keys (for example Wayland without a virtual
             // keyboard): leave the text on the clipboard and say so.
+            if let Some(generation) = saved {
+                forget_restore(generation);
+            }
             return Ok(Outcome::CopiedOnly {
                 reason: Some(reason),
             });
         }
         Err(PasteError::Failed(e)) => {
-            if let Some(s) = saved {
-                restore_later(s, text.to_string(), 0);
+            if let Some(generation) = saved {
+                restore_later(generation, 0);
             }
             return Err(e);
         }
     }
-    if let Some(s) = saved {
-        restore_later(s, text.to_string(), opts.restore_delay_ms);
+    if let Some(generation) = saved {
+        restore_later(generation, opts.restore_delay_ms);
     }
     Ok(Outcome::Pasted)
 }

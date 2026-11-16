@@ -1,6 +1,6 @@
 // General page -- launch at login, theme, privacy and About
 import { useEffect, useState } from "react";
-import { aboutInfo, diagnostics, openReleases, type AboutInfo } from "@/lib/commands/system";
+import { aboutInfo, copyDiagnostics, openReleases, type AboutInfo } from "@/lib/commands/system";
 import { resetAllSettings } from "@/lib/commands/settings";
 import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -47,10 +47,9 @@ function About() {
       .catch((err: unknown) => setError(errorText(err)));
   }, []);
 
-  const copyDiagnostics = () => {
+  const onCopyDiagnostics = () => {
     setError(null);
-    diagnostics()
-      .then((text) => navigator.clipboard.writeText(text))
+    copyDiagnostics()
       .then(() => {
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1500);
@@ -71,7 +70,7 @@ function About() {
       <Row label="Version" detail={info && <span className="font-mono text-[11.5px]">{info.version}</span>} error={error}>
         <span className="flex gap-2">
           <Button onClick={() => openReleases().catch((err: unknown) => setError(errorText(err)))}>Releases</Button>
-          <Button onClick={copyDiagnostics} className="min-w-[116px]" title="OS, CPU, memory, model and timings. Never dictated text.">
+          <Button onClick={onCopyDiagnostics} className="min-w-[116px]" title="OS, CPU, memory, model and timings. Never dictated text.">
             {copied ? "Copied" : "Copy diagnostics"}
           </Button>
         </span>
