@@ -10,9 +10,13 @@ on:
 permissions:
   contents: read
 
+# The workflow name is part of the group: when release.yml calls this file,
+# github.workflow is "Release", so a release run never cancels the push run
+# on the same ref (or the other way round). Runs on main and on tags are
+# never cancelled, so every commit there gets a complete result.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -108,7 +112,7 @@ jobs:
             librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev
 
       - name: Cache models
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/models
           key: models-${{ hashFiles('src-tauri/models.json') }}-parakeet-110m
@@ -146,7 +150,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -173,7 +177,7 @@ jobs:
             librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev xvfb xdotool dbus
 
       - name: Cache models
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ github.workspace }}/../models
           key: models-${{ runner.os }}-${{ hashFiles('src-tauri/models.json') }}-parakeet-110m
