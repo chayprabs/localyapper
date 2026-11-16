@@ -53,7 +53,10 @@ function Entry({ entry, onDelete }: { entry: HistoryEntry; onDelete: (id: string
           // Dragging to select text ends in a click too; leave the text as it is.
           if (window.getSelection()?.isCollapsed !== false) setOpen((v) => !v);
         }}
-        className={cn("selectable min-w-0 flex-1 text-[13px] leading-5 text-ink/90", !open && "line-clamp-2")}
+        className={cn(
+          "selectable min-w-0 flex-1 whitespace-pre-wrap break-words text-[13px] leading-5 text-ink/90",
+          !open && "line-clamp-2",
+        )}
       >
         {entry.final_text}
       </p>
@@ -157,10 +160,13 @@ export function HistoryPage() {
   };
 
   const noModel = app.modelFileStatus !== null && !app.modelFileStatus.exists;
+  const model = app.modelFileStatus;
   const status: ReactNode = noModel ? (
     <>
-      No speech model
-      <Button onClick={() => setActivePage("voice")}>Download</Button>
+      {model?.model_name ? `${model.model_name} not downloaded` : "No speech model"}
+      <Button title={model?.size_mb ? `About ${model.size_mb} MB` : undefined} onClick={() => setActivePage("voice")}>
+        Download
+      </Button>
     </>
   ) : paused ? (
     "Paused"

@@ -1,12 +1,13 @@
-// Wizard hotkey configuration -- set primary recording shortcut
+// Wizard hotkey configuration -- set and test the record shortcut
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { setHotkeyProbe, updateHotkey } from "@/lib/commands/hotkeys";
 import { useHotkeyCapture } from "@/hooks/useHotkeyCapture";
 import { Button } from "@/components/ui/Button";
 import { Keys } from "@/components/ui/Keys";
+import { Notice } from "@/components/settings/controls";
 import { cn } from "@/lib/utils";
-import { Step } from "./Step";
+import { Actions, Step } from "./Step";
 
 export function HotkeyStep({
   hotkey,
@@ -21,39 +22,53 @@ export function HotkeyStep({
   const [detected, setDetected] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
   const fieldRef = useRef<HTMLButtonElement>(null);
+  const capturingRef = useRef(false);
+  capturingRef.current = capturing;
 
-  // Register the hotkey now and listen for it globally. While the probe
-  // is on, presses only report detection and start no dictation.
+  // Make sure the current hotkey is registered, so a key another app
+  // already holds is reported here and not discovered later.
+  const initialHotkey = useRef(hotkey);
   useEffect(() => {
     let cancelled = false;
-    setDetected(false);
-    updateHotkey("hotkey_record", hotkey)
-      .then(() => {
-        if (!cancelled) setRegisterError(null);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) setRegisterError(String(error));
-      });
+    updateHotkey("hotkey_record", initialHotkey.current).catch((error: unknown) => {
+      if (!cancelled) setRegisterError(String(error));
+    });
     return () => {
       cancelled = true;
     };
-  }, [hotkey]);
+  }, []);
 
+  // While the probe is on, presses of the record key only report that
+  // they were seen and start no dictation.
   useEffect(() => {
     void setHotkeyProbe(true);
-    const unlisten = listen("hotkey-detected", () => setDetected(true));
+    const unlisten = listen("hotkey-detected", () => {
+      if (!capturingRef.current) setDetected(true);
+    });
     return () => {
       void setHotkeyProbe(false);
       void unlisten.then((stop) => stop());
     };
   }, []);
 
+  // A new combo replaces the old one only once it is registered. When it
+  // cannot be (in use elsewhere, or already another LocalYapper hotkey)
+  // the previous key stays and the reason is shown.
   const handleCapture = useCallback(
     (shortcut: string) => {
-      onHotkeyChange(shortcut);
       setCapturing(false);
+      if (shortcut === hotkey) return;
+      setRegisterError(null);
+      updateHotkey("hotkey_record", shortcut)
+        .then(() => {
+          setDetected(false);
+          onHotkeyChange(shortcut);
+        })
+        .catch((error: unknown) => {
+          setRegisterError(String(error));
+        });
     },
-    [onHotkeyChange],
+    [hotkey, onHotkeyChange],
   );
   const handleCancel = useCallback(() => setCapturing(false), []);
   useHotkeyCapture(capturing, fieldRef, handleCapture, handleCancel);
@@ -76,14 +91,24 @@ export function HotkeyStep({
         )}
       </button>
 
-      <p role="status" className={cn("flex h-5 items-center gap-2.5 text-[13px]", registerError ? "text-signal" : "text-ink/90")}>
-        {!registerError && <span className={cn("h-1.5 w-1.5 rounded-full", detected ? "bg-ink" : "border border-ink/30")} />}
-        {registerError ? registerError : detected ? "Detected" : "Not pressed yet"}
+      {registerError && <Notice>{registerError}. Choose a different key.</Notice>}
+      <p role="status" className="flex h-5 items-center gap-2.5 text-[13px] text-ink/90">
+        <span className={cn("h-1.5 w-1.5 rounded-full", detected ? "bg-ink" : "border border-ink/30")} />
+        {detected ? "Detected" : "Not pressed yet"}
       </p>
 
-      <Button variant="primary" size="lg" onClick={onContinue} disabled={!detected}>
-        Continue
-      </Button>
+      <Actions>
+        <Button variant="primary" size="lg" onClick={onContinue} disabled={!detected}>
+          Continue
+        </Button>
+        {/* Never a dead end: some desktops (Wayland without the shortcuts
+            portal) cannot deliver a global key at all. */}
+        {!detected && (
+          <Button variant="ghost" size="lg" onClick={onContinue}>
+            Skip test
+          </Button>
+        )}
+      </Actions>
     </Step>
   );
 }

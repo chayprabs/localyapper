@@ -15,11 +15,15 @@ export function CopyButton({ text, label = "Copy", className }: { text: string; 
   }, []);
 
   const handleCopy = useCallback(() => {
-    void navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      if (timer.current !== null) window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => setCopied(false), 1200);
-    });
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(true);
+        if (timer.current !== null) window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(() => setCopied(false), 1200);
+      })
+      // No tick when nothing was copied.
+      .catch((error: unknown) => console.error("Copy failed:", error));
   }, [text]);
 
   return (

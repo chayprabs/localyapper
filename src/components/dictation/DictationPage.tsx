@@ -68,7 +68,13 @@ function CustomPosition() {
     if (b !== undefined && Number.isFinite(b)) setY(b);
   }, [value]);
   if (position.value !== "custom") return null;
-  const commit = (nx: number, ny: number) => save(`${(nx / 100).toFixed(2)},${(ny / 100).toFixed(2)}`);
+  const commit = (nx: number, ny: number) => {
+    // Nothing to save when a slider was touched but not moved; saving would
+    // also round away the exact spot the pill was dragged to.
+    const [a, b] = (value ?? "").split(",").map((v) => Math.round(Number(v) * 100));
+    if (a === nx && b === ny) return;
+    save(`${(nx / 100).toFixed(4)},${(ny / 100).toFixed(4)}`);
+  };
   return (
     <div className="flex animate-fade-in items-center gap-5 py-3">
       <div aria-hidden="true" className="relative h-[60px] w-[96px] shrink-0 rounded-[4px] border border-ink/25">
@@ -141,6 +147,7 @@ export function DictationPage() {
         <SegmentedSetting
           k="overlay_position"
           label="Position"
+          hint="You can also drag the pill while it is showing."
           options={[
             { value: "bottom_center", label: "Bottom" },
             { value: "top_center", label: "Top" },

@@ -31,8 +31,8 @@ an action, it is not there.
   620 px at most.
 - **Wizard**: a left-aligned column with a step counter; one title, one
   sentence, the control, the buttons.
-- **Overlay**: a flat near-black capsule (its window is transparent, so it
-  is the same in both themes). Red bars while recording.
+- **Overlay**: a flat capsule in the app's colours, following the theme
+  setting. Red bars while recording; the pill can be dragged.
 
 ## Tokens
 

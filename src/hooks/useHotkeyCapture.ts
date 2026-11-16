@@ -1,7 +1,7 @@
 // While active, the next key combination is captured as a shortcut. Escape
 // or a click outside `containerRef` cancels.
 import { useEffect, type RefObject } from "react";
-import { eventToShortcut } from "@/lib/hotkeyFormat";
+import { eventToShortcut } from "@/lib/hotkeyCapture";
 
 export function useHotkeyCapture(
   active: boolean,

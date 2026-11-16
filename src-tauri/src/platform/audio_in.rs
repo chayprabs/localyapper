@@ -43,7 +43,10 @@ enum Cmd {
         on_error: ErrorFn,
         reply: mpsc::Sender<Result<Capture, String>>,
     },
-    Stop,
+    /// Stop the capture that was started with this `stopped` flag, and
+    /// no other: a late stop for an old recording must never end the
+    /// next one.
+    Stop(Arc<AtomicBool>),
     Shutdown,
 }
 
@@ -74,23 +77,44 @@ impl AudioThread {
         on_error: ErrorFn,
     ) -> Result<Capture, String> {
         let (reply, rx) = mpsc::channel();
-        self.tx
-            .send(Cmd::Start {
-                device: device.to_string(),
-                stopped,
-                on_error,
-                reply,
-            })
-            .map_err(|_| "the audio thread has stopped".to_string())?;
-        rx.recv_timeout(Duration::from_secs(5))
-            .map_err(|_| "the microphone did not start in time".to_string())?
+        let flag = send_start(&self.tx, device, stopped, on_error, reply)?;
+        match rx.recv_timeout(Duration::from_secs(5)) {
+            Ok(result) => result,
+            Err(_) => {
+                // The device may still open later; make sure it is closed
+                // again instead of leaving the microphone on.
+                self.stop_capture(&flag);
+                Err("the microphone did not start in time".to_string())
+            }
+        }
     }
 
-    /// Stop the current stream. The `stopped` flag given to `start` is set
-    /// once the stream has been dropped.
-    pub fn stop(&self) {
-        let _ = self.tx.send(Cmd::Stop);
+    /// Stop the capture started with this `stopped` flag, and no other.
+    /// The flag is set once the stream has been dropped. A stop that
+    /// arrives before its start has been handled finds nothing; whoever
+    /// started the capture then stops it once `start` returns.
+    pub fn stop_capture(&self, stopped: &Arc<AtomicBool>) {
+        let _ = self.tx.send(Cmd::Stop(stopped.clone()));
     }
+}
+
+/// Send the start command and hand back the capture's flag.
+fn send_start(
+    tx: &mpsc::Sender<Cmd>,
+    device: &str,
+    stopped: Arc<AtomicBool>,
+    on_error: ErrorFn,
+    reply: mpsc::Sender<Result<Capture, String>>,
+) -> Result<Arc<AtomicBool>, String> {
+    let flag = stopped.clone();
+    tx.send(Cmd::Start {
+        device: device.to_string(),
+        stopped,
+        on_error,
+        reply,
+    })
+    .map_err(|_| "the audio thread has stopped".to_string())?;
+    Ok(flag)
 }
 
 impl Drop for AudioThread {
@@ -154,9 +178,14 @@ fn run(rx: mpsc::Receiver<Cmd>) {
                     }
                 }
             }
-            Cmd::Stop => {
-                if let Some(a) = active.take() {
-                    a.finish();
+            Cmd::Stop(target) => {
+                let matches = active
+                    .as_ref()
+                    .is_some_and(|a| Arc::ptr_eq(&a.stopped, &target));
+                if matches {
+                    if let Some(a) = active.take() {
+                        a.finish();
+                    }
                 }
             }
             Cmd::Shutdown => break,

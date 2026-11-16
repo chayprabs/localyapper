@@ -1,9 +1,33 @@
-/* Overlay pill. Plain CSS: the overlay page loads no framework. The window
-   is transparent, so the pill is a flat near-black capsule that reads on
-   any desktop, in either theme. Red marks recording. */
+/* Overlay pill. Plain CSS: the overlay page loads no framework. A flat
+   capsule in the app's colours; it follows the theme setting like the
+   settings window ("system" follows the OS, data-theme on <html> forces
+   light or dark). Red marks recording and errors. */
 :root {
+  --bg: #fcfcfa;
+  --fg: #141413;
+  --muted: rgba(20, 20, 19, 0.58);
+  --edge: rgba(20, 20, 19, 0.2);
+  --faint: rgba(20, 20, 19, 0.16);
+  --signal: #cc261c;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121211;
+    --fg: #f2f2ee;
+    --muted: rgba(242, 242, 238, 0.6);
+    --edge: rgba(255, 255, 255, 0.18);
+    --faint: rgba(255, 255, 255, 0.2);
+    --signal: #ff6358;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121211;
   --fg: #f2f2ee;
   --muted: rgba(242, 242, 238, 0.6);
+  --edge: rgba(255, 255, 255, 0.18);
+  --faint: rgba(255, 255, 255, 0.2);
   --signal: #ff6358;
   color-scheme: dark;
 }
@@ -35,9 +59,15 @@ body {
   padding: 8px 14px;
   border-radius: 18px;
   color: var(--fg);
-  background: #121211;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: var(--bg);
+  border: 1px solid var(--edge);
   transition: opacity 120ms ease-out;
+  /* The pill can be dragged to a new place. */
+  cursor: grab;
+  touch-action: none;
+}
+.pill.dragging {
+  cursor: grabbing;
 }
 .pill[data-kind="hidden"] {
   opacity: 0;
@@ -66,7 +96,7 @@ body {
   width: 12px;
   height: 12px;
   box-sizing: border-box;
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border: 1.5px solid var(--faint);
   border-top-color: var(--fg);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -100,14 +130,21 @@ body {
 .pill[data-kind="error"] .text {
   display: none;
 }
-/* At most three lines, so the pill always fits its window. */
-.pill[data-kind="error"] .label {
-  color: var(--signal);
+/* Errors and notices wrap to at most three lines, so the pill always
+   fits its window. */
+.pill[data-kind="error"] .label,
+.pill[data-kind="notice"] .label {
   white-space: normal;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   overflow: hidden;
+}
+.pill[data-kind="error"] .label {
+  color: var(--signal);
+}
+.pill[data-kind="notice"] .label {
+  color: var(--fg);
 }
 .actions {
   display: none;
@@ -128,12 +165,12 @@ button {
   padding: 0 8px;
   color: var(--fg);
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid var(--edge);
   border-radius: 6px;
   cursor: pointer;
 }
 button:hover {
-  border-color: rgba(255, 255, 255, 0.6);
+  border-color: var(--muted);
 }
 #dismiss {
   width: 22px;

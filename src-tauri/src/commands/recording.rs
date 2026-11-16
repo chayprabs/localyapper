@@ -39,6 +39,22 @@ pub async fn overlay_dismiss(state: tauri::State<'_, AppState>) -> Result<(), St
     Ok(())
 }
 
+/// The pill is being dragged: `start` when it is pressed, `move` as the
+/// cursor moves, `end` when it is let go. The window follows the cursor
+/// and its new place is saved as the custom overlay position.
+#[tauri::command]
+pub fn overlay_drag(app: tauri::AppHandle, phase: String) {
+    use crate::platform::overlay::webview;
+    let handle = app.clone();
+    // Window geometry is main-thread work.
+    let _ = app.run_on_main_thread(move || match phase.as_str() {
+        "start" => webview::drag_start(&handle),
+        "move" => webview::drag_move(&handle),
+        "end" => webview::finish_drag(&handle),
+        _ => {}
+    });
+}
+
 /// The view the overlay should show now. The page asks once when it loads,
 /// so a view sent before its listener existed is not lost.
 #[tauri::command]

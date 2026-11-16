@@ -11,7 +11,7 @@ import {
 } from "@/lib/commands/models";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { errorText, Notice, Row, Section } from "@/components/settings/controls";
+import { errorText, Notice, Row, Section, Spinner } from "@/components/settings/controls";
 import { cn } from "@/lib/utils";
 
 interface Progress {
@@ -127,8 +127,13 @@ export function Models() {
             }
           >
             <span className="flex items-center gap-1">
-              {working ? (
+              {working && m.state !== "installed" ? (
                 <Button onClick={() => void cancelModelDownload()}>Cancel</Button>
+              ) : working ? (
+                <span className="flex h-7 items-center gap-2 px-1 text-[12.5px] text-ink/50">
+                  <Spinner size={12} />
+                  Working
+                </span>
               ) : m.state === "installed" ? (
                 <>
                   {!m.active && (
@@ -136,6 +141,16 @@ export function Models() {
                       Use
                     </Button>
                   )}
+                  {/* Checks every file against its checksum and fetches
+                      again only what is missing or damaged. */}
+                  <Button
+                    variant="ghost"
+                    title="Check the downloaded files and repair them if needed"
+                    disabled={busy !== null}
+                    onClick={() => void run(m.id, () => downloadModel(m.id))}
+                  >
+                    Check
+                  </Button>
                   <IconButton
                     label={`Delete ${m.name}`}
                     tone="danger"

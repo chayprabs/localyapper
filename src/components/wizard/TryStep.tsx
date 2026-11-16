@@ -7,7 +7,16 @@ import { Keys } from "@/components/ui/Keys";
 import { Notice } from "@/components/settings/controls";
 import { Step } from "./Step";
 
-export function TryStep({ hotkey, onContinue }: { hotkey: string; onContinue: () => void }) {
+export function TryStep({
+  hotkey,
+  filesInstalled,
+  onContinue,
+}: {
+  hotkey: string;
+  /** Whether the speech model is downloaded; without it nothing can arrive. */
+  filesInstalled: boolean;
+  onContinue: () => void;
+}) {
   const [text, setText] = useState("");
   const [attempts, setAttempts] = useState(0);
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -15,7 +24,7 @@ export function TryStep({ hotkey, onContinue }: { hotkey: string; onContinue: ()
   useEffect(() => {
     boxRef.current?.focus();
     // Each finished dictation reports its timings; if no text arrived
-    // shortly after, the hint below explains what to check.
+    // shortly after, the note below explains what to check.
     const unlisten = listen("dictation-timings", () => {
       window.setTimeout(() => setAttempts((n) => n + 1), 400);
     });
@@ -44,11 +53,16 @@ export function TryStep({ hotkey, onContinue }: { hotkey: string; onContinue: ()
         aria-label="Try dictation here"
         className="selectable w-full resize-none rounded-md border border-ink/20 bg-transparent px-3 py-2 text-[13px] leading-5 text-ink/90 outline-none transition-colors focus:border-ink/70"
       />
-      {failedOnce && (
-        <Notice tone="note">
-          Nothing arrived. Click in the box and try again.
-          {isMacPlatform && " LocalYapper also needs Accessibility access to paste."}
-        </Notice>
+      {!filesInstalled ? (
+        <Notice>No speech model yet, so nothing can arrive. Go back one step to download it, or get it later under Voice.</Notice>
+      ) : (
+        failedOnce && (
+          <Notice tone="note">
+            Nothing arrived. Click in the box and try again.
+            {isMacPlatform && " LocalYapper also needs Accessibility access to paste."} The overlay shows the reason
+            if dictation failed.
+          </Notice>
+        )
       )}
       <Button variant={worked ? "primary" : "outline"} size="lg" onClick={onContinue}>
         {worked ? "Continue" : "Skip"}
